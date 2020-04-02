@@ -140,6 +140,11 @@ public class BigIntegerContext {
       BigInteger b = new BigInteger(new int[] {0x00000000, 0x00000000, 0x00000000, 0xfb3cfbbb});
 
       expect(a.unsigned_left_shift(0x60).equals(b), true);
+      expect(a.mutating_unsigned_left_shift(0x60).equals(b), true);
+
+      BigInteger d = new BigInteger(0x55286f184fddfcL);
+      BigInteger e = new BigInteger(0xaa50de309fbbf8L);
+      expect(d.mutating_unsigned_left_shift().equals(e), true);
     }
   }
 
@@ -222,6 +227,7 @@ public class BigIntegerContext {
       BigInteger c = new BigInteger(new int[] {0x27f7abfd, 0xfff67d7f, 0x8adbefdb, 0xffe4a6a7});
 
       expect(a.or(b).equals(c), true);
+      expect(a.mutating_or(b).equals(c), true);
     }
   }
 

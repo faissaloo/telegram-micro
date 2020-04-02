@@ -13,8 +13,8 @@ public class TestSuite {
     TestRunner.register(new BigIntegerContext.NegateTest());
     TestRunner.register(new BigIntegerContext.SubtractTest());
     TestRunner.register(new BigIntegerContext.UnsignedDivideModuloTest());
-    TestRunner.register(new BigIntegerContext.UnsignedRightShiftTest());
     TestRunner.register(new BigIntegerContext.UnsignedLeftShiftTest());
+    TestRunner.register(new BigIntegerContext.UnsignedRightShiftTest());
     TestRunner.register(new BigIntegerContext.UnsignedLongMultiplyTest());
     TestRunner.register(new BigIntegerContext.AndTest());
     TestRunner.register(new BigIntegerContext.OrTest());
@@ -26,6 +26,6 @@ public class TestSuite {
 
     TestRunner.register(new PrimeDecomposerContext.LimitedPolynomialTest());
     TestRunner.register(new PrimeDecomposerContext.EuclidianGreatestCommonDenominatorTest());
-    TestRunner.register(new PrimeDecomposerContext.DecomposeTest());
+    TestRunner.register(new PrimeDecomposerContext.DecomposeTest()); //Warning: EXTREMELY SLOW, 30 mins+
   }
 }

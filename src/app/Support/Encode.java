@@ -25,25 +25,23 @@ public class Encode {
   }
 
   public static byte[] biginteger_encode(BigInteger to_encode) {
-    int[] representation = to_encode.representation();
-
     return new byte[] {
-      (byte) (representation[0]&0xFF),
-      (byte) ((representation[0]&0xFF00) >> 8),
-      (byte) ((representation[0]&0xFF0000) >> 16),
-      (byte) ((representation[0]&0xFF000000) >> 24),
-      (byte) (representation[1]&0xFF),
-      (byte) ((representation[1]&0xFF00) >> 8),
-      (byte) ((representation[1]&0xFF0000) >> 16),
-      (byte) ((representation[1]&0xFF000000) >> 24),
-      (byte) (representation[2]&0xFF),
-      (byte) ((representation[2]&0xFF00) >> 8),
-      (byte) ((representation[2]&0xFF0000) >> 16),
-      (byte) ((representation[2]&0xFF000000) >> 24),
-      (byte) (representation[3]&0xFF),
-      (byte) ((representation[3]&0xFF00) >> 8),
-      (byte) ((representation[3]&0xFF0000) >> 16),
-      (byte) ((representation[3]&0xFF000000) >> 24),
+      (byte) (to_encode.representation_0&0xFF),
+      (byte) ((to_encode.representation_0&0xFF00) >> 8),
+      (byte) ((to_encode.representation_0&0xFF0000) >> 16),
+      (byte) ((to_encode.representation_0&0xFF000000) >> 24),
+      (byte) (to_encode.representation_1&0xFF),
+      (byte) ((to_encode.representation_1&0xFF00) >> 8),
+      (byte) ((to_encode.representation_1&0xFF0000) >> 16),
+      (byte) ((to_encode.representation_1&0xFF000000) >> 24),
+      (byte) (to_encode.representation_2&0xFF),
+      (byte) ((to_encode.representation_2&0xFF00) >> 8),
+      (byte) ((to_encode.representation_2&0xFF0000) >> 16),
+      (byte) ((to_encode.representation_2&0xFF000000) >> 24),
+      (byte) (to_encode.representation_3&0xFF),
+      (byte) ((to_encode.representation_3&0xFF00) >> 8),
+      (byte) ((to_encode.representation_3&0xFF0000) >> 16),
+      (byte) ((to_encode.representation_3&0xFF000000) >> 24),
     };
   }
 }

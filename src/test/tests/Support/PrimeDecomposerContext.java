@@ -2,6 +2,8 @@ package test;
 
 import mtproto.PrimeDecomposer;
 
+import support.BigInteger;
+
 public class PrimeDecomposerContext {
   public static class DecomposeTest extends Test {
     public String label() {
@@ -20,7 +22,7 @@ public class PrimeDecomposerContext {
       return "It can provide the limited polynomial";
     }
     public void test() throws TestFailureException {
-      long result = PrimeDecomposer.limited_polynomial(0x93a652c056cb728cL, 0x211cafa9555101f5L);
+      long result = PrimeDecomposer.limited_polynomial(0x93a652c056cb728cL, new BigInteger(0x211cafa9555101f5L));
       expect(result, 0xd5428d6f285c04dL);
     }
   }

@@ -10,6 +10,8 @@ public class TestRunner extends MIDlet {
   private Display display;
   private static Vector tests = new Vector();
   private static Vector failures = new Vector();
+  private static int skipped = 0;
+  private static boolean focus_mode = false;
 
   public TestRunner() {
     super();
@@ -27,16 +29,23 @@ public class TestRunner extends MIDlet {
   private void run_tests() {
     System.out.println();
     System.out.println("[TestRunner]");
-    System.out.println("Running "+Integer.toString(tests.size())+" tests");
+    System.out.println("Loaded "+Integer.toString(tests.size())+" tests");
 
     for (int i = 0; i < tests.size(); i++) {
       Test current_test = (Test)tests.elementAt(i);
-      try {
-        current_test.run_tests();
-        System.out.println(" ✔ " +current_test.label());
-      } catch (Exception exception) {
-        failures.addElement(new TestFailure(current_test, exception));
-        System.out.println(" ✗ " +current_test.label());
+      if ((!focus_mode) || current_test.focused()) {
+        try {
+          current_test.run_tests();
+          System.out.println(" ✔ " +current_test.label());
+        } catch (Exception exception) {
+          failures.addElement(new TestFailure(current_test, exception));
+          System.out.println(" ✗ " +current_test.label());
+        }
+      }
+
+      if (current_test.skipped() || (focus_mode && !current_test.focused())) {
+        skipped++;
+        System.out.println(" - " +current_test.label());
       }
     }
 
@@ -45,11 +54,12 @@ public class TestRunner extends MIDlet {
   }
 
   private String pass_fail_string() {
-    return "(" + Integer.toString(tests.size()-failures.size()) + "/" + Integer.toString(tests.size()) + ")";
+    return "(" + Integer.toString(tests.size()-failures.size()-skipped) + "/" + Integer.toString(tests.size()-skipped) + ")";
   }
 
   private void print_conclusion() {
     System.out.println();
+    print_skipped();
     if (failures.size() == 0) {
       System.out.println(pass_fail_string() + " Test suite passed!");
     } else {
@@ -68,6 +78,12 @@ public class TestRunner extends MIDlet {
     }
   }
 
+  private void print_skipped() {
+    if (skipped > 0) {
+      System.out.println(Integer.toString(skipped)+" tests skipped");
+    }
+  }
+
   public void pauseApp() {}
 
   public void destroyApp(boolean unconditional) {
@@ -75,6 +91,7 @@ public class TestRunner extends MIDlet {
   }
 
   public static void register(Test test) {
+    focus_mode |= test.focused();
     tests.addElement(test);
   }
 }

@@ -2,6 +2,8 @@ package test;
 
 public class TestSuite {
   public static void register_all_tests() {
+    TestRunner.register(new AES256IGEContext.SubBytesTest());
+
     TestRunner.register(new BigIntegerContext.HexTest());
     TestRunner.register(new BigIntegerContext.EqualTest());
     TestRunner.register(new BigIntegerContext.UnsignedGreaterThanTest());
@@ -26,6 +28,6 @@ public class TestSuite {
 
     TestRunner.register(new PrimeDecomposerContext.LimitedPolynomialTest());
     TestRunner.register(new PrimeDecomposerContext.EuclidianGreatestCommonDenominatorTest());
-    TestRunner.register(new PrimeDecomposerContext.DecomposeTest()); //Warning: EXTREMELY SLOW, 30 mins+
+    //TestRunner.register(new PrimeDecomposerContext.DecomposeTest()); //Warning: SLOW, ~4 mins
   }
 }

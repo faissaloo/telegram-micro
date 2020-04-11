@@ -4,6 +4,7 @@ public class TestSuite {
   public static void register_all_tests() {
     TestRunner.register(new AES256IGEContext.SubBytesTest());
     TestRunner.register(new AES256IGEContext.MixColumnsTest());
+    TestRunner.register(new AES256IGEContext.ShiftRowsTest());
 
     TestRunner.register(new BigIntegerContext.HexTest());
     TestRunner.register(new BigIntegerContext.EqualTest());

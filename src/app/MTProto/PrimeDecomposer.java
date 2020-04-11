@@ -28,7 +28,7 @@ public class PrimeDecomposer {
     }
   }
 
-  public static long limited_polynomial(long current_value, BigInteger big_limit) {
+  public static long finite_ring(long current_value, BigInteger big_limit) {
     return BigInteger
       .unsigned_long_multiply(current_value, current_value)
       .unsigned_modulo(big_limit)
@@ -62,12 +62,12 @@ public class PrimeDecomposer {
       while (nontrivial_denominator == 1L) {
         slow_pointer = fast_pointer;
         for (long i = 0L; i < search_range; i++) {
-          fast_pointer = limited_polynomial(fast_pointer, big_to_factorise);
+          fast_pointer = finite_ring(fast_pointer, big_to_factorise);
         }
         already_searched = 0L;
         while (already_searched < search_range && nontrivial_denominator == 1L) {
           for (long i = 0L; i < Math.min(1L, search_range - already_searched); i++) {
-            fast_pointer = limited_polynomial(fast_pointer, big_to_factorise);
+            fast_pointer = finite_ring(fast_pointer, big_to_factorise);
             initial_guess = BigInteger
               .unsigned_long_multiply(initial_guess, Math.abs(slow_pointer-fast_pointer))
               .unsigned_modulo(big_to_factorise)
@@ -81,7 +81,7 @@ public class PrimeDecomposer {
 
       if (nontrivial_denominator == to_factorise) {
         while (true) {
-          fast_pointer = limited_polynomial(fast_pointer, big_to_factorise);
+          fast_pointer = finite_ring(fast_pointer, big_to_factorise);
           nontrivial_denominator = euclidian_greatest_common_denominator(Math.abs(slow_pointer - fast_pointer), to_factorise);
           if (nontrivial_denominator > 1L) {
             break;

@@ -28,7 +28,7 @@ public class TestSuite {
 
     TestRunner.register(new LongPlusContext.PowerTest());
 
-    TestRunner.register(new PrimeDecomposerContext.LimitedPolynomialTest());
+    TestRunner.register(new PrimeDecomposerContext.FiniteRingTest());
     TestRunner.register(new PrimeDecomposerContext.EuclidianGreatestCommonDenominatorTest());
     //TestRunner.register(new PrimeDecomposerContext.DecomposeTest()); //Warning: SLOW, ~4 mins
   }

@@ -17,12 +17,12 @@ public class PrimeDecomposerContext {
     }
   }
 
-  public static class LimitedPolynomialTest extends Test {
+  public static class FiniteRingTest extends Test {
     public String label() {
-      return "It can provide the limited polynomial";
+      return "It can provide the finite ring";
     }
     public void test() throws TestFailureException {
-      long result = PrimeDecomposer.limited_polynomial(0x93a652c056cb728cL, new BigInteger(0x211cafa9555101f5L));
+      long result = PrimeDecomposer.finite_ring(0x93a652c056cb728cL, new BigInteger(0x211cafa9555101f5L));
       expect(result, 0xd5428d6f285c04dL);
     }
   }

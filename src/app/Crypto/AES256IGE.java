@@ -21,11 +21,73 @@ public class AES256IGE {
     (byte)0x8c, (byte)0xa1, (byte)0x89, (byte)0x0d, (byte)0xbf, (byte)0xe6, (byte)0x42, (byte)0x68, (byte)0x41, (byte)0x99, (byte)0x2d, (byte)0x0f, (byte)0xb0, (byte)0x54, (byte)0xbb, (byte)0x16
   };
 
+  // Calculations are done in column major order, but the state is in the format
+  /*
+    a0, a1, a2, a3,
+    b0, b1, b2, b3,
+    c0, c1, c2, c3
+    d0, d1, d2, d3
+  */
   public byte[] state; //4x4 matrix
 
   public void substitute_bytes() {
-    for (int i = 0; i < state.length; i++) {
+    for (int i = 0; i < 16; i++) {
       state[i] = substitution_box[((int)state[i])&0xFF];
     }
+  }
+
+  public byte galois_field_multiply(byte multiplicand, byte multiplier) {
+    byte result = 0;
+    for (int i = 0; i < 8; i++) {
+      if ((multiplier & 1) != 0) {
+        result ^= multiplicand;
+      }
+      boolean hi_bit_set = (multiplicand & 0x80) != 0;
+      multiplicand <<= 1;
+      if (hi_bit_set) {
+        multiplicand ^= 0x1B;
+      }
+      multiplier >>>= 1;
+    }
+
+    return result;
+  }
+
+  public void mix_columns() {
+    byte[] new_state = new byte[] {
+      0,0,0,0,
+      0,0,0,0,
+      0,0,0,0,
+      0,0,0,0
+    };
+
+    for (int i = 0; i < 4; i++) {
+      new_state[0|(i<<2)] = (byte)(
+        galois_field_multiply((byte)0x02, state[0|(i<<2)]) ^
+        galois_field_multiply((byte)0x03, state[1|(i<<2)]) ^
+        state[2|(i<<2)] ^
+        state[3|(i<<2)]
+      );
+      new_state[1|(i<<2)] = (byte)(
+        state[0|(i<<2)] ^
+        galois_field_multiply((byte)0x02, state[1|(i<<2)]) ^
+        galois_field_multiply((byte)0x03, state[2|(i<<2)]) ^
+        state[3|(i<<2)]
+      );
+      new_state[2|(i<<2)] = (byte)(
+        state[0|(i<<2)] ^
+        state[1|(i<<2)] ^
+        galois_field_multiply((byte)0x02, state[2|(i<<2)]) ^
+        galois_field_multiply((byte)0x03, state[3|(i<<2)])
+      );
+      new_state[3|(i<<2)] = (byte)(
+        galois_field_multiply((byte)0x03, state[0|(i<<2)]) ^
+        state[1|(i<<2)] ^
+        state[2|(i<<2)] ^
+        galois_field_multiply((byte)0x02, state[3|(i<<2)])
+      );
+    }
+
+    state = new_state;
   }
 }

@@ -102,4 +102,8 @@ public class AES256IGE {
       state[12], state[9], state[6], state[3]
     };
   }
+
+  public byte[] generate_key_schedule(byte[] key) {
+    return key;
+  }
 }

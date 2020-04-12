@@ -69,6 +69,27 @@ public class AES256IGEContext {
     }
   }
 
+  public static class RotateLeftTest extends FocusedTest {
+    public String label() {
+      return "It can rotate a set of bytes";
+    }
+    public void test() throws TestFailureException {
+      AES256IGE subject = new AES256IGE();
+      byte[] result = subject.rotate_left(new byte[] { (byte)0x1, (byte)0x2, (byte)0x3, (byte)0x4 });
+      expect(result, new byte[] { (byte)0x2, (byte)0x3, (byte)0x4, (byte)0x1 });
+    }
+  }
+
+  public static class GaloisField2PowerTest extends FocusedTest {
+    public String label() {
+      return "It can exponentiate 2 within the galois field (aka 'rcon')";
+    }
+    public void test() throws TestFailureException {
+      AES256IGE subject = new AES256IGE();
+      expect(subject.galois_field_2_power((byte)0x69), (byte)4);
+    }
+  }
+
   //https://www.samiam.org/key-schedule.html
   public static class KeyScheduleTest extends FocusedTest {
     public String label() {

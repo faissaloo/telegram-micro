@@ -6,6 +6,8 @@ public class TestSuite {
     TestRunner.register(new AES256IGEContext.MixColumnsTest());
     TestRunner.register(new AES256IGEContext.ShiftRowsTest());
     TestRunner.register(new AES256IGEContext.KeyScheduleTest());
+    TestRunner.register(new AES256IGEContext.GaloisField2PowerTest());
+    TestRunner.register(new AES256IGEContext.RotateLeftTest());
 
     TestRunner.register(new BigIntegerContext.HexTest());
     TestRunner.register(new BigIntegerContext.EqualTest());

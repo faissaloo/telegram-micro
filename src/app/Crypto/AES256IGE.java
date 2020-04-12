@@ -50,9 +50,8 @@ public class AES256IGE {
       if (hi_bit_set) {
         multiplicand ^= 0x1B;
       }
-      multiplier >>>= 1;
+      multiplier = (byte)((((int)multiplier)&0xFF) >>> 1);
     }
-
     return result;
   }
 
@@ -104,6 +103,68 @@ public class AES256IGE {
   }
 
   public byte[] generate_key_schedule(byte[] key) {
-    return key;
+    byte[] new_key_schedule = new byte[240];
+    System.arraycopy(key, 0, new_key_schedule, 0, key.length);
+    byte[] t = new byte[4];
+    int c = 32;
+    int exponent = 1;
+
+    while (c < 240) {
+      /* Copy the temporary variable over */
+      for (int i = 0; i < 4; i++) {
+        t[i] = new_key_schedule[i + c - 4];
+      }
+      /* Every eight sets, do a complex calculation */
+      if (c % 32 == 0) {
+        t = schedule_core(t, exponent);
+        exponent++;
+      }
+      /* For 256-bit keys, we add an extra sbox to the
+      * calculation */
+      if (c % 32 == 16) {
+        for (int i = 0; i < 4; i++) {
+          t[i] = substitution_box[((int)t[i])&0xFF];
+        }
+      }
+      for (int i = 0; i < 4; i++) {
+        new_key_schedule[c] = (byte)(new_key_schedule[c - 32] ^ t[i]);
+        c++;
+      }
+    }
+
+    return new_key_schedule;
+  }
+
+  public byte[] schedule_core(byte[] in, int exponent) {
+        byte[] new_array = rotate_left(in);
+        /* Apply Rijndael's s-box on all 4 bytes */
+        for(int i = 0; i < 4; i++) {
+          new_array[i] = substitution_box[((int)new_array[i])&0xFF];
+        }
+        /* On just the first byte, add 2^i to the byte */
+        new_array[0] ^= galois_field_2_power(exponent);
+        return new_array;
+  }
+
+  //rcon
+  public byte galois_field_2_power(int exponent) {
+    byte power = 1;
+    if (exponent == 0) {
+      return 0;
+    }
+    while (exponent != 1) {
+      power = galois_field_multiply(power, (byte)2);
+      exponent--;
+    }
+    return power;
+  }
+
+  public byte[] rotate_left(byte[] in) {
+    byte[] new_array = new byte[in.length];
+    for (int i = 0; i < in.length-1; i++) {
+      new_array[i] = in[i + 1];
+    }
+    new_array[new_array.length-1] = in[0];
+    return new_array;
   }
 }

@@ -31,7 +31,9 @@ public class AES256IGE {
     Basically, columns are stored horizontally and rows are vertical
     It's weird I know
   */
+  public byte[] key_schedule;
   public byte[] state; //4x4 matrix
+  public int current_round=0;
 
   public void substitute_bytes() {
     for (int i = 0; i < 16; i++) {
@@ -102,9 +104,15 @@ public class AES256IGE {
     };
   }
 
-  public byte[] generate_key_schedule(byte[] key) {
-    byte[] new_key_schedule = new byte[240];
-    System.arraycopy(key, 0, new_key_schedule, 0, key.length);
+  public void add_round_key() {
+    for (int i = 0; i < state.length; i++) {
+      state[i] ^= key_schedule[current_round*16+i];
+    }
+   }
+
+  public void generate_key_schedule(byte[] key) {
+    key_schedule = new byte[240];
+    System.arraycopy(key, 0, key_schedule, 0, key.length);
     byte[] t = new byte[4];
     int c = 32;
     int exponent = 1;
@@ -112,7 +120,7 @@ public class AES256IGE {
     while (c < 240) {
       /* Copy the temporary variable over */
       for (int i = 0; i < 4; i++) {
-        t[i] = new_key_schedule[i + c - 4];
+        t[i] = key_schedule[i + c - 4];
       }
       /* Every eight sets, do a complex calculation */
       if (c % 32 == 0) {
@@ -127,12 +135,10 @@ public class AES256IGE {
         }
       }
       for (int i = 0; i < 4; i++) {
-        new_key_schedule[c] = (byte)(new_key_schedule[c - 32] ^ t[i]);
+        key_schedule[c] = (byte)(key_schedule[c - 32] ^ t[i]);
         c++;
       }
     }
-
-    return new_key_schedule;
   }
 
   public byte[] schedule_core(byte[] in, int exponent) {

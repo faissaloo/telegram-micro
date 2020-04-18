@@ -1,5 +1,7 @@
 package crypto;
 
+import java.lang.IllegalArgumentException;
+
 //https://en.wikipedia.org/wiki/Advanced_Encryption_Standard#Description_of_the_ciphers
 public class AES256IGE {
   public static final byte[] substitution_box = {
@@ -21,19 +23,17 @@ public class AES256IGE {
     (byte)0x8c, (byte)0xa1, (byte)0x89, (byte)0x0d, (byte)0xbf, (byte)0xe6, (byte)0x42, (byte)0x68, (byte)0x41, (byte)0x99, (byte)0x2d, (byte)0x0f, (byte)0xb0, (byte)0x54, (byte)0xbb, (byte)0x16
   };
 
-  // Calculations are done in column major order, but the state is in the format
-  /*
-    a0, a1, a2, a3,
-    b0, b1, b2, b3,
-    c0, c1, c2, c3
-    d0, d1, d2, d3
-
-    Basically, columns are stored horizontally and rows are vertical
-    It's weird I know
-  */
   public byte[] key_schedule;
-  public byte[] state; //4x4 matrix
-  public int current_round=0;
+  public byte[] state; //4x4 column major order matrix
+  public int current_round;
+
+  public AES256IGE(byte[] key) {
+    if (key.length == 32) {
+      generate_key_schedule(key);
+    } else {
+      throw new IllegalArgumentException("Key is of incorrect length, should be 32 bytes long but was "+Integer.toString(key.length));
+    }
+  }
 
   public void substitute_bytes() {
     for (int i = 0; i < 16; i++) {
@@ -58,12 +58,7 @@ public class AES256IGE {
   }
 
   public void mix_columns() {
-    byte[] new_state = new byte[] {
-      0,0,0,0,
-      0,0,0,0,
-      0,0,0,0,
-      0,0,0,0
-    };
+    byte[] new_state = new byte[16];
 
     for (int i = 0; i < 4; i++) {
       new_state[0|(i<<2)] = (byte)(
@@ -95,12 +90,13 @@ public class AES256IGE {
     state = new_state;
   }
 
+  //also sometimes called permutation
   public void shift_rows() {
     state = new byte[] {
-      state[0], state[13], state[10], state[7],
-      state[4], state[1], state[14], state[11],
-      state[8], state[5], state[2], state[15],
-      state[12], state[9], state[6], state[3]
+      state[0], state[5], state[10], state[15],
+      state[4], state[9], state[14], state[3],
+      state[8], state[13], state[2], state[7],
+      state[12], state[1], state[6], state[11]
     };
   }
 
@@ -139,17 +135,18 @@ public class AES256IGE {
         c++;
       }
     }
+    current_round = 0;
   }
 
   public byte[] schedule_core(byte[] in, int exponent) {
-        byte[] new_array = rotate_left(in);
-        /* Apply Rijndael's s-box on all 4 bytes */
-        for(int i = 0; i < 4; i++) {
-          new_array[i] = substitution_box[((int)new_array[i])&0xFF];
-        }
-        /* On just the first byte, add 2^i to the byte */
-        new_array[0] ^= galois_field_2_power(exponent);
-        return new_array;
+    byte[] new_array = rotate_left(in);
+    /* Apply Rijndael's s-box on all 4 bytes */
+    for(int i = 0; i < 4; i++) {
+      new_array[i] = substitution_box[((int)new_array[i])&0xFF];
+    }
+    /* On just the first byte, add 2^i to the byte */
+    new_array[0] ^= galois_field_2_power(exponent);
+    return new_array;
   }
 
   //rcon
@@ -172,5 +169,28 @@ public class AES256IGE {
     }
     new_array[new_array.length-1] = in[0];
     return new_array;
+  }
+
+  public byte[] encrypt_block(byte[] block) {
+    if (block.length == 16) {
+      state = new byte[16];
+      System.arraycopy(block, 0, state, 0, state.length);
+      add_round_key();
+      current_round++;
+      for (int i = 0; i < 13; i++) {
+        substitute_bytes();
+        shift_rows();
+        mix_columns();
+        add_round_key();
+        current_round++;
+      }
+      substitute_bytes();
+      shift_rows();
+      add_round_key();
+
+      return state;
+    } else {
+      throw new IllegalArgumentException("Block is of incorrect length, should be 16 bytes long but was "+Integer.toString(block.length));
+    }
   }
 }

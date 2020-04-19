@@ -10,6 +10,10 @@ public class TestSuite {
     TestRunner.register(new AES256IGEContext.RotateLeftTest());
     TestRunner.register(new AES256IGEContext.AddRoundKeyTest());
     TestRunner.register(new AES256IGEContext.EncryptBlockTest());
+    TestRunner.register(new AES256IGEContext.DecryptBlockTest());
+    TestRunner.register(new AES256IGEContext.UnshiftRowsTest());
+    TestRunner.register(new AES256IGEContext.UnmixColumnsTest());
+    TestRunner.register(new AES256IGEContext.UnsubstituteBytesTest());
 
     TestRunner.register(new BigIntegerContext.HexTest());
     TestRunner.register(new BigIntegerContext.EqualTest());

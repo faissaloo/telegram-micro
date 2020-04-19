@@ -32,6 +32,28 @@ public class AES256IGEContext {
     }
   }
 
+  public static class UnsubstituteBytesTest extends FocusedTest {
+    public String label() {
+      return "It can unsubstitute bytes";
+    }
+    public void test() throws TestFailureException {
+      AES256IGE subject = new AES256IGE(default_key);
+      subject.state = new byte[] {
+        (byte)0xCA, (byte)0x18, (byte)0xF9, (byte)0xD6,
+        (byte)0x16, (byte)0x28, (byte)0xC1, (byte)0x4B,
+        (byte)0xCA, (byte)0x18, (byte)0xF9, (byte)0xD6,
+        (byte)0x16, (byte)0x28, (byte)0xC1, (byte)0x4B
+      };
+      subject.unsubstitute_bytes();
+      expect(subject.state, new byte[] {
+        (byte)0x10, (byte)0x34, (byte)0x69, (byte)0x4A,
+        (byte)0xFF, (byte)0xEE, (byte)0xDD, (byte)0xCC,
+        (byte)0x10, (byte)0x34, (byte)0x69, (byte)0x4A,
+        (byte)0xFF, (byte)0xEE, (byte)0xDD, (byte)0xCC,
+      });
+    }
+  }
+
   public static class MixColumnsTest extends FocusedTest {
     public String label() {
       return "It can perform the MixColumns step";
@@ -51,6 +73,29 @@ public class AES256IGEContext {
         (byte)0x8E, (byte)0x4D, (byte)0xA1, (byte)0xBC,
         (byte)0x8E, (byte)0x4D, (byte)0xA1, (byte)0xBC,
         (byte)0x8E, (byte)0x4D, (byte)0xA1, (byte)0xBC,
+      });
+    }
+  }
+
+  public static class UnmixColumnsTest extends FocusedTest {
+    public String label() {
+      return "It can unmix columns";
+    }
+    public void test() throws TestFailureException {
+      AES256IGE subject = new AES256IGE(default_key);
+
+      subject.state = new byte[] {
+        (byte)0x8E, (byte)0x4D, (byte)0xA1, (byte)0xBC,
+        (byte)0x8E, (byte)0x4D, (byte)0xA1, (byte)0xBC,
+        (byte)0x8E, (byte)0x4D, (byte)0xA1, (byte)0xBC,
+        (byte)0x8E, (byte)0x4D, (byte)0xA1, (byte)0xBC,
+      };
+      subject.unmix_columns();
+      expect(subject.state, new byte[] {
+        (byte)0xDB, (byte)0x13, (byte)0x53, (byte)0x45,
+        (byte)0xDB, (byte)0x13, (byte)0x53, (byte)0x45,
+        (byte)0xDB, (byte)0x13, (byte)0x53, (byte)0x45,
+        (byte)0xDB, (byte)0x13, (byte)0x53, (byte)0x45,
       });
     }
   }
@@ -300,6 +345,65 @@ public class AES256IGEContext {
         (byte)0xeb, (byte)0x16, (byte)0x77, (byte)0x71,
         (byte)0x9a, (byte)0xcf, (byte)0x72, (byte)0x80,
         (byte)0x86, (byte)0x04, (byte)0x0a, (byte)0xe3
+      });
+    }
+  }
+
+  public static class DecryptBlockTest extends FocusedTest {
+    public String label() {
+      return "It can decrypt a block";
+    }
+    public void test() throws TestFailureException {
+      //ecb_tbl.txt, I=14
+      byte[] block = new byte[] {
+        (byte)0x08, (byte)0x0e, (byte)0x95, (byte)0x17,
+        (byte)0xeb, (byte)0x16, (byte)0x77, (byte)0x71,
+        (byte)0x9a, (byte)0xcf, (byte)0x72, (byte)0x80,
+        (byte)0x86, (byte)0x04, (byte)0x0a, (byte)0xe3
+      };
+      AES256IGE subject = new AES256IGE(new byte[] {
+        (byte)0x08, (byte)0x09, (byte)0x0A,
+        (byte)0x0B, (byte)0x0D, (byte)0x0E,
+        (byte)0x0F, (byte)0x10, (byte)0x12,
+        (byte)0x13, (byte)0x14, (byte)0x15,
+        (byte)0x17, (byte)0x18, (byte)0x19,
+        (byte)0x1A, (byte)0x1C, (byte)0x1D,
+        (byte)0x1E, (byte)0x1F, (byte)0x21,
+        (byte)0x22, (byte)0x23, (byte)0x24,
+        (byte)0x26, (byte)0x27, (byte)0x28,
+        (byte)0x29, (byte)0x2B, (byte)0x2C,
+        (byte)0x2D, (byte)0x2E
+      });
+      byte[] result = subject.decrypt_block(block);
+
+      expect(result, new byte[] {
+        (byte)0x06, (byte)0x9A, (byte)0x00, (byte)0x7F,
+        (byte)0xC7, (byte)0x6A, (byte)0x45, (byte)0x9F,
+        (byte)0x98, (byte)0xBA, (byte)0xF9, (byte)0x17,
+        (byte)0xFE, (byte)0xDF, (byte)0x95, (byte)0x21
+      });
+    }
+  }
+
+  public static class UnshiftRowsTest extends FocusedTest {
+    public String label() {
+      return "It can unshift rows";
+    }
+    public void test() throws TestFailureException {
+      AES256IGE subject = new AES256IGE(default_key);
+      subject.state = new byte[] {
+        (byte)0xab, (byte)0x43, (byte)0x55, (byte)0xe2,
+        (byte)0x74, (byte)0xd3, (byte)0x64, (byte)0x92,
+        (byte)0x7e, (byte)0xc6, (byte)0x67, (byte)0x73,
+        (byte)0x1e, (byte)0xdc, (byte)0xd6, (byte)0x77
+      };
+
+      subject.unshift_rows();
+      expect(subject.state, new byte[] {
+        (byte)0xab, (byte)0xdc, (byte)0x67, (byte)0x92,
+        (byte)0x74, (byte)0x43, (byte)0xd6, (byte)0x73,
+        (byte)0x7e, (byte)0xd3, (byte)0x55, (byte)0x77,
+        (byte)0x1e, (byte)0xc6, (byte)0x64, (byte)0xe2
       });
     }
   }

@@ -1,5 +1,6 @@
 package crypto;
 
+import support.ByteArrayPlus;
 import java.lang.IllegalArgumentException;
 
 //https://en.wikipedia.org/wiki/Advanced_Encryption_Standard#Description_of_the_ciphers
@@ -51,6 +52,41 @@ public class AES256IGE {
     } else {
       throw new IllegalArgumentException("Key is of incorrect length, should be 32 bytes long but was "+Integer.toString(key.length));
     }
+  }
+
+  public static byte[] encrypt(byte[] key, byte[] initialization_vector, byte[] data) {
+    AES256IGE encryption_primitive_engine = new AES256IGE(key);
+    ByteArrayPlus encrypted_bytes = new ByteArrayPlus();
+
+    byte[] previous_garbled_block = new byte[16];
+    System.arraycopy(initialization_vector, 0, previous_garbled_block, 0, 16);
+    byte[] previous_block = new byte[16];
+    System.arraycopy(initialization_vector, 16, previous_block, 0, 16);
+
+
+    for (int i = 0; i < data.length; i += 16) {
+      byte[] encrypted_block;
+      byte[] garbled_block;
+      byte[] block = new byte[16];
+      System.arraycopy(data, i, block, 0, 16);
+
+      encrypted_block = encryption_primitive_engine.encrypt_block(xor_bytes(block, previous_garbled_block));
+      garbled_block = xor_bytes(encrypted_block, previous_block);
+      previous_block = block;
+      previous_garbled_block = garbled_block;
+      encrypted_bytes.append_bytes(garbled_block);
+    }
+    return encrypted_bytes.toByteArray();
+  }
+
+  public static byte[] xor_bytes(byte[] a, byte[] b) {
+    byte[] result = new byte[16];
+
+    for (int i = 0; i < 16; i++) {
+      result[i] = (byte)((a[i]&0xFF) ^ (b[i]&0xFF));
+    }
+
+    return result;
   }
 
   public void substitute_bytes() {

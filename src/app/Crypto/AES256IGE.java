@@ -79,6 +79,30 @@ public class AES256IGE {
     return encrypted_bytes.toByteArray();
   }
 
+  public static byte[] decrypt(byte[] key, byte[] initialization_vector, byte[] data) {
+    AES256IGE encryption_primitive_engine = new AES256IGE(key);
+    ByteArrayPlus decrypted_bytes = new ByteArrayPlus();
+
+    byte[] previous_degarbled_block = new byte[16];
+    System.arraycopy(initialization_vector, 16, previous_degarbled_block, 0, 16);
+    byte[] previous_block = new byte[16];
+    System.arraycopy(initialization_vector, 0, previous_block, 0, 16);
+
+    for (int i = 0; i < data.length; i += 16) {
+      byte[] decrypted_block;
+      byte[] degarbled_block;
+      byte[] block = new byte[16];
+      System.arraycopy(data, i, block, 0, 16);
+
+      decrypted_block = encryption_primitive_engine.decrypt_block(xor_bytes(block, previous_degarbled_block));
+      degarbled_block = xor_bytes(decrypted_block, previous_block);
+      previous_block = block;
+      previous_degarbled_block = degarbled_block;
+      decrypted_bytes.append_bytes(degarbled_block);
+    }
+    return decrypted_bytes.toByteArray();
+  }
+
   public static byte[] xor_bytes(byte[] a, byte[] b) {
     byte[] result = new byte[16];
 

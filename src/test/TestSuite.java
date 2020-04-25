@@ -17,7 +17,8 @@ public class TestSuite {
     TestRunner.register(new AES256IGEContext.UnshiftRowsTest());
     TestRunner.register(new AES256IGEContext.UnmixColumnsTest());
     TestRunner.register(new AES256IGEContext.UnsubstituteBytesTest());
-    TestRunner.register(new AES256IGEContext.IGETest());
+    TestRunner.register(new AES256IGEContext.IGEEncryptTest());
+    TestRunner.register(new AES256IGEContext.IGEDecryptTest());
 
     TestRunner.register(new BigIntegerContext.HexTest());
     TestRunner.register(new BigIntegerContext.EqualTest());

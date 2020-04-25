@@ -10,7 +10,7 @@ public class AES256IGEContext {
     (byte)0, (byte)0, (byte)0, (byte)0, (byte)0, (byte)0, (byte)0, (byte)0
   };
 
-  public static class IGETest extends Test {
+  public static class IGEEncryptTest extends Test {
     public String label() {
       return "It can encrypt data with AES 256 IGE";
     }
@@ -49,6 +49,49 @@ public class AES256IGEContext {
         (byte)0x86, (byte)0xd9, (byte)0xe0, (byte)0x9a,
         (byte)0x7a, (byte)0x65, (byte)0x78, (byte)0x5e,
         (byte)0x77, (byte)0xec, (byte)0xc4, (byte)0xb1
+      });
+    }
+  }
+
+  public static class IGEDecryptTest extends Test {
+    public String label() {
+      return "It can decrypt data with AES 256 IGE";
+    }
+    public void test() throws TestFailureException {
+      byte[] key = new byte[] {
+        (byte)0x00, (byte)0x01, (byte)0x02, (byte)0x03,
+        (byte)0x04, (byte)0x05, (byte)0x06, (byte)0x07,
+        (byte)0x08, (byte)0x09, (byte)0x0A, (byte)0x0B,
+        (byte)0x0C, (byte)0x0D, (byte)0x0E, (byte)0x0F,
+        (byte)0x00, (byte)0x01, (byte)0x02, (byte)0x03,
+        (byte)0x04, (byte)0x05, (byte)0x06, (byte)0x07,
+        (byte)0x08, (byte)0x09, (byte)0x0A, (byte)0x0B,
+        (byte)0x0C, (byte)0x0D, (byte)0x0E, (byte)0x0F
+      };
+      byte[] initialization_vector = new byte[] {
+        (byte)0x00, (byte)0x01, (byte)0x02, (byte)0x03,
+        (byte)0x04, (byte)0x05, (byte)0x06, (byte)0x07,
+        (byte)0x08, (byte)0x09, (byte)0x0A, (byte)0x0B,
+        (byte)0x0C, (byte)0x0D, (byte)0x0E, (byte)0x0F,
+        (byte)0x10, (byte)0x11, (byte)0x12, (byte)0x13,
+        (byte)0x14, (byte)0x15, (byte)0x16, (byte)0x17,
+        (byte)0x18, (byte)0x19, (byte)0x1A, (byte)0x1B,
+        (byte)0x1C, (byte)0x1D, (byte)0x1E, (byte)0x1F
+      };
+      byte[] data = new byte[] {
+        (byte)0x63, (byte)0x6c, (byte)0x62, (byte)0x01,
+        (byte)0xca, (byte)0x3e, (byte)0x54, (byte)0x58,
+        (byte)0x6e, (byte)0x9e, (byte)0x60, (byte)0x84,
+        (byte)0x1e, (byte)0x48, (byte)0xd2, (byte)0x3d,
+        (byte)0x27, (byte)0xbc, (byte)0x72, (byte)0xf4,
+        (byte)0x86, (byte)0xd9, (byte)0xe0, (byte)0x9a,
+        (byte)0x7a, (byte)0x65, (byte)0x78, (byte)0x5e,
+        (byte)0x77, (byte)0xec, (byte)0xc4, (byte)0xb1
+      };
+      byte[] result = AES256IGE.decrypt(key, initialization_vector, data);
+      expect(result, new byte[] {
+        00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00,
+        00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00
       });
     }
   }

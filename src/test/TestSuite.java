@@ -2,6 +2,8 @@ package test;
 
 public class TestSuite {
   public static void register_all_tests() {
+    TestRunner.register(new SHA256Context.DigestTest());
+    
     TestRunner.register(new AES256IGEContext.SubBytesTest());
     TestRunner.register(new AES256IGEContext.MixColumnsTest());
     TestRunner.register(new AES256IGEContext.ShiftRowsTest());
@@ -33,12 +35,10 @@ public class TestSuite {
     TestRunner.register(new BigIntegerContext.OrTest());
     TestRunner.register(new BigIntegerContext.ToLongTest());
 
-    TestRunner.register(new IntegerPlusContext.PowerTest());
-
-    TestRunner.register(new LongPlusContext.PowerTest());
+    TestRunner.register(new IntegerPlusContext.RotateRightTest());
 
     TestRunner.register(new PrimeDecomposerContext.FiniteRingTest());
     TestRunner.register(new PrimeDecomposerContext.EuclidianGreatestCommonDenominatorTest());
-    //TestRunner.register(new PrimeDecomposerContext.DecomposeTest()); //Warning: SLOW, ~4 mins
+    TestRunner.register(new PrimeDecomposerContext.DecomposeTest()); //Warning: SLOW, ~4 mins
   }
 }

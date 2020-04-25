@@ -10,7 +10,7 @@ public class AES256IGEContext {
     (byte)0, (byte)0, (byte)0, (byte)0, (byte)0, (byte)0, (byte)0, (byte)0
   };
 
-  public static class SubBytesTest extends FocusedTest {
+  public static class SubBytesTest extends Test {
     public String label() {
       return "It can perform the SubBytes step";
     }
@@ -32,7 +32,7 @@ public class AES256IGEContext {
     }
   }
 
-  public static class UnsubstituteBytesTest extends FocusedTest {
+  public static class UnsubstituteBytesTest extends Test {
     public String label() {
       return "It can unsubstitute bytes";
     }
@@ -54,7 +54,7 @@ public class AES256IGEContext {
     }
   }
 
-  public static class MixColumnsTest extends FocusedTest {
+  public static class MixColumnsTest extends Test {
     public String label() {
       return "It can perform the MixColumns step";
     }
@@ -77,7 +77,7 @@ public class AES256IGEContext {
     }
   }
 
-  public static class UnmixColumnsTest extends FocusedTest {
+  public static class UnmixColumnsTest extends Test {
     public String label() {
       return "It can unmix columns";
     }
@@ -100,7 +100,7 @@ public class AES256IGEContext {
     }
   }
 
-  public static class ShiftRowsTest extends FocusedTest {
+  public static class ShiftRowsTest extends Test {
     public String label() {
       return "It can perform the ShiftRows step";
     }
@@ -123,7 +123,7 @@ public class AES256IGEContext {
     }
   }
 
-  public static class RotateLeftTest extends FocusedTest {
+  public static class RotateLeftTest extends Test {
     public String label() {
       return "It can rotate a set of bytes";
     }
@@ -134,7 +134,7 @@ public class AES256IGEContext {
     }
   }
 
-  public static class GaloisField2PowerTest extends FocusedTest {
+  public static class GaloisField2PowerTest extends Test {
     public String label() {
       return "It can exponentiate 2 within the galois field (aka 'rcon')";
     }
@@ -145,7 +145,7 @@ public class AES256IGEContext {
   }
 
   //Add a test for the round key generation
-  public static class AddRoundKeyTest extends FocusedTest {
+  public static class AddRoundKeyTest extends Test {
     public String label() {
       return "It can apply the round key";
     }
@@ -240,7 +240,7 @@ public class AES256IGEContext {
   }
 
   //https://www.samiam.org/key-schedule.html
-  public static class KeyScheduleTest extends FocusedTest {
+  public static class KeyScheduleTest extends Test {
     public String label() {
       return "It can generate the key schedule";
     }
@@ -311,7 +311,7 @@ public class AES256IGEContext {
     }
   }
 
-  public static class EncryptBlockTest extends FocusedTest {
+  public static class EncryptBlockTest extends Test {
     public String label() {
       return "It can encrypt a block";
     }
@@ -349,7 +349,7 @@ public class AES256IGEContext {
     }
   }
 
-  public static class DecryptBlockTest extends FocusedTest {
+  public static class DecryptBlockTest extends Test {
     public String label() {
       return "It can decrypt a block";
     }
@@ -385,7 +385,7 @@ public class AES256IGEContext {
     }
   }
 
-  public static class UnshiftRowsTest extends FocusedTest {
+  public static class UnshiftRowsTest extends Test {
     public String label() {
       return "It can unshift rows";
     }

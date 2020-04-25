@@ -1,11 +1,7 @@
 package support;
 
 public class IntegerPlus {
-  public static int power(int base, int exponent) {
-    int accumulator = 1;
-    for (int i = 0; i < exponent; i++) {
-      accumulator *= base;
-    }
-    return accumulator;
+  public static int rotateRight(int integer, int shift) {
+     return (integer >>> shift) | (integer << (32 - shift));
   }
 }

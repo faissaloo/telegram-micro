@@ -5,12 +5,11 @@ import mtproto.PrimeDecomposer;
 import support.BigInteger;
 
 public class PrimeDecomposerContext {
-  public static class DecomposeTest extends Test {
+  public static class DecomposeTest extends SkippedTest {
     public String label() {
-      return "It can decompose a prime";
+      return "It can decompose a prime (~4 min test)";
     }
     public void test() throws TestFailureException {
-      //This takes waaaaay too long
       PrimeDecomposer.Coprimes result = PrimeDecomposer.decompose(0x211cafa9555101f5L);
       expect(result.lesser_prime(), 0x59e2945dL);
       expect(result.greater_prime(), 0x5e4e4a79L);

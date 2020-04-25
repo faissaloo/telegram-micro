@@ -33,7 +33,7 @@ public class TestRunner extends MIDlet {
 
     for (int i = 0; i < tests.size(); i++) {
       Test current_test = (Test)tests.elementAt(i);
-      if ((!focus_mode) || current_test.focused()) {
+      if ((!(focus_mode||current_test.skipped())) || current_test.focused()) {
         try {
           current_test.run_tests();
           System.out.println(" ✔ " +current_test.label());

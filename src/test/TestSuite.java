@@ -3,7 +3,8 @@ package test;
 public class TestSuite {
   public static void register_all_tests() {
     TestRunner.register(new SHA256Context.DigestTest());
-    
+    TestRunner.register(new SHA1Context.DigestTest());
+
     TestRunner.register(new AES256IGEContext.SubBytesTest());
     TestRunner.register(new AES256IGEContext.MixColumnsTest());
     TestRunner.register(new AES256IGEContext.ShiftRowsTest());

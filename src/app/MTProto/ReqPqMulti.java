@@ -1,7 +1,7 @@
 package mtproto;
 import java.util.Random;
 import support.ByteArrayPlus;
-import support.BigInteger;
+import support.Integer128;
 import support.RandomPlus;
 import java.io.IOException;
 import java.lang.Math;
@@ -18,7 +18,7 @@ public class ReqPqMulti {
     // We'll have to stick to a shorter nonce then pad out the upper range cus we aren't in a position to be handling 128-bit integers on the regular
     message_data = new ByteArrayPlus();
     message_data.append_int(0xbe7e8ef1); //combinator_id
-    message_data.append_biginteger(random_number_generator.nextBigInteger()); //nonce
+    message_data.append_Integer128(random_number_generator.nextInteger128()); //nonce
   }
 
   public void send() {

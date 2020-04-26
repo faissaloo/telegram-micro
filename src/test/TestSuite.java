@@ -20,23 +20,23 @@ public class TestSuite {
     TestRunner.register(new AES256IGEContext.IGEEncryptTest());
     TestRunner.register(new AES256IGEContext.IGEDecryptTest());
 
-    TestRunner.register(new BigIntegerContext.HexTest());
-    TestRunner.register(new BigIntegerContext.EqualTest());
-    TestRunner.register(new BigIntegerContext.UnsignedGreaterThanTest());
-    TestRunner.register(new BigIntegerContext.UnsignedLessThanTest());
-    TestRunner.register(new BigIntegerContext.UnsignedGreaterThanEqualTest());
-    TestRunner.register(new BigIntegerContext.UnsignedLessThanEqualTest());
-    TestRunner.register(new BigIntegerContext.NotTest());
-    TestRunner.register(new BigIntegerContext.AddTest());
-    TestRunner.register(new BigIntegerContext.NegateTest());
-    TestRunner.register(new BigIntegerContext.SubtractTest());
-    TestRunner.register(new BigIntegerContext.UnsignedDivideModuloTest());
-    TestRunner.register(new BigIntegerContext.UnsignedLeftShiftTest());
-    TestRunner.register(new BigIntegerContext.UnsignedRightShiftTest());
-    TestRunner.register(new BigIntegerContext.UnsignedLongMultiplyTest());
-    TestRunner.register(new BigIntegerContext.AndTest());
-    TestRunner.register(new BigIntegerContext.OrTest());
-    TestRunner.register(new BigIntegerContext.ToLongTest());
+    TestRunner.register(new Integer128Context.HexTest());
+    TestRunner.register(new Integer128Context.EqualTest());
+    TestRunner.register(new Integer128Context.UnsignedGreaterThanTest());
+    TestRunner.register(new Integer128Context.UnsignedLessThanTest());
+    TestRunner.register(new Integer128Context.UnsignedGreaterThanEqualTest());
+    TestRunner.register(new Integer128Context.UnsignedLessThanEqualTest());
+    TestRunner.register(new Integer128Context.NotTest());
+    TestRunner.register(new Integer128Context.AddTest());
+    TestRunner.register(new Integer128Context.NegateTest());
+    TestRunner.register(new Integer128Context.SubtractTest());
+    TestRunner.register(new Integer128Context.UnsignedDivideModuloTest());
+    TestRunner.register(new Integer128Context.UnsignedLeftShiftTest());
+    TestRunner.register(new Integer128Context.UnsignedRightShiftTest());
+    TestRunner.register(new Integer128Context.UnsignedLongMultiplyTest());
+    TestRunner.register(new Integer128Context.AndTest());
+    TestRunner.register(new Integer128Context.OrTest());
+    TestRunner.register(new Integer128Context.ToLongTest());
 
     TestRunner.register(new IntegerPlusContext.RotateRightTest());
 

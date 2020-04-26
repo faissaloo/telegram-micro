@@ -1,6 +1,6 @@
 package mtproto;
 
-import support.BigInteger;
+import support.Integer128;
 import support.Utf8String;
 import support.ByteArrayPlus;
 import support.Decode;
@@ -13,9 +13,9 @@ public class RecieveResPQ {
     skip += 4;
 
     if (message_type == 0x05162463) {
-      BigInteger nonce = Decode.Little.biginteger_decode(data, skip);
+      Integer128 nonce = Decode.Little.Integer128_decode(data, skip);
       skip += 16;
-      BigInteger server_nonce = Decode.Little.biginteger_decode(data, skip);
+      Integer128 server_nonce = Decode.Little.Integer128_decode(data, skip);
       skip += 16;
       long pq = Decode.Big.long_decode(Deserialize.bytes_deserialize(data, skip), 0);
 
@@ -27,26 +27,26 @@ public class RecieveResPQ {
     }
   }
 
-  BigInteger nonce;
-  BigInteger server_nonce;
+  Integer128 nonce;
+  Integer128 server_nonce;
   long pq;
   long[] server_public_key_fingerprints;
 
   //pq is not in fact a Utf8String, it's that bytes are encoded the same
   //pq is actually a big endian number...
   //resPQ#05162463 nonce:int128 server_nonce:int128 pq:string server_public_key_fingerprints:Vector long = resPQ;
-  public RecieveResPQ(BigInteger nonce, BigInteger server_nonce, long pq, long[] server_public_key_fingerprints) {
+  public RecieveResPQ(Integer128 nonce, Integer128 server_nonce, long pq, long[] server_public_key_fingerprints) {
     this.nonce = nonce;
     this.server_nonce = server_nonce;
     this.pq = pq;
     this.server_public_key_fingerprints = server_public_key_fingerprints;
   }
 
-  public BigInteger nonce() {
+  public Integer128 nonce() {
     return nonce;
   }
 
-  public BigInteger server_nonce() {
+  public Integer128 server_nonce() {
     return server_nonce;
   }
 

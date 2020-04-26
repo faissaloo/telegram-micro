@@ -20,8 +20,8 @@ public class Decode {
       ((data[offset+7]&0xFFL)<<56);
     }
 
-    public static BigInteger biginteger_decode(byte[] data, int offset) {
-      return new BigInteger(long_decode(data, offset+8),long_decode(data, offset));
+    public static Integer128 Integer128_decode(byte[] data, int offset) {
+      return new Integer128(long_decode(data, offset+8),long_decode(data, offset));
     }
   }
 

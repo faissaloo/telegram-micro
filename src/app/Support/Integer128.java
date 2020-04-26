@@ -3,9 +3,9 @@ package support;
 import java.lang.ArithmeticException;
 
 //All arithmetic is unsigned (maybe we'll change this later)
-public class BigInteger {
-  public static BigInteger one = new BigInteger(1L);
-  public static BigInteger zero = new BigInteger(0L);
+public class Integer128 {
+  public static Integer128 one = new Integer128(1L);
+  public static Integer128 zero = new Integer128(0L);
 
   public int representation_0 = 0;
   public int representation_1 = 0;
@@ -13,31 +13,31 @@ public class BigInteger {
   public int representation_3 = 0;
 
   public static class QuotientRemainder {
-    BigInteger quotient;
-    BigInteger remainder;
+    Integer128 quotient;
+    Integer128 remainder;
 
-    public QuotientRemainder(BigInteger quotient, BigInteger remainder) {
+    public QuotientRemainder(Integer128 quotient, Integer128 remainder) {
       this.quotient = quotient;
       this.remainder = remainder;
     }
 
-    public BigInteger quotient() {
+    public Integer128 quotient() {
       return quotient;
     }
 
-    public BigInteger remainder() {
+    public Integer128 remainder() {
       return remainder;
     }
   }
 
-  public BigInteger(BigInteger to_copy) {
+  public Integer128(Integer128 to_copy) {
     representation_0 = to_copy.representation_0;
     representation_1 = to_copy.representation_1;
     representation_2 = to_copy.representation_2;
     representation_3 = to_copy.representation_3;
   }
 
-  public BigInteger(long upper, long lower) {
+  public Integer128(long upper, long lower) {
     //Wonder if I could improve things by doing the shift first...
     representation_0 = (int)(lower & 0xFFFFFFFFL);
     representation_1 = (int)((lower & 0xFFFFFFFF00000000L) >>> 32);
@@ -45,14 +45,14 @@ public class BigInteger {
     representation_3 = (int)((upper & 0xFFFFFFFF00000000L) >>> 32);
   }
 
-  public BigInteger(long lower) {
+  public Integer128(long lower) {
     representation_0 = (int)(lower & 0xFFFFFFFFL);
     representation_1 = (int)((lower & 0xFFFFFFFF00000000L) >>> 32);
   }
 
   //ordered from lowest order ints to highest
   //maybe deprecated
-  public BigInteger(int[] representation) {
+  public Integer128(int[] representation) {
     representation_0 = representation[0];
     representation_1 = representation[1];
     representation_2 = representation[2];
@@ -85,14 +85,14 @@ public class BigInteger {
     return new_string;
   }
 
-  public boolean equals(BigInteger other) {
+  public boolean equals(Integer128 other) {
     return (representation_0 == other.representation_0) &&
       (representation_1 == other.representation_1) &&
       (representation_2 == other.representation_2) &&
       (representation_3 == other.representation_3);
   }
 
-  public boolean unsigned_greater_than(BigInteger other) {
+  public boolean unsigned_greater_than(Integer128 other) {
     if (representation_3 != other.representation_3) {
       return ((long)representation_3&0xFFFFFFFFL) > ((long)other.representation_3&0xFFFFFFFFL);
     } else if (representation_2 != other.representation_2) {
@@ -104,20 +104,20 @@ public class BigInteger {
     }
   }
 
-  public boolean unsigned_less_than(BigInteger other) {
+  public boolean unsigned_less_than(Integer128 other) {
     return !(equals(other) || unsigned_greater_than(other));
   }
 
-  public boolean unsigned_greater_than_equal(BigInteger other) {
+  public boolean unsigned_greater_than_equal(Integer128 other) {
     return equals(other) || unsigned_greater_than(other);
   }
 
-  public boolean unsigned_less_than_equal(BigInteger other) {
+  public boolean unsigned_less_than_equal(Integer128 other) {
     return equals(other) || unsigned_less_than(other);
   }
 
-  public BigInteger and(BigInteger other) {
-    return new BigInteger(new int[] {
+  public Integer128 and(Integer128 other) {
+    return new Integer128(new int[] {
       representation_0 & other.representation_0,
       representation_1 & other.representation_1,
       representation_2 & other.representation_2,
@@ -125,7 +125,7 @@ public class BigInteger {
     });
   }
 
-  public BigInteger mutating_or(BigInteger other) {
+  public Integer128 mutating_or(Integer128 other) {
     representation_0 |= other.representation_0;
     representation_1 |= other.representation_1;
     representation_2 |= other.representation_2;
@@ -134,19 +134,19 @@ public class BigInteger {
     return this;
   }
 
-  public BigInteger or(BigInteger other) {
-    return (new BigInteger(this)).mutating_or(other);
+  public Integer128 or(Integer128 other) {
+    return (new Integer128(this)).mutating_or(other);
   }
 
-  public BigInteger mutating_negate() {
+  public Integer128 mutating_negate() {
     return mutating_not().mutating_add();
   }
 
-  public BigInteger negate() {
-    return (new BigInteger(this)).mutating_negate();
+  public Integer128 negate() {
+    return (new Integer128(this)).mutating_negate();
   }
 
-  public BigInteger mutating_not() {
+  public Integer128 mutating_not() {
     representation_0 = ~representation_0;
     representation_1 = ~representation_1;
     representation_2 = ~representation_2;
@@ -155,21 +155,21 @@ public class BigInteger {
     return this;
   }
 
-  public BigInteger not() {
-    return (new BigInteger(this)).mutating_not();
+  public Integer128 not() {
+    return (new Integer128(this)).mutating_not();
   }
 
-  public BigInteger mutating_subtract(BigInteger other) {
+  public Integer128 mutating_subtract(Integer128 other) {
     mutating_add(other.negate());
 
     return this;
   }
 
-  public BigInteger subtract(BigInteger other) {
-    return (new BigInteger(this)).mutating_subtract(other);
+  public Integer128 subtract(Integer128 other) {
+    return (new Integer128(this)).mutating_subtract(other);
   }
 
-  public BigInteger mutating_add() {
+  public Integer128 mutating_add() {
     long partial_00 = (((long) representation_0) & 0xFFFFFFFFL) + 1L;
     representation_0 = (int) partial_00;
     long partial_00_high = (partial_00 >>> 32);
@@ -189,7 +189,7 @@ public class BigInteger {
     return this;
   }
 
-  public BigInteger mutating_add(BigInteger other) {
+  public Integer128 mutating_add(Integer128 other) {
     long partial_00 = (((long) representation_0) & 0xFFFFFFFFL) +
       (((long) other.representation_0) & 0xFFFFFFFFL);
     representation_0 = (int) partial_00;
@@ -216,11 +216,11 @@ public class BigInteger {
     return this;
   }
 
-  public BigInteger add(BigInteger other) {
-    return (new BigInteger(this)).mutating_add(other);
+  public Integer128 add(Integer128 other) {
+    return (new Integer128(this)).mutating_add(other);
   }
 
-  public BigInteger get_bit(int index) {
+  public Integer128 get_bit(int index) {
     if (index >= 0) {
       if (index >= 32) {
         if (index >= 64) {
@@ -256,7 +256,7 @@ public class BigInteger {
     }
   }
 
-  public BigInteger mutating_set_bit(int index) {
+  public Integer128 mutating_set_bit(int index) {
     if (index >= 0) {
       if (index >= 32) {
         if (index >= 64) {
@@ -275,19 +275,19 @@ public class BigInteger {
     return this;
   }
 
-  public BigInteger set_bit(int index) {
-    return (new BigInteger(this)).mutating_set_bit(index);
+  public Integer128 set_bit(int index) {
+    return (new Integer128(this)).mutating_set_bit(index);
   }
 
   //https://en.wikipedia.org/wiki/Division_algorithm#Integer_division_(unsigned)_with_remainder
-  public QuotientRemainder unsigned_divide_modulo(BigInteger other) throws ArithmeticException {
+  public QuotientRemainder unsigned_divide_modulo(Integer128 other) throws ArithmeticException {
     if (other.equals(zero)) {
       throw new ArithmeticException("Division by zero");
     }
 
-    BigInteger quotient = new BigInteger(zero);
-    BigInteger remainder = new BigInteger(zero);
-    BigInteger negated_other = other.negate();
+    Integer128 quotient = new Integer128(zero);
+    Integer128 remainder = new Integer128(zero);
+    Integer128 negated_other = other.negate();
 
     for (int i = 128; i > 0; i--) {
       remainder.mutating_unsigned_left_shift().mutating_or(get_bit(i-1));
@@ -300,14 +300,14 @@ public class BigInteger {
     return new QuotientRemainder(quotient, remainder);
   }
 
-  public BigInteger unsigned_divide(BigInteger other) throws ArithmeticException {
+  public Integer128 unsigned_divide(Integer128 other) throws ArithmeticException {
     if (other.equals(zero)) {
       throw new ArithmeticException("Division by zero");
     }
 
-    BigInteger quotient = new BigInteger(zero);
-    BigInteger remainder = new BigInteger(zero);
-    BigInteger negated_other = other.negate();
+    Integer128 quotient = new Integer128(zero);
+    Integer128 remainder = new Integer128(zero);
+    Integer128 negated_other = other.negate();
 
     for (int i = 128; i > 0; i--) {
       remainder.mutating_unsigned_left_shift().mutating_or(get_bit(i-1));
@@ -320,15 +320,15 @@ public class BigInteger {
     return quotient;
   }
 
-  public BigInteger unsigned_modulo(BigInteger other) throws ArithmeticException {
+  public Integer128 unsigned_modulo(Integer128 other) throws ArithmeticException {
     if (other.equals(zero)) {
       throw new ArithmeticException("Division by zero");
     }
 
     //https://stackoverflow.com/a/33333636/5269447
     if (unsigned_greater_than_equal(other)) {
-      BigInteger remainder = new BigInteger(zero);
-      BigInteger negated_other = other.negate();
+      Integer128 remainder = new Integer128(zero);
+      Integer128 negated_other = other.negate();
 
       for (int i = 128; i > 0; i--) {
         remainder.mutating_unsigned_left_shift().mutating_or(get_bit(i-1));
@@ -339,11 +339,11 @@ public class BigInteger {
       }
       return remainder;
     } else {
-      return new BigInteger(this);
+      return new Integer128(this);
     }
   }
 
-  public BigInteger unsigned_right_shift(int shift) {
+  public Integer128 unsigned_right_shift(int shift) {
     long low = 0L;
     long high = 0L;
     if (shift < 64) {
@@ -356,11 +356,11 @@ public class BigInteger {
       low = ((((long)representation_3)&0xFFFFFFFFL) << 32) | (((long)representation_2)&0xFFFFFFFFL);
       low = (low >>> (shift-64));
     }
-    return new BigInteger(high,low);
+    return new Integer128(high,low);
   }
 
   //This shortcut makes division way faster
-  public BigInteger mutating_unsigned_left_shift() {
+  public Integer128 mutating_unsigned_left_shift() {
     representation_3 = (representation_3 << 1) | (representation_2 >>> 31);
     representation_2 = (representation_2 << 1) | (representation_1 >>> 31);
     representation_1 = (representation_1 << 1) | (representation_0 >>> 31);
@@ -369,7 +369,7 @@ public class BigInteger {
     return this;
   }
 
-  public BigInteger mutating_unsigned_left_shift(int shift) {
+  public Integer128 mutating_unsigned_left_shift(int shift) {
     long low = 0L;
     long high = 0L;
     if (shift < 64) {
@@ -391,12 +391,12 @@ public class BigInteger {
     return this;
   }
 
-  public BigInteger unsigned_left_shift(int shift) {
-    return (new BigInteger(this)).mutating_unsigned_left_shift(shift);
+  public Integer128 unsigned_left_shift(int shift) {
+    return (new Integer128(this)).mutating_unsigned_left_shift(shift);
   }
 
   //https://codereview.stackexchange.com/questions/72286/multiplication-128-x-64-bits
-  public static BigInteger unsigned_long_multiply(long x, long y) {
+  public static Integer128 unsigned_long_multiply(long x, long y) {
     long high = 0;
     long low = y;
     long y0  = (low & 0xFFFFFFFFL);
@@ -424,6 +424,6 @@ public class BigInteger {
     // Account for the possible carry from the low parts.
     long p2 = (p00 >>> 32) + (p01 & 0xFFFFFFFFL) + (p10 & 0xFFFFFFFFL);
     high += (p2 >>> 32);
-    return new BigInteger(high, low);
+    return new Integer128(high, low);
   }
 }

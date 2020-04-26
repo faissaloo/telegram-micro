@@ -2,7 +2,7 @@ package test;
 
 import mtproto.PrimeDecomposer;
 
-import support.BigInteger;
+import support.Integer128;
 
 public class PrimeDecomposerContext {
   public static class DecomposeTest extends SkippedTest {
@@ -21,7 +21,7 @@ public class PrimeDecomposerContext {
       return "It can provide the finite ring";
     }
     public void test() throws TestFailureException {
-      long result = PrimeDecomposer.finite_ring(0x93a652c056cb728cL, new BigInteger(0x211cafa9555101f5L));
+      long result = PrimeDecomposer.finite_ring(0x93a652c056cb728cL, new Integer128(0x211cafa9555101f5L));
       expect(result, 0xd5428d6f285c04dL);
     }
   }

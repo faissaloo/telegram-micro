@@ -2,7 +2,7 @@ package mtproto;
 
 import java.lang.Math;
 
-import support.BigInteger;
+import support.Integer128;
 
 public class PrimeDecomposer {
   public static class Coprimes {
@@ -28,8 +28,8 @@ public class PrimeDecomposer {
     }
   }
 
-  public static long finite_ring(long current_value, BigInteger big_limit) {
-    return BigInteger
+  public static long finite_ring(long current_value, Integer128 big_limit) {
+    return Integer128
       .unsigned_long_multiply(current_value, current_value)
       .unsigned_modulo(big_limit)
       .mutating_add()
@@ -52,7 +52,7 @@ public class PrimeDecomposer {
     if (to_factorise % 2 == 0) {
       return new Coprimes(2L, to_factorise/2);
     } else {
-      BigInteger big_to_factorise = new BigInteger(to_factorise);
+      Integer128 big_to_factorise = new Integer128(to_factorise);
       long slow_pointer = 1L;
       long fast_pointer = 1L;
       long nontrivial_denominator = 1L;
@@ -68,7 +68,7 @@ public class PrimeDecomposer {
         while (already_searched < search_range && nontrivial_denominator == 1L) {
           for (long i = 0L; i < Math.min(1L, search_range - already_searched); i++) {
             fast_pointer = finite_ring(fast_pointer, big_to_factorise);
-            initial_guess = BigInteger
+            initial_guess = Integer128
               .unsigned_long_multiply(initial_guess, Math.abs(slow_pointer-fast_pointer))
               .unsigned_modulo(big_to_factorise)
               .to_long();

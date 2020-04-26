@@ -24,7 +24,7 @@ public class Encode {
     };
   }
 
-  public static byte[] biginteger_encode(BigInteger to_encode) {
+  public static byte[] Integer128_encode(Integer128 to_encode) {
     return new byte[] {
       (byte) (to_encode.representation_0&0xFF),
       (byte) ((to_encode.representation_0&0xFF00) >> 8),

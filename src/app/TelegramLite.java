@@ -15,7 +15,7 @@ import mtproto.SendRequestThread;
 import mtproto.UnencryptedResponse;
 import mtproto.RecieveResPQ;
 
-import support.BigInteger;
+import support.Integer128;
 
 public class TelegramLite extends MIDlet {
   private Form form;

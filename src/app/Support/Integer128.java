@@ -65,24 +65,10 @@ public class Integer128 {
 
   //for debug
   public String hex() {
-    String new_string = Integer.toHexString(representation_0);
-    for (int i = new_string.length(); i < 8; i ++) {
-      new_string = "0"+new_string;
-    }
-    new_string = Integer.toHexString(representation_1)+new_string;
-    for (int i = new_string.length(); i < 16; i ++) {
-      new_string = "0"+new_string;
-    }
-    new_string = Integer.toHexString(representation_2)+new_string;
-    for (int i = new_string.length(); i < 24; i ++) {
-      new_string = "0"+new_string;
-    }
-    new_string = Integer.toHexString(representation_3)+new_string;
-    for (int i = new_string.length(); i < 32; i ++) {
-      new_string = "0"+new_string;
-    }
-
-    return new_string;
+    return IntegerPlus.padded_hex(representation_3)+
+      IntegerPlus.padded_hex(representation_2)+
+      IntegerPlus.padded_hex(representation_1)+
+      IntegerPlus.padded_hex(representation_0);
   }
 
   public boolean equals(Integer128 other) {

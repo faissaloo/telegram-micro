@@ -51,38 +51,71 @@ public class BigInteger {
     }
   }
 
-  public BigInteger mutating_add(BigInteger other) {
-    long last_high = 0;
+  public BigInteger mutating_subtract(BigInteger other) {
+    //this. must be larger than other.
+    int bigIndex = representation.length;
+    int[] result = new int[bigIndex];
+    int littleIndex = other.representation.length;
+    long difference = 0;
 
-    long first;
-    long second;
-    long partial;
-
-    for (int i = 0; i < Math.max(representation.length, other.representation.length); i++) {
-      if (representation.length-1 > i) {
-        grow(1);
-        first = 0;
-      } else {
-        first = ((long) representation[i]) & 0xFFFFFFFFL;
-      }
-
-      if (other.representation.length-1 > i) {
-        second = 0;
-      } else {
-        second = ((long) other.representation[i]) & 0xFFFFFFFFL;
-      }
-
-      partial = first + second + last_high;
-      representation[i] = (int) partial;
-      last_high = (partial >>> 32) & 0xFFFFFFFFL;
+    while (littleIndex > 0) {
+        difference = (big[--bigIndex] & 0xFFFFFFFFL) -
+                     (little[--littleIndex] & 0xFFFFFFFFL) +
+                     (difference >> 32);
+        result[bigIndex] = (int)difference;
     }
 
-    if (last_high != 0) {
-      grow(1);
-      representation[representation.length-1] = (int)last_high;
+    boolean borrow = (difference >> 32 != 0);
+
+    while (bigIndex > 0 && borrow) {
+      borrow = ((result[--bigIndex] = big[bigIndex] - 1) == -1);
     }
 
+    while (bigIndex > 0) {
+      result[--bigIndex] = big[bigIndex];
+    }
+
+    representation = result;
     return this;
+  }
+
+  public BigInteger mutating_add(BigInteger other) {
+    if (sign == other.sign) {
+      long last_high = 0;
+
+      long first;
+      long second;
+      long partial;
+
+      for (int i = 0; i < Math.max(representation.length, other.representation.length); i++) {
+        if (representation.length-1 > i) {
+          grow(1);
+          first = 0;
+        } else {
+          first = ((long) representation[i]) & 0xFFFFFFFFL;
+        }
+
+        if (other.representation.length-1 > i) {
+          second = 0;
+        } else {
+          second = ((long) other.representation[i]) & 0xFFFFFFFFL;
+        }
+
+        partial = first + second + last_high;
+        representation[i] = (int) partial;
+        last_high = (partial >>> 32) & 0xFFFFFFFFL;
+      }
+
+      if (last_high != 0) {
+        grow(1);
+        representation[representation.length-1] = (int)last_high;
+      }
+
+      return this;
+    } else {
+      //Do some other stuff
+      return this;
+    }
   }
 
   public void grow(int by) {

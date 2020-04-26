@@ -45,4 +45,16 @@ public class BigIntegerContext {
       expect(a.equal(b), true);
     }
   }
+
+  public static class MutatingNotTest extends Test {
+    public String label() {
+      return "It can add not a BigInteger";
+    }
+    public void test() throws TestFailureException {
+      BigInteger a = new BigInteger(new int[] {0xffffffff, 0xffffffff});
+      BigInteger b = new BigInteger(new int[] {0, 0});
+      a.mutating_not();
+      expect(a.equal(b), true);
+    }
+  }
 }

@@ -41,6 +41,9 @@ public class TestSuite {
     TestRunner.register(new BigIntegerContext.HexTest());
     TestRunner.register(new BigIntegerContext.EqualTest());
     TestRunner.register(new BigIntegerContext.MutatingAddTest());
+    TestRunner.register(new BigIntegerContext.MutatingSubTest());
+    TestRunner.register(new BigIntegerContext.MutatingNotTest());
+
 
     TestRunner.register(new IntegerPlusContext.RotateRightTest());
 

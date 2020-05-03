@@ -38,13 +38,6 @@ public class TestSuite {
     TestRunner.register(new Integer128Context.OrTest());
     TestRunner.register(new Integer128Context.ToLongTest());
 
-    TestRunner.register(new BigIntegerContext.HexTest());
-    TestRunner.register(new BigIntegerContext.EqualTest());
-    TestRunner.register(new BigIntegerContext.MutatingAddTest());
-    TestRunner.register(new BigIntegerContext.MutatingSubTest());
-    TestRunner.register(new BigIntegerContext.MutatingNotTest());
-
-
     TestRunner.register(new IntegerPlusContext.RotateRightTest());
 
     TestRunner.register(new PrimeDecomposerContext.FiniteRingTest());

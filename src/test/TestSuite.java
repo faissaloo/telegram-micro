@@ -2,6 +2,8 @@ package test;
 
 public class TestSuite {
   public static void register_all_tests() {
+    TestRunner.register(new RSAPKCS1OAEPContext.RSAEncryptionPrimitiveTest());
+    
     TestRunner.register(new SHA256Context.DigestTest());
     TestRunner.register(new SHA1Context.DigestTest());
 

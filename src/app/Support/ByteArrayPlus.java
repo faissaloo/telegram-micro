@@ -22,4 +22,8 @@ public class ByteArrayPlus extends ByteArrayOutputStream {
   public void append_bytes(byte[] to_write) {
     write(to_write, 0, to_write.length);
   }
+
+  public void append_bytes_up_to(byte[] to_write, int length) {
+    write(to_write, 0, length);
+  }
 }

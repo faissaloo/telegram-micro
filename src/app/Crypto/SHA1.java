@@ -1,7 +1,7 @@
 package crypto;
 
 //Written by Mariotaku for Twidere J2ME
-
+//SHA1 is no longer safe, only use it where the protocol requires it
 public class SHA1 {
 	private final int[] abcde = { 0x67452301, 0xefcdab89, 0x98badcfe,
 			0x10325476, 0xc3d2e1f0 };

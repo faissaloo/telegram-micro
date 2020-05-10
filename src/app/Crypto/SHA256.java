@@ -9,6 +9,7 @@ import support.IntegerPlus;
 
 //Needs major refactoring
 public class SHA256 {
+    public static final int HASH_SIZE = 32;
     /**
      * Initial H values. These are the first 32
      * bits of the fractional parts of the square

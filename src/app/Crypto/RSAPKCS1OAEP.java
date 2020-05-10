@@ -1,5 +1,6 @@
 package crypto;
 import bouncycastle.BigInteger;
+import support.ByteArrayPlus;
 
 //7.2.2 of SP 800-56B
 public class RSAPKCS1OAEP {
@@ -18,15 +19,21 @@ public class RSAPKCS1OAEP {
     //return rsa_encryption_primitive(key, em)
   //}
 
-  //public static mask_generation_function(byte[] mask_generation_functionSeed, int masklen) {
-  //Don't need to check if masklen is >2^32 hashlen because masklen is a 32-bit quantity that can't store that value anyway
-  //  byte[] T = new byte[0];
-  //  for (int i = 0; i<masklen/hashLen; i++) {
-  //    D = integer_to_byte_array(i);
-  //    T = T+hash(mask_generation_functionSeed + D);
-  //  }
-  //  return T[0...masklen];
-  //}
+  public static byte[] mask_generation_function(byte[] mask_generation_functionSeed, int masklen) {
+    //Don't need to check if masklen is >2^32 hashlen because masklen is a 32-bit quantity that can't store that value anyway
+    //hashlen is 32
+    ByteArrayPlus to_return = new ByteArrayPlus();
+    for (int i = 0; i<masklen/SHA256.HASH_SIZE+1; i++) {
+      SHA256 sha256_engine = new SHA256();
+      ByteArrayPlus to_hash = new ByteArrayPlus();
+      to_hash.append_bytes(mask_generation_functionSeed);
+      to_hash.append_int(i);
+      int bytes_to_append = (((SHA256.HASH_SIZE-((SHA256.HASH_SIZE*(i+1))%masklen))+31)%SHA256.HASH_SIZE)+1;
+      System.out.println(bytes_to_append);
+      to_return.append_bytes_up_to(sha256_engine.digest(to_hash.toByteArray()), bytes_to_append); //We need some way to make sure we don't add more than masklen
+    }
+    return to_return.toByteArray();
+  }
 
   //public static byte[] oeap(RSAPublicKey key, byte[] keying_material, byte[] additional_input) {
   //  hashA = some kind of hash of the additional input?

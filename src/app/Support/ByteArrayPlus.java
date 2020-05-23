@@ -15,6 +15,10 @@ public class ByteArrayPlus extends ByteArrayOutputStream {
     append_bytes(Encode.int_encode(to_write));
   }
 
+  public void append_int24(int to_write) {
+    append_bytes(Encode.int24_encode(to_write));
+  }
+
   public void append_Integer128(Integer128 to_write) {
     append_bytes(Encode.Integer128_encode(to_write));
   }

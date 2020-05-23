@@ -2,6 +2,12 @@ package support;
 
 public class Decode {
   public static class Little {
+    public static int int24_decode(byte[] data, int offset) {
+      return (data[offset+0]&0xFF)|
+      ((data[offset+1]&0xFF)<<8)|
+      ((data[offset+2]&0xFF)<<16);
+    }
+
     public static int int_decode(byte[] data, int offset) {
       return (data[offset+0]&0xFF)|
       ((data[offset+1]&0xFF)<<8)|

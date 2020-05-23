@@ -15,6 +15,14 @@ public class Encode {
     };
   }
 
+  public static byte[] int24_encode(int to_encode) {
+    return new byte[] {
+      (byte) (to_encode&0xFFL),
+      (byte) ((to_encode&0xFF00L)>>8),
+      (byte) ((to_encode&0xFF0000L)>>16)
+    };
+  }
+
   public static byte[] int_encode(int to_encode) {
     return new byte[] {
       (byte) (to_encode&0xFFL),

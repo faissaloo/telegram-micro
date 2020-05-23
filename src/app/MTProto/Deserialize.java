@@ -7,10 +7,10 @@ import support.Decode;
 public class Deserialize {
   //https://core.telegram.org/type/bytes
   public static byte[] bytes_deserialize(byte[] data, int offset) {
-    int bytes_length = data[offset];
+    int bytes_length = data[offset]&0xFF;
     int bytes_offset = 1;
     if (bytes_length >= 254) {
-      bytes_length = Decode.Little.int_decode(data, offset);
+      bytes_length = Decode.Little.int24_decode(data, offset);
       bytes_offset = 4;
     }
     ByteArrayPlus bytes = new ByteArrayPlus();

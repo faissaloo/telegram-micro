@@ -4,7 +4,7 @@ public class TestSuite {
   public static void register_all_tests() {
     TestRunner.register(new SerializeContext.SerializeBytesTest());
 
-    TestRunner.register(new RSAPublicKeyContext.RSAPublicKeySignatureTest());
+    TestRunner.register(new RSAPublicKeyContext.RSAPublicKeyFingerprintTest());
     TestRunner.register(new RSAContext.RSAEncryptionPrimitiveTest());
 
     TestRunner.register(new SHA256Context.DigestTest());

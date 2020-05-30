@@ -51,15 +51,8 @@ public class TelegramLite extends MIDlet {
         if (RecieveResponseThread.has_responses()) {
           UnencryptedResponse key_response = UnencryptedResponse.from_tcp_response(RecieveResponseThread.dequeue_response());
           RecieveResPQ a = RecieveResPQ.from_unencrypted_message(key_response);
-          System.out.println("FINGERPRINTS RECIEVED:");
-          for (int i = 0; i < a.server_public_key_fingerprints.length; i++) {
-            System.out.println(Long.toString(a.server_public_key_fingerprints[i], 16));
-          }
           TelegramPublicKeys t = new TelegramPublicKeys();
-          System.out.println("FINGERPRINTS AVAILABLE:");
-          for (int i = 0; i < t.keys.length; i++) {
-            System.out.println(Long.toString(t.keys[i].signature, 16));
-          }
+          System.out.println(Long.toString(t.find_public_key(a.server_public_key_fingerprints).fingerprint, 16));
         }
       }
     } catch (IOException e) {

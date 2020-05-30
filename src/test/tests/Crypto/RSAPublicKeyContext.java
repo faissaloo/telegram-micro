@@ -11,7 +11,7 @@ public class RSAPublicKeyContext {
 
     public void test() throws TestFailureException {
       RSAPublicKey public_key = new RSAPublicKey(0x10001, new byte[] {(byte)0x66, (byte)0x77, (byte)0x88});
-      expect(public_key.signature, 0xAEBD06335441BD73L);
+      expect(public_key.signature, 0xD7FB3D3B0178C2BCL);
     }
   }
 }

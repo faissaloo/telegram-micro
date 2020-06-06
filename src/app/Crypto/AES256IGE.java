@@ -74,7 +74,7 @@ public class AES256IGE {
       garbled_block = xor_bytes(encrypted_block, previous_block);
       previous_block = block;
       previous_garbled_block = garbled_block;
-      encrypted_bytes.append_bytes(garbled_block);
+      encrypted_bytes.append_raw_bytes(garbled_block);
     }
     return encrypted_bytes.toByteArray();
   }
@@ -98,7 +98,7 @@ public class AES256IGE {
       degarbled_block = xor_bytes(decrypted_block, previous_block);
       previous_block = block;
       previous_degarbled_block = degarbled_block;
-      decrypted_bytes.append_bytes(degarbled_block);
+      decrypted_bytes.append_raw_bytes(degarbled_block);
     }
     return decrypted_bytes.toByteArray();
   }

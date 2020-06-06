@@ -19,7 +19,7 @@ public class TCPRequest {
     //request_data.append_int(0xeeeeeeee);
     request_data.append_int(data.length); //Doesn't seem like we'll actually need to /4, not sure what that was about
     //data
-    request_data.append_bytes(data);
+    request_data.append_raw_bytes(data);
   }
 
   public byte[] request_data() {

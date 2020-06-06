@@ -13,7 +13,20 @@ public class UnencryptedRequest {
     message_data.append_long(0L);
     message_data.append_long(message_id);
     message_data.append_int(data.length);
-    message_data.append_bytes(data);
+    message_data.append_raw_bytes(data);
+  }
+
+  public UnencryptedRequest(byte[] data) {
+    message_data = new ByteArrayPlus();
+    message_data.append_long(0L);
+    message_data.append_long(message_id());
+    message_data.append_int(data.length);
+    message_data.append_raw_bytes(data);
+  }
+
+  private long message_id() {
+    //https://core.telegram.org/mtproto/description#message-identifier-msg-id
+    return (System.currentTimeMillis()/1000L)*4294967296L;
   }
 
   public void send() {

@@ -10,13 +10,14 @@ import javax.microedition.io.Connector;
 import javax.microedition.io.SocketConnection;
 
 import mtproto.TelegramPublicKeys;
-import mtproto.ReqPqMulti;
+import mtproto.SendReqPqMulti;
 import mtproto.RecieveResponseThread;
 import mtproto.SendRequestThread;
 import mtproto.UnencryptedResponse;
 import mtproto.RecieveResPQ;
 
 import support.Integer128;
+import support.RandomPlus;
 
 public class TelegramLite extends MIDlet {
   private Form form;
@@ -42,7 +43,11 @@ public class TelegramLite extends MIDlet {
       message_send_thread.start(); //Should we have these start when they're instantiated?
       message_recieve_thread.start();
 
-      ReqPqMulti key_exchange = new ReqPqMulti();
+      RandomPlus random_number_generator = new RandomPlus(); //This might need to be cryptographically secure idk
+      Integer128 nonce = random_number_generator.nextInteger128();
+      System.out.println("NONCE 1: "+nonce.hex());
+
+      SendReqPqMulti key_exchange = new SendReqPqMulti(nonce);
       key_exchange.send();
       System.out.println("QUEUED FOR SENDING!");
 
@@ -51,6 +56,8 @@ public class TelegramLite extends MIDlet {
         if (RecieveResponseThread.has_responses()) {
           UnencryptedResponse key_response = UnencryptedResponse.from_tcp_response(RecieveResponseThread.dequeue_response());
           RecieveResPQ a = RecieveResPQ.from_unencrypted_message(key_response);
+          System.out.println("NONCE 2: "+a.nonce.hex());
+          System.out.println("SERVER NONCE: "+a.server_nonce.hex());
           TelegramPublicKeys t = new TelegramPublicKeys();
           System.out.println(Long.toString(t.find_public_key(a.server_public_key_fingerprints).fingerprint, 16));
         }

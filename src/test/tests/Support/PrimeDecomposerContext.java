@@ -11,8 +11,8 @@ public class PrimeDecomposerContext {
     }
     public void test() throws TestFailureException {
       PrimeDecomposer.Coprimes result = PrimeDecomposer.decompose(0x211cafa9555101f5L);
-      expect(result.lesser_prime(), 0x59e2945dL);
-      expect(result.greater_prime(), 0x5e4e4a79L);
+      expect(result.lesser_prime, 0x59e2945dL);
+      expect(result.greater_prime, 0x5e4e4a79L);
     }
   }
 

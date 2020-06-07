@@ -6,8 +6,8 @@ import support.Integer128;
 
 public class PrimeDecomposer {
   public static class Coprimes {
-    long lesser_prime;
-    long greater_prime;
+    public long lesser_prime;
+    public long greater_prime;
 
     public Coprimes(long first_prime, long second_prime) {
       if (first_prime < second_prime) {
@@ -17,14 +17,6 @@ public class PrimeDecomposer {
         this.lesser_prime = second_prime;
         this.greater_prime = first_prime;
       }
-    }
-
-    public long lesser_prime() {
-      return lesser_prime;
-    }
-
-    public long greater_prime() {
-      return greater_prime;
     }
   }
 

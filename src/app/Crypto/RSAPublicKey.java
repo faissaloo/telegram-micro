@@ -11,7 +11,7 @@ public class RSAPublicKey {
 
   public RSAPublicKey(int exponent, byte[] modulus) {
     this.exponent = BigInteger.valueOf(exponent);
-    this.modulus = new BigInteger(modulus);
+    this.modulus = new BigInteger(1, modulus);
 
     update_fingerprint();
   }
@@ -19,7 +19,7 @@ public class RSAPublicKey {
   public RSAPublicKey(long fingerprint, int exponent, byte[] modulus) {
     this.fingerprint = fingerprint;
     this.exponent = BigInteger.valueOf(exponent);
-    this.modulus = new BigInteger(modulus);
+    this.modulus = new BigInteger(1, modulus);
   }
 
   //https://github.com/tdlib/td/issues/250

@@ -27,6 +27,7 @@ public class SendRequestThread extends Thread {
   public void run() {
     try {
       OutputStream request_stream = connection.openOutputStream();
+      System.out.println("REQUEST STREAM OPENED");
       connection.setSocketOption(SocketConnection.LINGER,5);
 
       while (true) {
@@ -42,11 +43,12 @@ public class SendRequestThread extends Thread {
           //send message
           TCPRequest message = ((TCPRequest) requests.dequeue());
           byte[] message_data = message.request_data();
+          System.out.println("SENDING REQUEST");
           request_stream.write(message_data);
-          System.out.println("MESSAGE SENT");
         }
       }
 
+      System.out.println("CLOSING REQUEST STREAM");
       request_stream.close();
       connection.close();
     } catch (IOException exception) {

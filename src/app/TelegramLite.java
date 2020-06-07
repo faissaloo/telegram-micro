@@ -11,12 +11,17 @@ import javax.microedition.io.SocketConnection;
 
 import mtproto.TelegramPublicKeys;
 import mtproto.SendReqPqMulti;
+import mtproto.SendReqDhParams;
 import mtproto.RecieveResponseThread;
 import mtproto.SendRequestThread;
 import mtproto.UnencryptedResponse;
 import mtproto.RecieveResPQ;
+import mtproto.PrimeDecomposer;
+
+import crypto.RSAPublicKey;
 
 import support.Integer128;
+import support.Integer256;
 import support.RandomPlus;
 
 public class TelegramLite extends MIDlet {
@@ -45,21 +50,46 @@ public class TelegramLite extends MIDlet {
 
       RandomPlus random_number_generator = new RandomPlus(); //This might need to be cryptographically secure idk
       Integer128 nonce = random_number_generator.nextInteger128();
-      System.out.println("NONCE 1: "+nonce.hex());
+      Integer256 second_nonce;
 
       SendReqPqMulti key_exchange = new SendReqPqMulti(nonce);
       key_exchange.send();
-      System.out.println("QUEUED FOR SENDING!");
+      System.out.println("KEY EXCHANGE SENT");
 
       while (true) {
         SendRequestThread.sleep(1); //Don't peg the CPU
         if (RecieveResponseThread.has_responses()) {
           UnencryptedResponse key_response = UnencryptedResponse.from_tcp_response(RecieveResponseThread.dequeue_response());
-          RecieveResPQ a = RecieveResPQ.from_unencrypted_message(key_response);
-          System.out.println("NONCE 2: "+a.nonce.hex());
-          System.out.println("SERVER NONCE: "+a.server_nonce.hex());
-          TelegramPublicKeys t = new TelegramPublicKeys();
-          System.out.println(Long.toString(t.find_public_key(a.server_public_key_fingerprints).fingerprint, 16));
+          //check that it's a RecieveResPQ first
+          //RecieveResPQ.message_is()
+          RecieveResPQ pq_data = RecieveResPQ.from_unencrypted_message(key_response);
+
+          System.out.println("PQ DATA RECIEVED; PQ = "+Long.toString(pq_data.pq, 16));
+          PrimeDecomposer.Coprimes decomposed_pq = PrimeDecomposer.decompose(pq_data.pq);
+          System.out.println("PQ DECOMPOSED; P = "+Long.toString(decomposed_pq.lesser_prime, 16)+"; Q = "+Long.toString(decomposed_pq.greater_prime, 16));
+          TelegramPublicKeys public_keys = new TelegramPublicKeys();
+          RSAPublicKey public_key = public_keys.find_public_key(pq_data.server_public_key_fingerprints);
+          if (public_key != null) {
+            System.out.println("PUBLIC KEY FOUND; FINGERPRINT = "+Long.toString(public_key.fingerprint, 16));
+          } else {
+            System.out.println("ERROR NO PUBLIC KEY FOUND; POTENTIAL FINGERPRINTS ARE: ");
+            for (int i = 0; i < pq_data.server_public_key_fingerprints.length; i++) {
+              System.out.println("  "+Long.toString(pq_data.server_public_key_fingerprints[i], 16));
+            }
+          }
+          second_nonce = random_number_generator.nextInteger256();
+
+          SendReqDhParams diffie_hellman_params_request = new SendReqDhParams(
+              nonce,
+              pq_data.server_nonce,
+              pq_data.pq,
+              decomposed_pq.lesser_prime,
+              decomposed_pq.greater_prime,
+              public_key,
+              second_nonce
+          );
+          diffie_hellman_params_request.send(); //For some reason this is killing the connection no idea what's up with that
+          System.out.println("REQUESTING DIFFIE HELLMAN PARAMETERS");
         }
       }
     } catch (IOException e) {

@@ -18,6 +18,10 @@ public class TCPResponse {
     for (int shift = 0; shift < 32 && (response_byte = response_stream.read()) != -1; shift += 8) {
       length |= response_byte << shift;
     }
+    if (response_byte == -1) {
+      System.out.println("RAN OUT OF BYTES WHILE READING LENGTH");
+      System.out.println("LENGTH = "+Integer.toString(length));
+    }
 
     //read the number of bytes specified by TCP response
     ByteArrayPlus response_data = new ByteArrayPlus();

@@ -3,6 +3,8 @@ package bouncycastle;
 import java.util.Random;
 import java.util.Stack;
 import java.util.Vector;
+import support.ByteArrayPlus;
+import support.Encode;
 
 public class BigInteger
 {
@@ -2730,6 +2732,7 @@ public class BigInteger
         return new BigInteger(this.sign * compare, subtract(0, res, 0, littlun.magnitude));
     }
 
+    //This includes a byte to indicate the sign
     public byte[] toByteArray()
     {
         if (sign == 0)
@@ -3276,5 +3279,46 @@ public class BigInteger
 
         int word = magnitude[magnitude.length - 1 - wordNum];
         return ((word >> (n % 32)) & 1) > 0;
+    }
+
+    public byte[] magnitudeToBytes()
+    {
+        if (magnitude == null)
+        {
+            return null;
+        }
+        if (sign == 0)
+        {
+            return new byte[] {};
+        }
+
+
+        // NOTE: This *should* be unnecessary, since the magnitude *should* never have leading zero digits
+        int firstNonZero = 0;
+        while (firstNonZero < magnitude.length)
+        {
+            if (magnitude[firstNonZero] != 0)
+            {
+                break;
+            }
+            ++firstNonZero;
+        }
+
+        if (firstNonZero == magnitude.length)
+        {
+            return new byte[] {};
+        }
+
+        ByteArrayPlus sb = new ByteArrayPlus();
+
+        int pos = firstNonZero;
+        //We'll need to ignore zeroes when converting to bytes
+        sb.append_raw_bytes(Encode.Big.int_encode_without_leading_zeroes(magnitude[pos]));
+        while (++pos < magnitude.length)
+        {
+          sb.append_raw_bytes(Encode.Big.int_encode(magnitude[pos]));
+        }
+
+        return sb.toByteArray();
     }
 }

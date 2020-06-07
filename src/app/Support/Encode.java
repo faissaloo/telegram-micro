@@ -2,6 +2,43 @@ package support;
 
 public class Encode {
   public static class Big {
+    public static byte[] int_encode_without_leading_zeroes(int to_encode) {
+      if (to_encode > 0xFF0000) {
+        return new byte[] {
+          (byte) ((to_encode&0xFF000000)>>24),
+          (byte) ((to_encode&0xFF0000)>>16),
+          (byte) ((to_encode&0xFF00)>>8),
+          (byte) (to_encode&0xFF)
+        };
+      } else if (to_encode > 0xFF00) {
+        return new byte[] {
+          (byte) ((to_encode&0xFF0000)>>16),
+          (byte) ((to_encode&0xFF00)>>8),
+          (byte) (to_encode&0xFF)
+        };
+      } else if (to_encode > 0xFF) {
+        return new byte[] {
+          (byte) ((to_encode&0xFF00)>>8),
+          (byte) (to_encode&0xFF)
+        };
+      } else if (to_encode > 0x0) {
+        return new byte[] {
+          (byte) (to_encode&0xFF)
+        };
+      } else {
+        return new byte[] {};
+      }
+    }
+
+    public static byte[] int_encode(int to_encode) {
+      return new byte[] {
+        (byte) ((to_encode&0xFF000000L)>>24),
+        (byte) ((to_encode&0xFF0000L)>>16),
+        (byte) ((to_encode&0xFF00L)>>8),
+        (byte) (to_encode&0xFFL)
+      };
+    }
+
     public static byte[] long_encode(long to_encode) {
       return new byte[] {
         (byte) ((to_encode&0xFF00000000000000L)>>56),

@@ -7,6 +7,8 @@ import crypto.RSAPublicKey;
 import crypto.SHA1;
 import crypto.RSA;
 
+import support.Debug;
+
 public class SendReqDhParams {
   ByteArrayPlus message_data;
 
@@ -26,11 +28,19 @@ public class SendReqDhParams {
     ByteArrayPlus data_with_hash = new ByteArrayPlus();
     {
       data_with_hash.append_raw_bytes((new SHA1()).digest(p_q_inner_data.toByteArray()));
-      for (int i = 0; i < 255-data_with_hash.size(); i++) {
+      data_with_hash.append_raw_bytes(p_q_inner_data.toByteArray());
+      int padding_needed = 255 - data_with_hash.size();
+      for (int i = 0; i < padding_needed; i++) {
         data_with_hash.append_byte((byte)0);
       }
     }
     byte[] encrypted_data_bytes = RSA.encrypt(public_key, data_with_hash.toByteArray());
+    //System.out.println("ENCRYPTED DATA LENGTH: " + Integer.toString(encrypted_data_bytes.length)); //Someone explain whym'st tf this is sometimes 257 bytes long?
+    System.out.println("MODULUS: "+Debug.bytes_to_hex(public_key.modulus.magnitudeToBytes())); //...why the hell is toByteArray returning an extra byte?
+    System.out.println("UNENCRYPTED DATA BYTES: "+Debug.bytes_to_hex(data_with_hash.toByteArray()));
+    //The encrypted data seems to be utterly wrong... Is it an endianness issue?
+    System.out.println("ENCRYPTED DATA BYTES: "+Debug.bytes_to_hex(encrypted_data_bytes));
+    System.out.println("ENCRYPTED DATA BYTES LENGTH: "+encrypted_data_bytes.length);
 
     message_data = new ByteArrayPlus();
     message_data.append_int(0xd712e4be); //combinator_id

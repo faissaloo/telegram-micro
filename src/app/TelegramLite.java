@@ -45,6 +45,7 @@ public class TelegramLite extends MIDlet {
       SocketConnection api_connection = (SocketConnection) Connector.open("socket://149.154.167.40:443");
       SendRequestThread message_send_thread = new SendRequestThread(api_connection);
       RecieveResponseThread message_recieve_thread = new RecieveResponseThread(api_connection);
+
       message_send_thread.start(); //Should we have these start when they're instantiated?
       message_recieve_thread.start();
 
@@ -63,7 +64,6 @@ public class TelegramLite extends MIDlet {
           //check that it's a RecieveResPQ first
           //RecieveResPQ.message_is()
           RecieveResPQ pq_data = RecieveResPQ.from_unencrypted_message(key_response);
-
           System.out.println("PQ DATA RECIEVED; PQ = "+Long.toString(pq_data.pq, 16));
           PrimeDecomposer.Coprimes decomposed_pq = PrimeDecomposer.decompose(pq_data.pq);
           System.out.println("PQ DECOMPOSED; P = "+Long.toString(decomposed_pq.lesser_prime, 16)+"; Q = "+Long.toString(decomposed_pq.greater_prime, 16));

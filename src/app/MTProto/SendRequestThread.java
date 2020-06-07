@@ -28,7 +28,7 @@ public class SendRequestThread extends Thread {
     try {
       OutputStream request_stream = connection.openOutputStream();
       System.out.println("REQUEST STREAM OPENED");
-      connection.setSocketOption(SocketConnection.LINGER,5);
+      connection.setSocketOption(SocketConnection.LINGER, 5);
 
       while (true) {
         try {

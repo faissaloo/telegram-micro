@@ -7,7 +7,7 @@ public class Debug {
     //We can make this way more efficient if we really want, rn this is gonna blow up the GC
     String new_string = "";
     for (int i = 0; i < array.length; i++) {
-      new_string += hex_lookup_table[(array[i] >> 4)&0xF] + "" + hex_lookup_table[array[i]&0xF];
+      new_string += hex_lookup_table[(array[i]&0xF0) >>> 4] + "" + hex_lookup_table[array[i]&0xF];
     }
     return new_string;
   }

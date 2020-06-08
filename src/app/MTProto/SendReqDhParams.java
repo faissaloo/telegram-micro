@@ -35,8 +35,8 @@ public class SendReqDhParams {
       }
     }
     byte[] encrypted_data_bytes = RSA.encrypt(public_key, data_with_hash.toByteArray());
-    //System.out.println("ENCRYPTED DATA LENGTH: " + Integer.toString(encrypted_data_bytes.length)); //Someone explain whym'st tf this is sometimes 257 bytes long?
-    System.out.println("MODULUS: "+Debug.bytes_to_hex(public_key.modulus.magnitudeToBytes())); //...why the hell is toByteArray returning an extra byte?
+    //System.out.println("ENCRYPTED DATA LENGTH: " + Integer.toString(encrypted_data_bytes.length));
+    System.out.println("MODULUS: "+Debug.bytes_to_hex(public_key.modulus.magnitudeToBytes()));
     System.out.println("UNENCRYPTED DATA BYTES: "+Debug.bytes_to_hex(data_with_hash.toByteArray()));
     //The encrypted data seems to be utterly wrong... Is it an endianness issue?
     System.out.println("ENCRYPTED DATA BYTES: "+Debug.bytes_to_hex(encrypted_data_bytes));

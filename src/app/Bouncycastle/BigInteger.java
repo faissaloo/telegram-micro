@@ -3292,7 +3292,6 @@ public class BigInteger
             return new byte[] {};
         }
 
-
         // NOTE: This *should* be unnecessary, since the magnitude *should* never have leading zero digits
         int firstNonZero = 0;
         while (firstNonZero < magnitude.length)
@@ -3309,11 +3308,11 @@ public class BigInteger
             return new byte[] {};
         }
 
-        ByteArrayPlus sb = new ByteArrayPlus();
 
         int pos = firstNonZero;
         //We'll need to ignore zeroes when converting to bytes
-        sb.append_raw_bytes(Encode.Big.int_encode_without_leading_zeroes(magnitude[pos]));
+        ByteArrayPlus sb = new ByteArrayPlus();
+        sb.append_raw_bytes(Encode.Big.int_encode_without_leading_zeroes(magnitude[pos])); //Maybe this is giving incorrect results
         while (++pos < magnitude.length)
         {
           sb.append_raw_bytes(Encode.Big.int_encode(magnitude[pos]));

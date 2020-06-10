@@ -35,18 +35,11 @@ public class SendReqDhParams {
       }
     }
     byte[] encrypted_data_bytes = RSA.encrypt(public_key, data_with_hash.toByteArray());
-    //System.out.println("ENCRYPTED DATA LENGTH: " + Integer.toString(encrypted_data_bytes.length));
-    System.out.println("MODULUS: "+Debug.bytes_to_hex(public_key.modulus.magnitudeToBytes()));
-    System.out.println("UNENCRYPTED DATA BYTES: "+Debug.bytes_to_hex(data_with_hash.toByteArray()));
-    //The encrypted data seems to be utterly wrong... Is it an endianness issue?
-    System.out.println("ENCRYPTED DATA BYTES: "+Debug.bytes_to_hex(encrypted_data_bytes));
-    System.out.println("ENCRYPTED DATA BYTES LENGTH: "+encrypted_data_bytes.length);
 
     message_data = new ByteArrayPlus();
     message_data.append_int(0xd712e4be); //combinator_id
     message_data.append_Integer128(nonce);
     message_data.append_Integer128(server_nonce);
-    //we probably have to strip leading zeroes from these
     message_data.append_raw_bytes(Serialize.serialize_bytes(Encode.Big.long_encode(p)));
     message_data.append_raw_bytes(Serialize.serialize_bytes(Encode.Big.long_encode(q)));
     message_data.append_long(public_key.fingerprint);

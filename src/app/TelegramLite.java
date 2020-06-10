@@ -33,12 +33,6 @@ public class TelegramLite extends MIDlet {
   }
 
   public void startApp() {
-    //Apparently our current display has to be null otherwise it hangs, weird
-    //form = new Form("Hello World");
-    //String msg = getIP();
-    //form.append(msg);
-    //display = Display.getDisplay(this);
-    //display.setCurrent(form);
     Display.getDisplay(this).setCurrent(null);
 
     try {

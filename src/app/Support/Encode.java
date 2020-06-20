@@ -1,7 +1,7 @@
 package support;
 
 public class Encode {
-  public static class Big {
+  public static class Big {    
     public static byte[] int_encode_without_leading_zeroes(int to_encode) {
       if ((to_encode&0xFFFFFFFFL) > 0xFF0000) {
         return new byte[] {

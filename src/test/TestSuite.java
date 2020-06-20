@@ -2,6 +2,8 @@ package test;
 
 public class TestSuite {
   public static void register_all_tests() {
+    TestRunner.register(new ArrayPlusContext.RemoveLeadingZeroesTest());
+
     TestRunner.register(new SerializeContext.SerializeBytesTest());
 
     TestRunner.register(new RSAPublicKeyContext.RSAPublicKeyFingerprintTest());

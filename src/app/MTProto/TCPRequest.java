@@ -7,6 +7,7 @@ import javax.microedition.io.SocketConnection;
 
 import support.Encode;
 import support.ByteArrayPlus;
+import support.Debug;
 
 public class TCPRequest {
   ByteArrayPlus request_data;
@@ -27,6 +28,7 @@ public class TCPRequest {
   }
 
   public void send() {
+    System.out.println("REQUEST SENT: "+Debug.bytes_to_hex(request_data()));
     SendRequestThread.enqueue_request(this);
   }
 }

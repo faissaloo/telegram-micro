@@ -16,6 +16,19 @@ public class SendReqDhParams {
   ByteArrayPlus message_data;
 
   public SendReqDhParams(Integer128 nonce, Integer128 server_nonce, long pq, long p, long q, RSAPublicKey public_key, Integer256 new_nonce) {
+    byte[] encrypted_data_bytes = RSA.encrypt(public_key, data_with_hash(p_q_inner_data(nonce, server_nonce, pq, p, q, new_nonce)));
+    
+    message_data = new ByteArrayPlus();
+    message_data.append_int(CombinatorIds.req_DH_params); //combinator_id
+    message_data.append_Integer128(nonce);
+    message_data.append_Integer128(server_nonce);
+    message_data.append_raw_bytes(Serialize.serialize_bytes(ArrayPlus.remove_leading_zeroes(Encode.Big.long_encode(p))));
+    message_data.append_raw_bytes(Serialize.serialize_bytes(ArrayPlus.remove_leading_zeroes(Encode.Big.long_encode(q))));
+    message_data.append_long(public_key.fingerprint);
+    message_data.append_raw_bytes(Serialize.serialize_bytes(encrypted_data_bytes));
+  }
+  
+  public static byte[] p_q_inner_data(Integer128 nonce, Integer128 server_nonce, long pq, long p, long q, Integer256 new_nonce) {
     ByteArrayPlus p_q_inner_data = new ByteArrayPlus();
     {
       p_q_inner_data.append_int(CombinatorIds.p_q_inner_data);
@@ -26,26 +39,18 @@ public class SendReqDhParams {
       p_q_inner_data.append_Integer128(server_nonce);
       p_q_inner_data.append_Integer256(new_nonce);
     }
-
+    return p_q_inner_data.toByteArray();
+  }
+  
+  public static byte[] data_with_hash(byte[] p_q_inner_data) {
     ByteArrayPlus data_with_hash = new ByteArrayPlus();
-    {
-      data_with_hash.append_raw_bytes((new SHA1()).digest(p_q_inner_data.toByteArray()));
-      data_with_hash.append_raw_bytes(p_q_inner_data.toByteArray());
-      int padding_needed = 255 - data_with_hash.size();
-      
-      SecureRandomPlus random_number_generator = new SecureRandomPlus();
-      data_with_hash.append_raw_bytes(random_number_generator.nextBytes(padding_needed));
-    }
-    byte[] encrypted_data_bytes = RSA.encrypt(public_key, data_with_hash.toByteArray());
-
-    message_data = new ByteArrayPlus();
-    message_data.append_int(CombinatorIds.req_DH_params); //combinator_id
-    message_data.append_Integer128(nonce);
-    message_data.append_Integer128(server_nonce);
-    message_data.append_raw_bytes(Serialize.serialize_bytes(ArrayPlus.remove_leading_zeroes(Encode.Big.long_encode(p))));
-    message_data.append_raw_bytes(Serialize.serialize_bytes(ArrayPlus.remove_leading_zeroes(Encode.Big.long_encode(q))));
-    message_data.append_long(public_key.fingerprint);
-    message_data.append_raw_bytes(Serialize.serialize_bytes(encrypted_data_bytes));
+    data_with_hash.append_raw_bytes((new SHA1()).digest(p_q_inner_data));
+    data_with_hash.append_raw_bytes(p_q_inner_data);
+    int padding_needed = 255 - data_with_hash.size();
+    
+    SecureRandomPlus random_number_generator = new SecureRandomPlus();
+    data_with_hash.append_raw_bytes(random_number_generator.nextBytes(padding_needed));
+    return data_with_hash.toByteArray();
   }
 
   public void send() {

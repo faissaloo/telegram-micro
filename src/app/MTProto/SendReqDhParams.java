@@ -8,6 +8,7 @@ import support.RandomPlus;
 import crypto.RSAPublicKey;
 import crypto.SHA1;
 import crypto.RSA;
+import crypto.SecureRandomPlus;
 
 import support.Debug;
 
@@ -32,7 +33,7 @@ public class SendReqDhParams {
       data_with_hash.append_raw_bytes(p_q_inner_data.toByteArray());
       int padding_needed = 255 - data_with_hash.size();
       
-      RandomPlus random_number_generator = new RandomPlus();
+      SecureRandomPlus random_number_generator = new SecureRandomPlus();
       data_with_hash.append_raw_bytes(random_number_generator.nextBytes(padding_needed));
     }
     byte[] encrypted_data_bytes = RSA.encrypt(public_key, data_with_hash.toByteArray());

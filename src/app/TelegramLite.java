@@ -19,6 +19,7 @@ import mtproto.RecieveResPQ;
 import mtproto.PrimeDecomposer;
 
 import crypto.RSAPublicKey;
+import crypto.SecureRandomPlus;
 
 import support.Integer128;
 import support.Integer256;
@@ -43,7 +44,7 @@ public class TelegramLite extends MIDlet {
       message_send_thread.start(); //Should we have these start when they're instantiated?
       message_recieve_thread.start();
 
-      RandomPlus random_number_generator = new RandomPlus(); //This might need to be cryptographically secure idk
+      SecureRandomPlus random_number_generator = new SecureRandomPlus();
       Integer128 nonce = random_number_generator.nextInteger128();
       Integer256 second_nonce;
 

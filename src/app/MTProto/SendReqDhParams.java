@@ -18,7 +18,7 @@ public class SendReqDhParams {
   public SendReqDhParams(Integer128 nonce, Integer128 server_nonce, long pq, long p, long q, RSAPublicKey public_key, Integer256 new_nonce) {
     ByteArrayPlus p_q_inner_data = new ByteArrayPlus();
     {
-      p_q_inner_data.append_int(0x83c95aec); //p_q_inner_data#83c95aec combinator_id
+      p_q_inner_data.append_int(CombinatorIds.p_q_inner_data);
       p_q_inner_data.append_raw_bytes(Serialize.serialize_bytes(ArrayPlus.remove_leading_zeroes(Encode.Big.long_encode(pq))));
       p_q_inner_data.append_raw_bytes(Serialize.serialize_bytes(ArrayPlus.remove_leading_zeroes(Encode.Big.long_encode(p))));
       p_q_inner_data.append_raw_bytes(Serialize.serialize_bytes(ArrayPlus.remove_leading_zeroes(Encode.Big.long_encode(q))));
@@ -39,7 +39,7 @@ public class SendReqDhParams {
     byte[] encrypted_data_bytes = RSA.encrypt(public_key, data_with_hash.toByteArray());
 
     message_data = new ByteArrayPlus();
-    message_data.append_int(0xd712e4be); //combinator_id
+    message_data.append_int(CombinatorIds.req_DH_params); //combinator_id
     message_data.append_Integer128(nonce);
     message_data.append_Integer128(server_nonce);
     message_data.append_raw_bytes(Serialize.serialize_bytes(ArrayPlus.remove_leading_zeroes(Encode.Big.long_encode(p))));

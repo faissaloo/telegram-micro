@@ -13,9 +13,8 @@ public class SendReqPqMulti {
   ByteArrayPlus message_data;
 
   public SendReqPqMulti(Integer128 nonce) {
-    // req_pq_multi#be7e8ef1 nonce:int128 = ResPQ;
     message_data = new ByteArrayPlus();
-    message_data.append_int(0xbe7e8ef1); //combinator_id
+    message_data.append_int(CombinatorIds.req_pq_multi);
     message_data.append_Integer128(nonce); //nonce
   }
 

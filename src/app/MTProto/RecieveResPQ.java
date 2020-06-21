@@ -12,7 +12,7 @@ public class RecieveResPQ {
     int message_type = Decode.Little.int_decode(data, skip);
     skip += 4;
 
-    if (message_type == 0x05162463) {
+    if (message_type == CombinatorIds.resPQ) {
       Integer128 nonce = Decode.Little.Integer128_decode(data, skip);
       skip += 16;
       Integer128 server_nonce = Decode.Little.Integer128_decode(data, skip);

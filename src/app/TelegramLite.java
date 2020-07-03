@@ -17,6 +17,8 @@ import mtproto.SendRequestThread;
 import mtproto.UnencryptedResponse;
 import mtproto.RecieveResPQ;
 import mtproto.PrimeDecomposer;
+import mtproto.SendPing;
+import mtproto.CombinatorIds;
 
 import crypto.RSAPublicKey;
 import crypto.SecureRandomPlus;
@@ -44,6 +46,24 @@ public class TelegramLite extends MIDlet {
       message_send_thread.start(); //Should we have these start when they're instantiated?
       message_recieve_thread.start();
 
+      SendPing ping = new SendPing(69L);
+      
+      ping.send();
+      ping.send();
+      
+      while (true) {
+        SendRequestThread.sleep(1); //Don't peg the CPU
+        if (RecieveResponseThread.has_responses()) {
+          UnencryptedResponse response = UnencryptedResponse.from_tcp_response(RecieveResponseThread.dequeue_response());
+          if (response.type() == CombinatorIds.pong) {
+            System.out.println("RECIEVED PONG");
+          }
+          if (response.type() == CombinatorIds.resPQ) {
+            System.out.println("RECIEVED RESPQ");
+          }
+        }
+      }
+      /*
       SecureRandomPlus random_number_generator = new SecureRandomPlus();
       Integer128 nonce = random_number_generator.nextInteger128();
       Integer256 second_nonce;
@@ -87,6 +107,7 @@ public class TelegramLite extends MIDlet {
           System.out.println("REQUESTING DIFFIE HELLMAN PARAMETERS");
         }
       }
+      */
     } catch (IOException e) {
       e.printStackTrace();
     } catch (InterruptedException e) {

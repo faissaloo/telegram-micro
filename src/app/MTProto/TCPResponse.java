@@ -38,7 +38,6 @@ public class TCPResponse {
   }
 
   public TCPResponse(byte[] data) throws IOException {
-    System.out.println("RESPONSE RECIEVED: "+Debug.bytes_to_hex(data));
     this.data = data;
   }
 

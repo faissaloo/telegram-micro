@@ -32,7 +32,6 @@ public class RecieveResponseThread extends Thread {
   public void run() {
     try {
       InputStream response_stream = connection.openInputStream();
-      System.out.println("RESPONSE STREAM OPENED");
       connection.setSocketOption(SocketConnection.LINGER, 5);
 
       // THE NETWORK MONITOR IS A LIE
@@ -41,11 +40,9 @@ public class RecieveResponseThread extends Thread {
         // unencrypted messages start with a 8 bytes/long of zero (auth_key_id)
         // encrypted messages start with a 8 bytes/long with a non-zero value (auth_key_id)
         //We should probably have different classes for recieved messages unlike the example
-        System.out.println("RESPONSE RECIEVED");
         responses.enqueue(response);
       }
 
-      System.out.println("CLOSING RESPONSE STREAM");
       response_stream.close();
       connection.close();
     } catch (IOException exception) {

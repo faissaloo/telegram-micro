@@ -40,6 +40,9 @@ public class UnencryptedResponse {
   public long message_id() {
     return message_id;
   }
+  public long type() {
+    return Decode.Little.int_decode(data, 0);
+  }
   public byte[] data() {
     return data;
   }

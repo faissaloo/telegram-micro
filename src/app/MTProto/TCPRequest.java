@@ -28,7 +28,6 @@ public class TCPRequest {
   }
 
   public void send() {
-    System.out.println("REQUEST SENT: "+Debug.bytes_to_hex(request_data()));
     SendRequestThread.enqueue_request(this);
   }
 }

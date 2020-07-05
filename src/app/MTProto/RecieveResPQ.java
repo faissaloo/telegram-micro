@@ -9,8 +9,7 @@ public class RecieveResPQ {
   public static RecieveResPQ from_unencrypted_message(UnencryptedResponse message) throws TypeMismatchException {
     int skip = 0;
     byte[] data = message.data();
-    int message_type = Decode.Little.int_decode(data, skip);
-    skip += 4;
+    int message_type = message.type();
 
     if (message_type == CombinatorIds.resPQ) {
       Integer128 nonce = Decode.Little.Integer128_decode(data, skip);

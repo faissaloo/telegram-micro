@@ -52,7 +52,7 @@ public class TelegramLite extends MIDlet {
 
       SendReqPqMulti key_exchange = new SendReqPqMulti(nonce);
       key_exchange.send();
-      System.out.println("KEY EXCHANGE SENT");
+      System.out.println("REQUESTING PROOF OF WORK PARAMETERS");
 
       while (true) {
         SendRequestThread.sleep(1); //Don't peg the CPU
@@ -60,18 +60,11 @@ public class TelegramLite extends MIDlet {
           UnencryptedResponse key_response = UnencryptedResponse.from_tcp_response(RecieveResponseThread.dequeue_response());
           if (key_response.type() == CombinatorIds.resPQ) {
             RecieveResPQ pq_data = RecieveResPQ.from_unencrypted_message(key_response);
-            System.out.println("PQ DATA RECIEVED; PQ = "+Long.toString(pq_data.pq, 16));
             PrimeDecomposer.Coprimes decomposed_pq = PrimeDecomposer.decompose(pq_data.pq);
-            System.out.println("PQ DECOMPOSED; P = "+Long.toString(decomposed_pq.lesser_prime, 16)+"; Q = "+Long.toString(decomposed_pq.greater_prime, 16));
             TelegramPublicKeys public_keys = new TelegramPublicKeys();
             RSAPublicKey public_key = public_keys.find_public_key(pq_data.server_public_key_fingerprints);
-            if (public_key != null) {
-              System.out.println("PUBLIC KEY FOUND; FINGERPRINT = "+Long.toString(public_key.fingerprint, 16));
-            } else {
-              System.out.println("ERROR NO PUBLIC KEY FOUND; POTENTIAL FINGERPRINTS ARE: ");
-              for (int i = 0; i < pq_data.server_public_key_fingerprints.length; i++) {
-                System.out.println("  "+Long.toString(pq_data.server_public_key_fingerprints[i], 16));
-              }
+            if (public_key == null) {
+              System.out.println("NO MATCHING PUBLIC KEY FOUND");
             }
             second_nonce = random_number_generator.nextInteger256();
             
@@ -85,9 +78,9 @@ public class TelegramLite extends MIDlet {
             second_nonce
             );
             diffie_hellman_params_request.send();
-            System.out.println("REQUESTING DIFFIE HELLMAN PARAMETERS");
+            System.out.println("SENDING PROOF OF WORK");
           } else if (key_response.type() == CombinatorIds.server_DH_params_ok) {
-            System.out.println("SERVER SAID DIFFIE HELLMAN PARAMETERS ARE OK!");
+            System.out.println("SERVER SAID PROOF OF WORK PARAMETERS ARE OK!");
           }
         }
       }

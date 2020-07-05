@@ -45,7 +45,6 @@ public class SendRequestThread extends Thread {
           //send message
           TCPRequest message = ((TCPRequest) requests.dequeue());
           byte[] message_data = message.request_data();
-          System.out.println("SENDING REQUEST");
           request_stream.write(message_data);
         }
       }

@@ -7,4 +7,5 @@ public class CombinatorIds {
   public static int req_pq_multi = 0xbe7e8ef1;
   public static int ping = 0x7abe77ec;
   public static int pong = 0x347773c5;
+  public static int server_DH_params_ok = 0xd0e8075c;
 }

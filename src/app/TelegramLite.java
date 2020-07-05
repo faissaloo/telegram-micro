@@ -46,24 +46,6 @@ public class TelegramLite extends MIDlet {
       message_send_thread.start(); //Should we have these start when they're instantiated?
       message_recieve_thread.start();
 
-      SendPing ping = new SendPing(69L);
-      
-      ping.send();
-      ping.send();
-      
-      while (true) {
-        SendRequestThread.sleep(1); //Don't peg the CPU
-        if (RecieveResponseThread.has_responses()) {
-          UnencryptedResponse response = UnencryptedResponse.from_tcp_response(RecieveResponseThread.dequeue_response());
-          if (response.type() == CombinatorIds.pong) {
-            System.out.println("RECIEVED PONG");
-          }
-          if (response.type() == CombinatorIds.resPQ) {
-            System.out.println("RECIEVED RESPQ");
-          }
-        }
-      }
-      /*
       SecureRandomPlus random_number_generator = new SecureRandomPlus();
       Integer128 nonce = random_number_generator.nextInteger128();
       Integer256 second_nonce;
@@ -76,38 +58,39 @@ public class TelegramLite extends MIDlet {
         SendRequestThread.sleep(1); //Don't peg the CPU
         if (RecieveResponseThread.has_responses()) {
           UnencryptedResponse key_response = UnencryptedResponse.from_tcp_response(RecieveResponseThread.dequeue_response());
-          //check that it's a RecieveResPQ first
-          //RecieveResPQ.message_is()
-          RecieveResPQ pq_data = RecieveResPQ.from_unencrypted_message(key_response);
-          System.out.println("PQ DATA RECIEVED; PQ = "+Long.toString(pq_data.pq, 16));
-          PrimeDecomposer.Coprimes decomposed_pq = PrimeDecomposer.decompose(pq_data.pq);
-          System.out.println("PQ DECOMPOSED; P = "+Long.toString(decomposed_pq.lesser_prime, 16)+"; Q = "+Long.toString(decomposed_pq.greater_prime, 16));
-          TelegramPublicKeys public_keys = new TelegramPublicKeys();
-          RSAPublicKey public_key = public_keys.find_public_key(pq_data.server_public_key_fingerprints);
-          if (public_key != null) {
-            System.out.println("PUBLIC KEY FOUND; FINGERPRINT = "+Long.toString(public_key.fingerprint, 16));
-          } else {
-            System.out.println("ERROR NO PUBLIC KEY FOUND; POTENTIAL FINGERPRINTS ARE: ");
-            for (int i = 0; i < pq_data.server_public_key_fingerprints.length; i++) {
-              System.out.println("  "+Long.toString(pq_data.server_public_key_fingerprints[i], 16));
+          if (key_response.type() == CombinatorIds.resPQ) {
+            RecieveResPQ pq_data = RecieveResPQ.from_unencrypted_message(key_response);
+            System.out.println("PQ DATA RECIEVED; PQ = "+Long.toString(pq_data.pq, 16));
+            PrimeDecomposer.Coprimes decomposed_pq = PrimeDecomposer.decompose(pq_data.pq);
+            System.out.println("PQ DECOMPOSED; P = "+Long.toString(decomposed_pq.lesser_prime, 16)+"; Q = "+Long.toString(decomposed_pq.greater_prime, 16));
+            TelegramPublicKeys public_keys = new TelegramPublicKeys();
+            RSAPublicKey public_key = public_keys.find_public_key(pq_data.server_public_key_fingerprints);
+            if (public_key != null) {
+              System.out.println("PUBLIC KEY FOUND; FINGERPRINT = "+Long.toString(public_key.fingerprint, 16));
+            } else {
+              System.out.println("ERROR NO PUBLIC KEY FOUND; POTENTIAL FINGERPRINTS ARE: ");
+              for (int i = 0; i < pq_data.server_public_key_fingerprints.length; i++) {
+                System.out.println("  "+Long.toString(pq_data.server_public_key_fingerprints[i], 16));
+              }
             }
+            second_nonce = random_number_generator.nextInteger256();
+            
+            SendReqDhParams diffie_hellman_params_request = new SendReqDhParams(
+            nonce,
+            pq_data.server_nonce,
+            pq_data.pq,
+            decomposed_pq.lesser_prime,
+            decomposed_pq.greater_prime,
+            public_key,
+            second_nonce
+            );
+            diffie_hellman_params_request.send();
+            System.out.println("REQUESTING DIFFIE HELLMAN PARAMETERS");
+          } else if (key_response.type() == CombinatorIds.server_DH_params_ok) {
+            System.out.println("SERVER SAID DIFFIE HELLMAN PARAMETERS ARE OK!");
           }
-          second_nonce = random_number_generator.nextInteger256();
-
-          SendReqDhParams diffie_hellman_params_request = new SendReqDhParams(
-              nonce,
-              pq_data.server_nonce,
-              pq_data.pq,
-              decomposed_pq.lesser_prime,
-              decomposed_pq.greater_prime,
-              public_key,
-              second_nonce
-          );
-          diffie_hellman_params_request.send(); //For some reason this is killing the connection no idea what's up with that
-          System.out.println("REQUESTING DIFFIE HELLMAN PARAMETERS");
         }
       }
-      */
     } catch (IOException e) {
       e.printStackTrace();
     } catch (InterruptedException e) {

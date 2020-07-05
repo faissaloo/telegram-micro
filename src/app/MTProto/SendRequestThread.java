@@ -14,6 +14,7 @@ public class SendRequestThread extends Thread {
   static Queue requests = new Queue();
   static SendRequestThread instance;
   SocketConnection connection;
+  OutputStream request_stream;
 
   public static void enqueue_request(TCPRequest request) {
     requests.enqueue(request);
@@ -26,9 +27,11 @@ public class SendRequestThread extends Thread {
 
   public void run() {
     try {
-      OutputStream request_stream = connection.openOutputStream();
+      request_stream = connection.openOutputStream();
       connection.setSocketOption(SocketConnection.LINGER, 5);
 
+      set_transport();
+      
       while (true) {
         try {
           SendRequestThread.sleep(1); //Don't peg the CPU
@@ -53,5 +56,10 @@ public class SendRequestThread extends Thread {
     } catch (IOException exception) {
       exception.printStackTrace();
     }
+  }
+  
+  //https://core.telegram.org/mtproto/mtproto-transports
+  public void set_transport() throws IOException {
+    request_stream.write(new byte[] {(byte)0xee, (byte)0xee, (byte)0xee, (byte)0xee});
   }
 }

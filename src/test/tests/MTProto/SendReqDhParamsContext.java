@@ -27,9 +27,8 @@ public class SendReqDhParamsContext {
         (byte)0xD7, (byte)0x8B, (byte)0x24, (byte)0x49
       };
       
-      SHA1 hash_engine = new SHA1();
       byte[] result = SendReqDhParams.p_q_inner_data(nonce, server_nonce, pq, p, q, new_nonce);
-      byte[] result_sha1 = hash_engine.digest(result);
+      byte[] result_sha1 = (new SHA1()).process_input_bytes(result).digest();
       expect(result_sha1, expected_sha1);
     }
   }

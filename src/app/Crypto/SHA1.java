@@ -15,7 +15,7 @@ public class SHA1 {
 	private int[] tmpData = new int[80];
 
 	// Calculates sha -1 Summary
-	private int process_input_bytes(byte[] bytedata) {
+	public SHA1 process_input_bytes(byte[] bytedata) {
 		// Keen understanding of constant
 		System.arraycopy(abcde, 0, digestInt, 0, abcde.length);
 
@@ -37,7 +37,7 @@ public class SHA1 {
 			encrypt();
 		}
 
-		return 20;
+		return this;
 	}
 
 	// Formatted input byte array format
@@ -224,16 +224,42 @@ public class SHA1 {
 		return strDigest;
 	}
 
-	// Calculates sha -1 Summary returns the corresponding byte array
-	public byte[] digest(byte[] byteData) {
-		process_input_bytes(byteData);
-
+	//Returns the resulting digest
+	public byte[] digest() {
 		byte[] digest = new byte[20];
 
-		for (int i = 0; i < digestInt.length; i++) {
+		for (int i = 0; i < HASH_SIZE/4; i++) {
 			intToByteArray(digestInt[i], digest, i * 4);
 		}
 
+		return digest;
+	}
+	
+	//Allows you to specify how much of the digest you want
+	public byte[] digest(int length) {
+		if (length > HASH_SIZE) {
+			throw new IllegalArgumentException("Digest size specified was too large, maximum is "+Integer.toString(HASH_SIZE)+" but was given "+Integer.toString(length));
+		} 
+		byte[] digest = new byte[length];
+		for (int i = 0; i < length/4; i++) {
+			intToByteArray(digestInt[i], digest, i * 4);
+		}
+		
+		int remaining_bytes = length%4;
+		if (remaining_bytes > 0) {
+			int final_int = digestInt[length/4];
+			if (remaining_bytes == 3) {
+				digest[length-3] = (byte) (final_int >>> 24);
+				digest[length-2] = (byte) (final_int >>> 16);
+				digest[length-1] = (byte) (final_int >>> 8);
+			} else if (remaining_bytes == 2) {
+				digest[length-2] = (byte) (final_int >>> 24);
+				digest[length-1] = (byte) (final_int >>> 16);
+			} else if (remaining_bytes == 1) {
+				digest[length-1] = (byte) (final_int >>> 24);
+			}
+		}
+		
 		return digest;
 	}
 }

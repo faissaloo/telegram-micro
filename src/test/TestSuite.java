@@ -13,6 +13,8 @@ public class TestSuite {
 
     TestRunner.register(new SHA256Context.DigestTest());
     TestRunner.register(new SHA1Context.DigestTest());
+    TestRunner.register(new SHA1Context.ShortenedDigestTest());
+
 
     TestRunner.register(new AES256IGEContext.SubBytesTest());
     TestRunner.register(new AES256IGEContext.MixColumnsTest());

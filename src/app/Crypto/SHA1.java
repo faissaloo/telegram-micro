@@ -1,5 +1,7 @@
 package crypto;
 
+import support.Encode;
+
 //Written by Mariotaku for Twidere J2ME
 //SHA1 is no longer safe, only use it where the protocol requires it
 public class SHA1 {

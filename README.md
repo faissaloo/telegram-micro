@@ -1,6 +1,6 @@
-TelegramLite  [![License: GPL v2](https://img.shields.io/badge/License-GPL%20v2-blue.svg)](https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html)
+TelegramMicro  [![License: GPL v2](https://img.shields.io/badge/License-GPL%20v2-blue.svg)](https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html)
 ==
-TelegramLite is an attempt to build a Telegram implementation for J2ME, there's still alot of work to be done but I think I've gotten most of the difficult stuff out of the way now (in terms of protocol and such) it's just a matter of implementing all the MTProto objects and creating a UI.  
+TelegramMicro is an attempt to build a Telegram implementation for J2ME, there's still alot of work to be done but I think I've gotten most of the difficult stuff out of the way now (in terms of protocol and such) it's just a matter of implementing all the MTProto objects and creating a UI.  
 
 Building
 --

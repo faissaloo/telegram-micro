@@ -27,11 +27,11 @@ import support.Integer128;
 import support.Integer256;
 import support.RandomPlus;
 
-public class TelegramLite extends MIDlet {
+public class TelegramMicro extends MIDlet {
   private Form form;
   private Display display;
 
-  public TelegramLite() {
+  public TelegramMicro() {
     super();
   }
 

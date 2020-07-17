@@ -8,14 +8,14 @@ public class Deserialize {
   //https://core.telegram.org/type/bytes
   public static byte[] bytes_deserialize(byte[] data, int offset) {
     int bytes_length = data[offset]&0xFF;
-    int bytes_offset = 1;
+    offset += 1;
     if (bytes_length >= 254) {
       bytes_length = Decode.Little.int24_decode(data, offset);
-      bytes_offset = 4;
+      offset += 3;
     }
     ByteArrayPlus bytes = new ByteArrayPlus();
     for (int i = 0; i < bytes_length;i++) {
-      bytes.append_byte(data[offset+bytes_offset+i]);
+      bytes.append_byte(data[offset+i]);
     }
     return bytes.toByteArray();
   }
@@ -24,6 +24,7 @@ public class Deserialize {
     int bytes_length = data[offset];
     int bytes_offset = 1;
     if (bytes_length >= 254) {
+      bytes_length = Decode.Little.int24_decode(data, offset+1);
       bytes_offset = 4;
     }
     int bytes_padding = (4-(bytes_length+bytes_offset)%4)%4;

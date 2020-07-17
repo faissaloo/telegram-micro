@@ -8,6 +8,7 @@ import support.Decode;
 import support.Encode;
 import crypto.SHA1;
 import crypto.AES256IGE;
+import support.Debug;
 
 public class RecieveServerDHParamsOk {
   public static RecieveServerDHParamsOk from_unencrypted_message(UnencryptedResponse message, Integer256 new_nonce) throws TypeMismatchException {
@@ -29,30 +30,30 @@ public class RecieveServerDHParamsOk {
         byte[] encoded_server_nonce = Encode.Integer128_encode(server_nonce);
         
         byte[] new_nonce_hash = (new SHA1())
-        .process_input_bytes(Encode.Integer256_encode(new_nonce))
-        .digest(16);
+          .process_input_bytes(Encode.Integer256_encode(new_nonce))
+          .digest(16);
         
         byte[] new_nonce_server_nonce_hash = (new SHA1())
-        .process_input_bytes(encoded_new_nonce)
-        .process_input_bytes(encoded_server_nonce)
-        .digest();
+          .process_input_bytes(encoded_new_nonce)
+          .process_input_bytes(encoded_server_nonce)
+          .digest();
         
         byte[] server_nonce_new_nonce_hash = (new SHA1())
-        .process_input_bytes(encoded_server_nonce)
-        .process_input_bytes(encoded_new_nonce)
-        .digest();
-        
+          .process_input_bytes(encoded_server_nonce)
+          .process_input_bytes(encoded_new_nonce)
+          .digest();
+          
         byte[] new_nonce_new_nonce_hash = (new SHA1())
-        .process_input_bytes(encoded_new_nonce)
-        .process_input_bytes(encoded_new_nonce)
-        .digest();
+          .process_input_bytes(encoded_new_nonce)
+          .process_input_bytes(encoded_new_nonce)
+          .digest();
         
         System.arraycopy(new_nonce_server_nonce_hash, 0, tmp_aes_key, 0, 20);
         System.arraycopy(server_nonce_new_nonce_hash, 0, tmp_aes_key, 20, 12);
         
-        System.arraycopy(server_nonce_new_nonce_hash, 12, tmp_aes_key, 0, 8);
-        System.arraycopy(new_nonce_new_nonce_hash, 0, tmp_aes_key, 8, 20);
-        System.arraycopy(encoded_new_nonce, 0, tmp_aes_key, 28, 4);
+        System.arraycopy(server_nonce_new_nonce_hash, 12, tmp_aes_iv, 0, 8);
+        System.arraycopy(new_nonce_new_nonce_hash, 0, tmp_aes_iv, 8, 20);
+        System.arraycopy(encoded_new_nonce, 0, tmp_aes_iv, 28, 4);
       }
       
       byte[] decrypted_data = AES256IGE.decrypt(tmp_aes_key, tmp_aes_iv, encrypted_data);
@@ -60,6 +61,7 @@ public class RecieveServerDHParamsOk {
       int decrypted_skip = 0;
       System.arraycopy(decrypted_data, 0, answer_hash, 0, SHA1.HASH_SIZE);
       decrypted_skip += SHA1.HASH_SIZE;
+      System.out.println(Debug.bytes_to_hex(decrypted_data));
       if (Decode.Little.int_decode(decrypted_data, decrypted_skip) == CombinatorIds.server_DH_inner_data) {
         System.out.println("DECRYPTED PROPERLY");
       } else {

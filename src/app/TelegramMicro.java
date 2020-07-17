@@ -49,7 +49,7 @@ public class TelegramMicro extends MIDlet {
 
       SecureRandomPlus random_number_generator = new SecureRandomPlus();
       Integer128 nonce = random_number_generator.nextInteger128();
-      Integer256 second_nonce = null;
+      Integer256 new_nonce = null;
 
       SendReqPqMulti key_exchange = new SendReqPqMulti(nonce);
       key_exchange.send();
@@ -67,7 +67,7 @@ public class TelegramMicro extends MIDlet {
             if (public_key == null) {
               System.out.println("NO MATCHING PUBLIC KEY FOUND");
             }
-            second_nonce = random_number_generator.nextInteger256();
+            new_nonce = random_number_generator.nextInteger256();
             
             SendReqDhParams diffie_hellman_params_request = new SendReqDhParams(
               nonce,
@@ -76,13 +76,13 @@ public class TelegramMicro extends MIDlet {
               decomposed_pq.lesser_prime,
               decomposed_pq.greater_prime,
               public_key,
-              second_nonce
+              new_nonce
             );
             diffie_hellman_params_request.send();
             System.out.println("SENDING PROOF OF WORK");
           } else if (unencrypted_response.type() == CombinatorIds.server_DH_params_ok) {
             System.out.println("SERVER SAID PROOF OF WORK PARAMETERS ARE OK!");
-            RecieveServerDHParamsOk.from_unencrypted_message(unencrypted_response, second_nonce);
+            RecieveServerDHParamsOk.from_unencrypted_message(unencrypted_response, new_nonce);
           }
         }
       }

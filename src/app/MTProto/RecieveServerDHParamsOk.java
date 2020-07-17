@@ -48,6 +48,7 @@ public class RecieveServerDHParamsOk {
           .process_input_bytes(encoded_new_nonce)
           .digest();
         
+        //Guessing here that the SHAs might be wrong
         System.arraycopy(new_nonce_server_nonce_hash, 0, tmp_aes_key, 0, 20);
         System.arraycopy(server_nonce_new_nonce_hash, 0, tmp_aes_key, 20, 12);
         

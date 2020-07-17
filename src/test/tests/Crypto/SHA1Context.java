@@ -39,4 +39,23 @@ public class SHA1Context {
       });
     }
   }
+  
+  public static class DifferenceTest extends FocusedTest {
+    public String label() {
+      return "It generates a different digest given multiple .process_input_bytes() calls";
+    }
+    
+    public void test() {
+      //THESE SHOULDN'T PASS, PROCESS INPUT BYTES SHOULDN'T BE OVERWRITING THE LAST RESULTS IT SHOULD BE ACTING LIKE THERE'S MORE BYTES
+      expect((new SHA1()).process_input_bytes(new byte[] {
+        (byte)0x69, (byte)0x69, (byte)0x69, (byte)0x69, (byte)0x69, (byte)0x69
+      }).digest(),
+      (new SHA1()).process_input_bytes(new byte[] {
+        (byte)0x10, (byte)0x10, (byte)0x10, (byte)0x10, (byte)0x10, (byte)0x10
+      }).process_input_bytes(new byte[] {
+        (byte)0x69, (byte)0x69, (byte)0x69, (byte)0x69, (byte)0x69, (byte)0x69
+      }).digest()
+      );
+    }
+  }
 }

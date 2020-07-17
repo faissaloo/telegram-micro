@@ -19,6 +19,7 @@ import mtproto.RecieveResPQ;
 import mtproto.PrimeDecomposer;
 import mtproto.SendPing;
 import mtproto.CombinatorIds;
+import mtproto.RecieveServerDHParamsOk;
 
 import crypto.RSAPublicKey;
 import crypto.SecureRandomPlus;
@@ -48,7 +49,7 @@ public class TelegramMicro extends MIDlet {
 
       SecureRandomPlus random_number_generator = new SecureRandomPlus();
       Integer128 nonce = random_number_generator.nextInteger128();
-      Integer256 second_nonce;
+      Integer256 second_nonce = null;
 
       SendReqPqMulti key_exchange = new SendReqPqMulti(nonce);
       key_exchange.send();
@@ -57,9 +58,9 @@ public class TelegramMicro extends MIDlet {
       while (true) {
         SendRequestThread.sleep(1); //Don't peg the CPU
         if (RecieveResponseThread.has_responses()) {
-          UnencryptedResponse key_response = UnencryptedResponse.from_tcp_response(RecieveResponseThread.dequeue_response());
-          if (key_response.type() == CombinatorIds.resPQ) {
-            RecieveResPQ pq_data = RecieveResPQ.from_unencrypted_message(key_response);
+          UnencryptedResponse unencrypted_response = UnencryptedResponse.from_tcp_response(RecieveResponseThread.dequeue_response());
+          if (unencrypted_response.type() == CombinatorIds.resPQ) {
+            RecieveResPQ pq_data = RecieveResPQ.from_unencrypted_message(unencrypted_response);
             PrimeDecomposer.Coprimes decomposed_pq = PrimeDecomposer.decompose(pq_data.pq);
             TelegramPublicKeys public_keys = new TelegramPublicKeys();
             RSAPublicKey public_key = public_keys.find_public_key(pq_data.server_public_key_fingerprints);
@@ -69,18 +70,19 @@ public class TelegramMicro extends MIDlet {
             second_nonce = random_number_generator.nextInteger256();
             
             SendReqDhParams diffie_hellman_params_request = new SendReqDhParams(
-            nonce,
-            pq_data.server_nonce,
-            pq_data.pq,
-            decomposed_pq.lesser_prime,
-            decomposed_pq.greater_prime,
-            public_key,
-            second_nonce
+              nonce,
+              pq_data.server_nonce,
+              pq_data.pq,
+              decomposed_pq.lesser_prime,
+              decomposed_pq.greater_prime,
+              public_key,
+              second_nonce
             );
             diffie_hellman_params_request.send();
             System.out.println("SENDING PROOF OF WORK");
-          } else if (key_response.type() == CombinatorIds.server_DH_params_ok) {
+          } else if (unencrypted_response.type() == CombinatorIds.server_DH_params_ok) {
             System.out.println("SERVER SAID PROOF OF WORK PARAMETERS ARE OK!");
+            RecieveServerDHParamsOk.from_unencrypted_message(unencrypted_response, second_nonce);
           }
         }
       }

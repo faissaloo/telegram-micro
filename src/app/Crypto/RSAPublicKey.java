@@ -29,7 +29,7 @@ public class RSAPublicKey {
     to_hash.append_raw_bytes(Serialize.serialize_bytes(modulus.toByteArray()));
     to_hash.append_raw_bytes(Serialize.serialize_bytes(exponent.toByteArray()));
     byte[] to_hash_bytes = to_hash.toByteArray();
-    byte[] full_hash = (new SHA1()).process_input_bytes(to_hash_bytes).digest();
+    byte[] full_hash = (new SHA1()).digest(to_hash_bytes);
     fingerprint = Decode.Little.long_decode(full_hash, SHA1.HASH_SIZE-8);
   }
 }

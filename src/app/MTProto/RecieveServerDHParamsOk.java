@@ -23,38 +23,50 @@ public class RecieveServerDHParamsOk {
       skip += 16;
       byte[] encrypted_data = Deserialize.bytes_deserialize(data, skip);
       
-      byte[] tmp_aes_key = new byte[32];
-      byte[] tmp_aes_iv = new byte[32];
+      byte[] tmp_aes_key;
+      byte[] tmp_aes_iv;
       {
         byte[] encoded_new_nonce = Encode.Integer256_encode(new_nonce);
         byte[] encoded_server_nonce = Encode.Integer128_encode(server_nonce);
         
         byte[] new_nonce_hash = (new SHA1())
-          .process_input_bytes(Encode.Integer256_encode(new_nonce))
-          .digest(16);
+          .digest(Encode.Integer256_encode(new_nonce), 16);
         
         byte[] new_nonce_server_nonce_hash = (new SHA1())
-          .process_input_bytes(encoded_new_nonce)
-          .process_input_bytes(encoded_server_nonce)
-          .digest();
+          .digest(
+            (new ByteArrayPlus())
+              .append_raw_bytes(encoded_new_nonce)
+              .append_raw_bytes(encoded_server_nonce)
+              .toByteArray()
+          );
         
         byte[] server_nonce_new_nonce_hash = (new SHA1())
-          .process_input_bytes(encoded_server_nonce)
-          .process_input_bytes(encoded_new_nonce)
-          .digest();
+          .digest(
+            (new ByteArrayPlus())
+              .append_raw_bytes(encoded_server_nonce)
+              .append_raw_bytes(encoded_new_nonce)
+              .toByteArray()
+          );
           
         byte[] new_nonce_new_nonce_hash = (new SHA1())
-          .process_input_bytes(encoded_new_nonce)
-          .process_input_bytes(encoded_new_nonce)
-          .digest();
+          .digest(
+            (new ByteArrayPlus())
+              .append_raw_bytes(encoded_new_nonce)
+              .append_raw_bytes(encoded_new_nonce)
+              .toByteArray()
+          );
         
         //Guessing here that the SHAs might be wrong
-        System.arraycopy(new_nonce_server_nonce_hash, 0, tmp_aes_key, 0, 20);
-        System.arraycopy(server_nonce_new_nonce_hash, 0, tmp_aes_key, 20, 12);
+        tmp_aes_key = (new ByteArrayPlus())
+          .append_raw_bytes(new_nonce_server_nonce_hash)
+          .append_raw_bytes_up_to(server_nonce_new_nonce_hash, 12)
+          .toByteArray();
         
-        System.arraycopy(server_nonce_new_nonce_hash, 12, tmp_aes_iv, 0, 8);
-        System.arraycopy(new_nonce_new_nonce_hash, 0, tmp_aes_iv, 8, 20);
-        System.arraycopy(encoded_new_nonce, 0, tmp_aes_iv, 28, 4);
+        tmp_aes_iv = (new ByteArrayPlus())
+          .append_raw_bytes_from_up_to(server_nonce_new_nonce_hash, 12, 8)
+          .append_raw_bytes(new_nonce_new_nonce_hash)
+          .append_raw_bytes(encoded_new_nonce)
+          .toByteArray();
       }
       
       byte[] decrypted_data = AES256IGE.decrypt(tmp_aes_key, tmp_aes_iv, encrypted_data);

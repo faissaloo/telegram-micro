@@ -28,7 +28,7 @@ public class SendReqDhParamsContext {
       };
       
       byte[] result = SendReqDhParams.p_q_inner_data(nonce, server_nonce, pq, p, q, new_nonce);
-      byte[] result_sha1 = (new SHA1()).process_input_bytes(result).digest();
+      byte[] result_sha1 = (new SHA1()).digest(result);
       expect(result_sha1, expected_sha1);
     }
   }

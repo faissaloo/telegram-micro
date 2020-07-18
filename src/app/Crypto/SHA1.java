@@ -15,12 +15,15 @@ public class SHA1 {
 
 	// The calculation process for temporary data storage array
 	private int[] tmpData = new int[80];
-
+	
+	public SHA1() {
+	}
+	
 	// Calculates sha -1 Summary
-	public SHA1 process_input_bytes(byte[] bytedata) {
-		// Keen understanding of constant
+	private void process_input_bytes(byte[] bytedata) {
+		// Initialise digest integer
 		System.arraycopy(abcde, 0, digestInt, 0, abcde.length);
-
+		
 		// Formatted input byte array, Supplement 10 and length data
 		byte[] newbyte = byteArrayFormatData(bytedata);
 
@@ -38,8 +41,6 @@ public class SHA1 {
 			// Summary of the evaluation function
 			encrypt();
 		}
-
-		return this;
 	}
 
 	// Formatted input byte array format
@@ -227,7 +228,8 @@ public class SHA1 {
 	}
 
 	//Returns the resulting digest
-	public byte[] digest() {
+	public byte[] digest(byte[] data) {
+		process_input_bytes(data);
 		byte[] digest = new byte[20];
 
 		for (int i = 0; i < HASH_SIZE/4; i++) {
@@ -238,10 +240,12 @@ public class SHA1 {
 	}
 	
 	//Allows you to specify how much of the digest you want
-	public byte[] digest(int length) {
+	public byte[] digest(byte[] data, int length) {
 		if (length > HASH_SIZE) {
 			throw new IllegalArgumentException("Digest size specified was too large, maximum is "+Integer.toString(HASH_SIZE)+" but was given "+Integer.toString(length));
 		} 
+		process_input_bytes(data);
+
 		byte[] digest = new byte[length];
 		for (int i = 0; i < length/4; i++) {
 			intToByteArray(digestInt[i], digest, i * 4);

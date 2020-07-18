@@ -1,5 +1,6 @@
 package mtproto;
 
+import bouncycastle.BigInteger;
 import support.Integer128;
 import support.Integer256;
 import support.Utf8String;
@@ -56,7 +57,6 @@ public class RecieveServerDHParamsOk {
               .toByteArray()
           );
         
-        //Guessing here that the SHAs might be wrong
         tmp_aes_key = (new ByteArrayPlus())
           .append_raw_bytes(new_nonce_server_nonce_hash)
           .append_raw_bytes_up_to(server_nonce_new_nonce_hash, 12)
@@ -74,25 +74,43 @@ public class RecieveServerDHParamsOk {
       int decrypted_skip = 0;
       System.arraycopy(decrypted_data, 0, answer_hash, 0, SHA1.HASH_SIZE);
       decrypted_skip += SHA1.HASH_SIZE;
-      System.out.println(Debug.bytes_to_hex(decrypted_data));
       if (Decode.Little.int_decode(decrypted_data, decrypted_skip) == CombinatorIds.server_DH_inner_data) {
-        System.out.println("DECRYPTED PROPERLY");
+        decrypted_skip += 4;
+        nonce = Decode.Little.Integer128_decode(decrypted_data, decrypted_skip);
+        decrypted_skip += 16;
+        server_nonce = Decode.Little.Integer128_decode(decrypted_data, decrypted_skip);
+        decrypted_skip += 16;
+        //https://en.wikipedia.org/wiki/Cyclic_group
+        int group_generator = Decode.Little.int_decode(decrypted_data, decrypted_skip);
+        decrypted_skip += 4;
+        BigInteger diffie_hellman_prime = new BigInteger(1, Deserialize.bytes_deserialize(decrypted_data, decrypted_skip));
+        decrypted_skip += Deserialize.bytes_length_deserialize(decrypted_data, decrypted_skip);
+        BigInteger group_generator_power_a = new BigInteger(1, Deserialize.bytes_deserialize(decrypted_data, decrypted_skip));
+        decrypted_skip += Deserialize.bytes_length_deserialize(decrypted_data, decrypted_skip);
+        int server_time = Decode.Little.int_decode(decrypted_data, decrypted_skip);
+        decrypted_skip += 4;
+        return new RecieveServerDHParamsOk(nonce, server_nonce, group_generator, diffie_hellman_prime, group_generator_power_a, server_time);
       } else {
-        System.out.println("NOT DECRYPTED PROPERLY");
+        throw new TypeMismatchException("Expected a %(server_DH_inner_data)");
       }
-      //server_DH_inner_data#b5890dba nonce:int128 server_nonce:int128 g:int dh_prime:string g_a:string server_time:int = Server_DH_inner_data;
-      
-      return null;//new RecieveServerDHParamsOk(nonce, server_nonce, pq, server_public_key_fingerprints);
     } else {
       throw new TypeMismatchException("Expected a %(server_DH_params_ok)");
     }
   }
-
-/*
-  public RecieveServerDHParamsOk(Integer128 nonce, Integer128 server_nonce, long pq, long[] server_public_key_fingerprints) {
+  
+  Integer128 nonce;
+  Integer128 server_nonce;
+  int group_generator;
+  BigInteger diffie_hellman_prime;
+  BigInteger group_generator_power_a;
+  int server_time;
+  
+  public RecieveServerDHParamsOk(Integer128 nonce, Integer128 server_nonce, int group_generator, BigInteger diffie_hellman_prime, BigInteger group_generator_power_a, int server_time) {
     this.nonce = nonce;
     this.server_nonce = server_nonce;
-    this.pq = pq;
-    this.server_public_key_fingerprints = server_public_key_fingerprints;
-  }*/
+    this.group_generator = group_generator;
+    this.diffie_hellman_prime = diffie_hellman_prime;
+    this.group_generator_power_a = group_generator_power_a;
+    this.server_time = server_time;
+  }
 }

@@ -95,6 +95,31 @@ public class Integer128 {
       return ((long)representation_0&0xFFFFFFFFL) > ((long)other.representation_0&0xFFFFFFFFL);
     }
   }
+  
+  public boolean unsigned_greater_than_long(long other) {
+    long other_upper = ((other & 0xFFFFFFFF00000000L) >>> 32);
+    long other_lower = (other & 0xFFFFFFFFL);
+    if (representation_3 != 0 || representation_2 != 0) {
+      return true;
+    } else if (representation_1 != other_upper) {
+      return ((long)representation_1&0xFFFFFFFFL) > other_upper;
+    } else {
+      return ((long)representation_0&0xFFFFFFFFL) > other_lower;
+    }
+  }
+  
+  public boolean equals_long(long other) {
+    long other_upper = ((other & 0xFFFFFFFF00000000L) >>> 32);
+    long other_lower = (other & 0xFFFFFFFFL);
+    return representation_3 == 0 &&
+      representation_2 == 0 &&
+      ((long)representation_1&0xFFFFFFFFL) == other_upper &&
+      ((long)representation_0&0xFFFFFFFFL) == other_lower;
+  }
+  
+  public boolean unsigned_greater_than_equal_long(long other) {
+    return equals_long(other) || unsigned_greater_than_long(other);
+  }
 
   public boolean unsigned_less_than(Integer128 other) {
     return !(equals(other) || unsigned_greater_than(other));
@@ -247,6 +272,42 @@ public class Integer128 {
       return zero;
     }
   }
+  
+  public long get_bit_long(int index) {
+    if (index >= 0) {
+      if (index >= 32) {
+        if (index >= 64) {
+          if (index >= 96) {
+            if (((representation_3 >>> (index - 96))&1) == 1) {
+              return 1L;
+            } else {
+              return 0L;
+            }
+          } else {
+            if (((representation_2 >>> (index - 64))&1) == 1) {
+              return 1L;
+            } else {
+              return 0L;
+            }
+          }
+        } else {
+          if (((representation_1 >>> (index - 32))&1) == 1) {
+            return 1L;
+          } else {
+            return 0L;
+          }
+        }
+      } else {
+        if (((representation_0 >>> index)&1) == 1) {
+          return 1L;
+        } else {
+          return 0L;
+        }
+      }
+    } else {
+      return 0L;
+    }
+  }
 
   public Integer128 mutating_set_bit(int index) {
     if (index >= 0) {
@@ -336,6 +397,30 @@ public class Integer128 {
       set(remainder);
     }
     return this;
+  }
+  
+  public long fast_unsigned_modulo_long(long other) {
+    if (other == 0) {
+      throw new ArithmeticException("Division by zero");
+    }
+
+    //https://stackoverflow.com/a/33333636/5269447
+    if (unsigned_greater_than_equal_long(other)) {
+      long remainder = 0;
+
+      for (int i = 128; i > 0; i--) {
+        remainder <<= 1;
+        remainder |= get_bit_long(i-1);
+
+        if (remainder >= other) {
+          remainder -= other;
+        }
+      }
+      
+      return remainder;
+    } else {
+      return to_long();
+    }
   }
 
   public Integer128 unsigned_right_shift(int shift) {

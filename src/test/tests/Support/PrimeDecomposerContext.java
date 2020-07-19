@@ -5,9 +5,9 @@ import mtproto.PrimeDecomposer;
 import support.Integer128;
 
 public class PrimeDecomposerContext {
-  public static class DecomposeTest extends SkippedTest {
+  public static class DecomposeTest extends Test {
     public String label() {
-      return "It can decompose a prime (~2 min test)";
+      return "It can decompose a prime (~1 min test)";
     }
     public void test() throws TestFailureException {
       PrimeDecomposer.Coprimes result = PrimeDecomposer.decompose(0x211cafa9555101f5L);
@@ -21,9 +21,10 @@ public class PrimeDecomposerContext {
       return "It can provide the finite ring";
     }
     public void test() throws TestFailureException {
-      Integer128 big_limit = new Integer128(0x211cafa9555101f5L);
+      long limit = 0x211cafa9555101f5L;
+      Integer128 big_limit = new Integer128(limit);
       Integer128 negated_big_limit = big_limit.negate();
-      long result = PrimeDecomposer.finite_ring(0x93a652c056cb728cL, big_limit, negated_big_limit);
+      long result = PrimeDecomposer.finite_ring(0x93a652c056cb728cL, big_limit, negated_big_limit, limit);
       expect(result, 0xd5428d6f285c04dL);
     }
   }

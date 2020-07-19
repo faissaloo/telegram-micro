@@ -31,10 +31,16 @@ public class Integer128 {
   }
 
   public Integer128(Integer128 to_copy) {
-    representation_0 = to_copy.representation_0;
-    representation_1 = to_copy.representation_1;
-    representation_2 = to_copy.representation_2;
-    representation_3 = to_copy.representation_3;
+    set(to_copy);
+  }
+  
+  public Integer128 set(Integer128 other) {
+    representation_0 = other.representation_0;
+    representation_1 = other.representation_1;
+    representation_2 = other.representation_2;
+    representation_3 = other.representation_3;
+    
+    return this;
   }
 
   public Integer128(long upper, long lower) {
@@ -307,6 +313,10 @@ public class Integer128 {
   }
 
   public Integer128 unsigned_modulo(Integer128 other) throws ArithmeticException {
+    return fast_unsigned_modulo(other, other.negate());
+  }
+  
+  public Integer128 fast_unsigned_modulo(Integer128 other, Integer128 negated_other) {
     if (other.equals(zero)) {
       throw new ArithmeticException("Division by zero");
     }
@@ -314,7 +324,6 @@ public class Integer128 {
     //https://stackoverflow.com/a/33333636/5269447
     if (unsigned_greater_than_equal(other)) {
       Integer128 remainder = new Integer128(zero);
-      Integer128 negated_other = other.negate();
 
       for (int i = 128; i > 0; i--) {
         remainder.mutating_unsigned_left_shift().mutating_or(get_bit(i-1));
@@ -323,10 +332,10 @@ public class Integer128 {
           remainder.mutating_add(negated_other);
         }
       }
-      return remainder;
-    } else {
-      return new Integer128(this);
+      
+      set(remainder);
     }
+    return this;
   }
 
   public Integer128 unsigned_right_shift(int shift) {

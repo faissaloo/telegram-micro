@@ -43,14 +43,11 @@ public class SendReqDhParams {
   }
   
   public static byte[] data_with_hash(byte[] p_q_inner_data) {
-    ByteArrayPlus data_with_hash = new ByteArrayPlus();
-    data_with_hash.append_raw_bytes((new SHA1()).digest(p_q_inner_data));
-    data_with_hash.append_raw_bytes(p_q_inner_data);
-    int padding_needed = 255 - data_with_hash.size();
-    
-    SecureRandomPlus random_number_generator = new SecureRandomPlus();
-    data_with_hash.append_raw_bytes(random_number_generator.nextBytes(padding_needed));
-    return data_with_hash.toByteArray();
+    return (new ByteArrayPlus())
+      .append_raw_bytes((new SHA1()).digest(p_q_inner_data));
+      .append_raw_bytes(p_q_inner_data);
+      .pad_to_length(255, new SecureRandomPlus());
+      .toByteArray();
   }
 
   public void send() {

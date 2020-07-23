@@ -4,6 +4,7 @@ import support.Integer128;
 import bouncycastle.BigInteger;
 import crypto.SHA1;
 import crypto.AES256IGE;
+import crypto.SecureRandomPlus;
 
 public class SendSetClientDHParams {
   ByteArrayPlus message_data;
@@ -20,13 +21,20 @@ public class SendSetClientDHParams {
       .append_Integer128(nonce)
       .append_Integer128(server_nonce)
       .append_long(retry_id)
-      .append_raw_bytes(Serialize.serialize_bytes(group_generator_power_b.magnitudeToBytes())
+      .append_raw_bytes(Serialize.serialize_bytes(group_generator_power_b.magnitudeToBytes()))
       .toByteArray();
     //data_with_hash should be padded such that it's divisible by 16
     byte[] inner_data_hash = (new SHA1()).digest(inner_data);
+    
+    SecureRandomPlus random_number_generator = new SecureRandomPlus();
+    byte[] data_with_hash = new ByteArrayPlus()
+      .append_raw_bytes(inner_data_hash)
+      .append_raw_bytes(inner_data)
+      .pad_to_alignment(16, random_number_generator)
+      .toByteArray();
   }
   
   public void send() {
-    (new UnencryptedRequest(message_data.toByteArray())).send();
+    //(new UnencryptedRequest(message_data.toByteArray())).send();
   }
 }

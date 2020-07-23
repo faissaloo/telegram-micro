@@ -47,4 +47,24 @@ public class ByteArrayPlus extends ByteArrayOutputStream {
     write(to_write, from, length);
     return this;
   }
+  
+  public ByteArrayPlus pad_to_length(int length, RandomPlus random_number_generator) {
+    int to_pad = length-size();
+    append_raw_bytes(random_number_generator.nextBytes(to_pad));
+    return this;
+  }
+  
+  public ByteArrayPlus pad_to_alignment(int alignment) {
+    int to_pad = (alignment-(size()%alignment))%alignment;
+    for (int i = 0; i < to_pad; i++) {
+      append_byte((byte)0);
+    }
+    return this;
+  }
+  
+  public ByteArrayPlus pad_to_alignment(int alignment, RandomPlus random_number_generator) {
+    int to_pad = (alignment-(size()%alignment))%alignment;
+    append_raw_bytes(random_number_generator.nextBytes(to_pad));
+    return this;
+  }
 }

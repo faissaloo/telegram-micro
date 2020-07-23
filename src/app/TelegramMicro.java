@@ -28,6 +28,7 @@ import crypto.SecureRandomPlus;
 import support.Integer128;
 import support.Integer256;
 import support.RandomPlus;
+import support.Debug;
 
 import bouncycastle.BigInteger;
 
@@ -100,6 +101,10 @@ public class TelegramMicro extends MIDlet {
             );
             
             set_client_dh_params.send();
+          } else if (unencrypted_response.type() == CombinatorIds.dh_gen_ok) {
+            System.out.println("DIFFIE HELLMAN GENERATION COMPLETE!");
+          } else {
+            System.out.println("UNKNOWN MESSAGE RECIEVED "+Integer.toHexString(unencrypted_response.type()));
           }
         }
       }

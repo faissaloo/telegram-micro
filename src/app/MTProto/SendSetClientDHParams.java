@@ -34,9 +34,10 @@ public class SendSetClientDHParams {
       .toByteArray();
       
     byte[] encrypted_data = AES256IGE.encrypt(tmp_aes_key, tmp_aes_iv, data_with_hash);
+    message_data.append_raw_bytes(Serialize.serialize_bytes(encrypted_data));
   }
   
   public void send() {
-    //(new UnencryptedRequest(message_data.toByteArray())).send();
+    (new UnencryptedRequest(message_data.toByteArray())).send();
   }
 }

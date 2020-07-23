@@ -49,7 +49,7 @@ public class TelegramMicro extends MIDlet {
     display.setCurrent(log);
 
     try {
-      SocketConnection api_connection = (SocketConnection) Connector.open("socket://149.154.167.40:443");
+      SocketConnection api_connection = (SocketConnection) Connector.open("socket://149.154.175.10:5222");
       SendRequestThread message_send_thread = new SendRequestThread(api_connection);
       RecieveResponseThread message_recieve_thread = new RecieveResponseThread(api_connection);
 

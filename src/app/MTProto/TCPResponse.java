@@ -20,8 +20,7 @@ public class TCPResponse {
       length |= response_byte << shift;
     }
     if (response_byte == -1) {
-      System.out.println("RAN OUT OF BYTES WHILE READING LENGTH");
-      System.out.println("LENGTH = "+Integer.toString(length));
+      throw new IOException("Connection terminated by server");
     }
 
     //read the number of bytes specified by TCP response

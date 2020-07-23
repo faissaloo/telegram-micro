@@ -44,9 +44,9 @@ public class SendReqDhParams {
   
   public static byte[] data_with_hash(byte[] p_q_inner_data) {
     return (new ByteArrayPlus())
-      .append_raw_bytes((new SHA1()).digest(p_q_inner_data));
-      .append_raw_bytes(p_q_inner_data);
-      .pad_to_length(255, new SecureRandomPlus());
+      .append_raw_bytes((new SHA1()).digest(p_q_inner_data))
+      .append_raw_bytes(p_q_inner_data)
+      .pad_to_length(255, new SecureRandomPlus())
       .toByteArray();
   }
 

@@ -23,7 +23,7 @@ public class SendSetClientDHParams {
       .append_long(retry_id)
       .append_raw_bytes(Serialize.serialize_bytes(group_generator_power_b.magnitudeToBytes()))
       .toByteArray();
-    //data_with_hash should be padded such that it's divisible by 16
+
     byte[] inner_data_hash = (new SHA1()).digest(inner_data);
     
     SecureRandomPlus random_number_generator = new SecureRandomPlus();
@@ -32,6 +32,8 @@ public class SendSetClientDHParams {
       .append_raw_bytes(inner_data)
       .pad_to_alignment(16, random_number_generator)
       .toByteArray();
+      
+    byte[] encrypted_data = AES256IGE.encrypt(tmp_aes_key, tmp_aes_iv, data_with_hash);
   }
   
   public void send() {

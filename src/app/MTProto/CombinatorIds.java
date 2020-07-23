@@ -9,4 +9,6 @@ public class CombinatorIds {
   public static int pong = 0x347773c5;
   public static int server_DH_params_ok = 0xd0e8075c;
   public static int server_DH_inner_data = 0xb5890dba;
+  public static int set_client_DH_params = 0xf5045f1f;
+  public static int client_DH_inner_data = 0x6643b654;
 }

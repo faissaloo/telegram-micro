@@ -89,7 +89,7 @@ public class RecieveServerDHParamsOk {
         decrypted_skip += Deserialize.bytes_length_deserialize(decrypted_data, decrypted_skip);
         int server_time = Decode.Little.int_decode(decrypted_data, decrypted_skip);
         decrypted_skip += 4;
-        return new RecieveServerDHParamsOk(nonce, server_nonce, group_generator, diffie_hellman_prime, group_generator_power_a, server_time);
+        return new RecieveServerDHParamsOk(nonce, server_nonce, group_generator, diffie_hellman_prime, group_generator_power_a, server_time, tmp_aes_key, tmp_aes_iv);
       } else {
         throw new TypeMismatchException("Expected a %(server_DH_inner_data)");
       }
@@ -98,19 +98,23 @@ public class RecieveServerDHParamsOk {
     }
   }
   
-  Integer128 nonce;
-  Integer128 server_nonce;
-  int group_generator;
-  BigInteger diffie_hellman_prime;
-  BigInteger group_generator_power_a;
-  int server_time;
+  public Integer128 nonce;
+  public Integer128 server_nonce;
+  public int group_generator;
+  public BigInteger diffie_hellman_prime;
+  public BigInteger group_generator_power_a;
+  public int server_time;
+  public byte[] tmp_aes_iv;
+  public byte[] tmp_aes_key;
   
-  public RecieveServerDHParamsOk(Integer128 nonce, Integer128 server_nonce, int group_generator, BigInteger diffie_hellman_prime, BigInteger group_generator_power_a, int server_time) {
+  public RecieveServerDHParamsOk(Integer128 nonce, Integer128 server_nonce, int group_generator, BigInteger diffie_hellman_prime, BigInteger group_generator_power_a, int server_time, byte[] tmp_aes_key, byte[] tmp_aes_iv) {
     this.nonce = nonce;
     this.server_nonce = server_nonce;
     this.group_generator = group_generator;
     this.diffie_hellman_prime = diffie_hellman_prime;
     this.group_generator_power_a = group_generator_power_a;
     this.server_time = server_time;
+    this.tmp_aes_iv = tmp_aes_iv;
+    this.tmp_aes_key = tmp_aes_key;
   }
 }

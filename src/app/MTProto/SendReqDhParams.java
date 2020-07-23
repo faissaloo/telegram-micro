@@ -19,7 +19,7 @@ public class SendReqDhParams {
     byte[] encrypted_data_bytes = RSA.encrypt(public_key, data_with_hash(p_q_inner_data(nonce, server_nonce, pq, p, q, new_nonce)));
     
     message_data = new ByteArrayPlus();
-    message_data.append_int(CombinatorIds.req_DH_params); //combinator_id
+    message_data.append_int(CombinatorIds.req_DH_params);
     message_data.append_Integer128(nonce);
     message_data.append_Integer128(server_nonce);
     message_data.append_raw_bytes(Serialize.serialize_bytes(ArrayPlus.remove_leading_zeroes(Encode.Big.long_encode(p))));

@@ -20,6 +20,7 @@ import mtproto.PrimeDecomposer;
 import mtproto.SendPing;
 import mtproto.CombinatorIds;
 import mtproto.RecieveServerDHParamsOk;
+import mtproto.SendSetClientDHParams;
 
 import crypto.RSAPublicKey;
 import crypto.SecureRandomPlus;
@@ -27,6 +28,8 @@ import crypto.SecureRandomPlus;
 import support.Integer128;
 import support.Integer256;
 import support.RandomPlus;
+
+import bouncycastle.BigInteger;
 
 public class TelegramMicro extends MIDlet {
   private Form form;
@@ -50,6 +53,7 @@ public class TelegramMicro extends MIDlet {
       SecureRandomPlus random_number_generator = new SecureRandomPlus();
       Integer128 nonce = random_number_generator.nextInteger128();
       Integer256 new_nonce = null;
+      long retry_id = 0;
 
       SendReqPqMulti key_exchange = new SendReqPqMulti(nonce);
       key_exchange.send();
@@ -82,7 +86,20 @@ public class TelegramMicro extends MIDlet {
             System.out.println("SENDING PROOF OF WORK");
           } else if (unencrypted_response.type() == CombinatorIds.server_DH_params_ok) {
             System.out.println("SERVER SAID PROOF OF WORK PARAMETERS ARE OK!");
-            RecieveServerDHParamsOk.from_unencrypted_message(unencrypted_response, new_nonce);
+            RecieveServerDHParamsOk dh_params_ok = RecieveServerDHParamsOk.from_unencrypted_message(unencrypted_response, new_nonce);
+            BigInteger b = new BigInteger(1, random_number_generator.nextBytes(2048));
+            SendSetClientDHParams set_client_dh_params = new SendSetClientDHParams(
+              dh_params_ok.nonce,
+              dh_params_ok.server_nonce,
+              retry_id,
+              dh_params_ok.group_generator,
+              dh_params_ok.diffie_hellman_prime,
+              b,
+              dh_params_ok.tmp_aes_key,
+              dh_params_ok.tmp_aes_iv
+            );
+            
+            set_client_dh_params.send();
           }
         }
       }

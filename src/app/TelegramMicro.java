@@ -1,3 +1,4 @@
+import java.util.Date;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -32,6 +33,7 @@ import support.Debug;
 
 import bouncycastle.BigInteger;
 
+
 public class TelegramMicro extends MIDlet {
   private Form form;
   private Display display;
@@ -41,7 +43,10 @@ public class TelegramMicro extends MIDlet {
   }
 
   public void startApp() {
-    Display.getDisplay(this).setCurrent(null);
+    Display display = Display.getDisplay(this);
+    Form log = new Form("Telegram Micro");
+    log.append("Starting Telegram Micro");
+    display.setCurrent(log);
 
     try {
       SocketConnection api_connection = (SocketConnection) Connector.open("socket://149.154.167.40:443");
@@ -50,6 +55,9 @@ public class TelegramMicro extends MIDlet {
 
       message_send_thread.start(); //Should we have these start when they're instantiated?
       message_recieve_thread.start();
+      log.append((new Date()).toString());
+      log.append("Connected to Telegram servers");
+      display.setCurrent(log);
 
       SecureRandomPlus random_number_generator = new SecureRandomPlus();
       Integer128 nonce = random_number_generator.nextInteger128();
@@ -58,7 +66,8 @@ public class TelegramMicro extends MIDlet {
 
       SendReqPqMulti key_exchange = new SendReqPqMulti(nonce);
       key_exchange.send();
-      System.out.println("REQUESTING PROOF OF WORK PARAMETERS");
+      log.append("Requesting proof of work parameters");
+      display.setCurrent(log);
 
       while (true) {
         SendRequestThread.sleep(1); //Don't peg the CPU
@@ -66,11 +75,15 @@ public class TelegramMicro extends MIDlet {
           UnencryptedResponse unencrypted_response = UnencryptedResponse.from_tcp_response(RecieveResponseThread.dequeue_response());
           if (unencrypted_response.type() == CombinatorIds.resPQ) {
             RecieveResPQ pq_data = RecieveResPQ.from_unencrypted_message(unencrypted_response);
+            log.append((new Date()).toString());
+            log.append("Processing proof of work");
+            display.setCurrent(log);
             PrimeDecomposer.Coprimes decomposed_pq = PrimeDecomposer.decompose(pq_data.pq);
             TelegramPublicKeys public_keys = new TelegramPublicKeys();
             RSAPublicKey public_key = public_keys.find_public_key(pq_data.server_public_key_fingerprints);
             if (public_key == null) {
-              System.out.println("NO MATCHING PUBLIC KEY FOUND");
+              log.append("No matching public key found");
+              display.setCurrent(log);
             }
             new_nonce = random_number_generator.nextInteger256();
             
@@ -84,10 +97,17 @@ public class TelegramMicro extends MIDlet {
               new_nonce
             );
             diffie_hellman_params_request.send();
-            System.out.println("SENDING PROOF OF WORK");
+            log.append((new Date()).toString());
+            log.append("Sending proof of work");
+            display.setCurrent(log);
           } else if (unencrypted_response.type() == CombinatorIds.server_DH_params_ok) {
-            System.out.println("SERVER SAID PROOF OF WORK PARAMETERS ARE OK!");
+            log.append("Proof of work was ok");
+            display.setCurrent(log);
             RecieveServerDHParamsOk dh_params_ok = RecieveServerDHParamsOk.from_unencrypted_message(unencrypted_response, new_nonce);
+            log.append((new Date()).toString());
+            log.append("Generating client diffie hellman parameters");
+            display.setCurrent(log);
+            
             BigInteger b = new BigInteger(1, random_number_generator.nextBytes(2048));
             SendSetClientDHParams set_client_dh_params = new SendSetClientDHParams(
               dh_params_ok.nonce,
@@ -101,9 +121,16 @@ public class TelegramMicro extends MIDlet {
             );
             
             set_client_dh_params.send();
+            log.append((new Date()).toString());
+            log.append("Sending client diffie hellman parameters");
+            display.setCurrent(log);
           } else if (unencrypted_response.type() == CombinatorIds.dh_gen_ok) {
-            System.out.println("DIFFIE HELLMAN GENERATION COMPLETE!");
+            log.append((new Date()).toString());
+            log.append("Diffie hellman generation complete");
+            display.setCurrent(log);
           } else {
+            log.append("Unknown message recieved "+Integer.toHexString(unencrypted_response.type()));
+            display.setCurrent(log);
             System.out.println("UNKNOWN MESSAGE RECIEVED "+Integer.toHexString(unencrypted_response.type()));
           }
         }

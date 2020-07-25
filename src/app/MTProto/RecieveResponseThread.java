@@ -12,20 +12,28 @@ import support.ByteArrayPlus;
 import support.Queue;
 
 public class RecieveResponseThread extends Thread {
-  static Queue responses = new Queue();
-  static RecieveResponseThread instance;
+  Queue responses = new Queue();
+  Queue waiting = new Queue();
   SocketConnection connection;
 
-  static public TCPResponse dequeue_response() {
+  public TCPResponse dequeue_response() {
     return (TCPResponse) responses.dequeue();
   }
+  
+  public synchronized void wait_for_response() {
+    waiting.enqueue(this);
+    try {
+      wait();
+    } catch (InterruptedException e) {
+      return;
+    }
+  }
 
-  static public boolean has_responses() {
+  public boolean has_responses() {
     return responses.length() > 0;
   }
 
   public RecieveResponseThread(SocketConnection connection) {
-    instance = this;
     this.connection = connection;
   }
 
@@ -41,6 +49,13 @@ public class RecieveResponseThread extends Thread {
         // encrypted messages start with a 8 bytes/long with a non-zero value (auth_key_id)
         //We should probably have different classes for recieved messages unlike the example
         responses.enqueue(response);
+        
+        while (waiting.length() > 0) {
+          Object waiter = (Object)waiting.dequeue();
+          synchronized(waiter) {
+            waiter.notify();
+          }
+        }
       }
 
       response_stream.close();

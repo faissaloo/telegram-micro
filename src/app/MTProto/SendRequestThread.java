@@ -11,21 +11,20 @@ import javax.microedition.io.SocketConnection;
 import support.Queue;
 
 public class SendRequestThread extends Thread {
-  static Queue requests = new Queue();
-  static SendRequestThread instance;
+  Queue requests = new Queue();
   SocketConnection connection;
   OutputStream request_stream;
 
-  public static void enqueue_request(TCPRequest request) {
+  public synchronized void enqueue_request(TCPRequest request) {
     requests.enqueue(request);
+    notify();
   }
 
   public SendRequestThread(SocketConnection connection) {
-    instance = this;
     this.connection = connection;
   }
-
-  public void run() {
+  
+  public synchronized void run() {
     try {
       request_stream = connection.openOutputStream();
       connection.setSocketOption(SocketConnection.LINGER, 5);
@@ -33,12 +32,6 @@ public class SendRequestThread extends Thread {
       set_transport();
       
       while (true) {
-        try {
-          SendRequestThread.sleep(1); //Don't peg the CPU
-        } catch (InterruptedException e) {
-          break;
-        }
-
         while (requests.length() > 0) {
           //https://core.telegram.org/mtproto/transports#tcp
           //https://www.oracle.com/technetwork/systems/index-156878.html
@@ -46,6 +39,11 @@ public class SendRequestThread extends Thread {
           TCPRequest message = ((TCPRequest) requests.dequeue());
           byte[] message_data = message.request_data();
           request_stream.write(message_data);
+        }
+        try {
+          wait();
+        } catch (InterruptedException e) {
+          break;
         }
       }
 

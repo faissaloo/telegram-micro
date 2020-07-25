@@ -29,7 +29,7 @@ public class UnencryptedRequest {
     return (System.currentTimeMillis()/1000L)*4294967296L;
   }
 
-  public void send() {
-    (new TCPRequest(message_data.toByteArray())).send();
+  public void send(SendRequestThread sender) {
+    (new TCPRequest(message_data.toByteArray())).send(sender);
   }
 }

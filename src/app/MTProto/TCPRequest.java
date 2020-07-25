@@ -20,11 +20,11 @@ public class TCPRequest {
   }
 
   public byte[] request_data() {
-    //Ok so it looks like the network monitor will take anything that's 'negative' and turn it into 3 bits for some reason, but that's not what's actually being sent
+    //Ok so it looks like the network monitor will take anything that's 'negative' and turn it into 3 bytes for some reason, but that's not what's actually being sent
     return request_data.toByteArray();
   }
 
-  public void send() {
-    SendRequestThread.enqueue_request(this);
+  public void send(SendRequestThread sender) {
+    sender.enqueue_request(this);
   }
 }

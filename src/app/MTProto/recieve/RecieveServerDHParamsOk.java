@@ -1,15 +1,22 @@
-package mtproto;
+package mtproto.recieve;
 
 import bouncycastle.BigInteger;
+
 import support.Integer128;
 import support.Integer256;
 import support.Utf8String;
 import support.ByteArrayPlus;
 import support.Decode;
 import support.Encode;
+import support.Debug;
+
 import crypto.SHA1;
 import crypto.AES256IGE;
-import support.Debug;
+
+import mtproto.UnencryptedResponse;
+import mtproto.TypeMismatchException;
+import mtproto.CombinatorIds;
+import mtproto.Deserialize;
 
 public class RecieveServerDHParamsOk {
   public static RecieveServerDHParamsOk from_unencrypted_message(UnencryptedResponse message, Integer256 new_nonce) throws TypeMismatchException {

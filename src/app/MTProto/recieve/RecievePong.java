@@ -1,6 +1,11 @@
-package mtproto;
+package mtproto.recieve;
 
 import support.Decode;
+
+import mtproto.CombinatorIds;
+import mtproto.UnencryptedResponse;
+import mtproto.TypeMismatchException;
+import mtproto.Deserialize;
 
 public class RecievePong {
   public long message_id;

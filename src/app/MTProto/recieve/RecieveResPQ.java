@@ -1,9 +1,14 @@
-package mtproto;
+package mtproto.recieve;
 
 import support.Integer128;
 import support.Utf8String;
 import support.ByteArrayPlus;
 import support.Decode;
+
+import mtproto.CombinatorIds;
+import mtproto.UnencryptedResponse;
+import mtproto.TypeMismatchException;
+import mtproto.Deserialize;
 
 public class RecieveResPQ {
   public static RecieveResPQ from_unencrypted_message(UnencryptedResponse message) throws TypeMismatchException {

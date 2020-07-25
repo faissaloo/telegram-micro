@@ -1,16 +1,21 @@
-package mtproto;
+package mtproto.send;
+
 import support.Encode;
 import support.Integer128;
 import support.Integer256;
 import support.ArrayPlus;
 import support.ByteArrayPlus;
 import support.RandomPlus;
+
 import crypto.RSAPublicKey;
 import crypto.SHA1;
 import crypto.RSA;
 import crypto.SecureRandomPlus;
 
 import support.Debug;
+import mtproto.CombinatorIds;
+import mtproto.Serialize;
+import mtproto.UnencryptedRequest;
 
 public class SendReqDhParams {
   ByteArrayPlus message_data;

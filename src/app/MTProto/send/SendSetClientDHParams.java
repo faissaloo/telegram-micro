@@ -1,10 +1,16 @@
-package mtproto;
+package mtproto.send;
+import bouncycastle.BigInteger;
+
 import support.ByteArrayPlus;
 import support.Integer128;
-import bouncycastle.BigInteger;
+
 import crypto.SHA1;
 import crypto.AES256IGE;
 import crypto.SecureRandomPlus;
+
+import mtproto.CombinatorIds;
+import mtproto.Serialize;
+import mtproto.UnencryptedRequest;
 
 public class SendSetClientDHParams {
   ByteArrayPlus message_data;

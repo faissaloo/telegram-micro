@@ -1,6 +1,10 @@
-package mtproto;
+package mtproto.send;
 
 import support.ByteArrayPlus;
+
+import mtproto.CombinatorIds;
+import mtproto.UnencryptedRequest;
+import mtproto.Deserialize;
 
 //https://core.telegram.org/mtproto/service_messages#ping-messages-pingpong
 public class SendPing {

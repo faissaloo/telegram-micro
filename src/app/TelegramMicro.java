@@ -11,17 +11,17 @@ import javax.microedition.io.Connector;
 import javax.microedition.io.SocketConnection;
 
 import mtproto.TelegramPublicKeys;
-import mtproto.SendReqPqMulti;
-import mtproto.SendReqDhParams;
+import mtproto.send.SendReqPqMulti;
+import mtproto.send.SendReqDhParams;
 import mtproto.RecieveResponseThread;
 import mtproto.SendRequestThread;
 import mtproto.UnencryptedResponse;
-import mtproto.RecieveResPQ;
+import mtproto.recieve.RecieveResPQ;
 import mtproto.PrimeDecomposer;
-import mtproto.SendPing;
+import mtproto.send.SendPing;
 import mtproto.CombinatorIds;
-import mtproto.RecieveServerDHParamsOk;
-import mtproto.SendSetClientDHParams;
+import mtproto.recieve.RecieveServerDHParamsOk;
+import mtproto.send.SendSetClientDHParams;
 
 import crypto.RSAPublicKey;
 import crypto.SecureRandomPlus;

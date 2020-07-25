@@ -1,6 +1,6 @@
 package test;
 
-import mtproto.SendReqDhParams;
+import mtproto.send.SendReqDhParams;
 import support.Integer128;
 import support.Integer256;
 import crypto.SHA1;

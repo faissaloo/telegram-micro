@@ -17,9 +17,7 @@ import mtproto.CombinatorIds;
 import mtproto.Serialize;
 import mtproto.UnencryptedRequest;
 
-public class SendReqDhParams {
-  ByteArrayPlus message_data;
-
+public class SendReqDhParams extends SendUnencrypted {
   public SendReqDhParams(Integer128 nonce, Integer128 server_nonce, long pq, long p, long q, RSAPublicKey public_key, Integer256 new_nonce) {
     byte[] encrypted_data_bytes = RSA.encrypt(public_key, data_with_hash(p_q_inner_data(nonce, server_nonce, pq, p, q, new_nonce)));
     
@@ -53,9 +51,5 @@ public class SendReqDhParams {
       .append_raw_bytes(p_q_inner_data)
       .pad_to_length(255, new SecureRandomPlus())
       .toByteArray();
-  }
-
-  public void send() {
-    (new UnencryptedRequest(message_data.toByteArray())).send();
   }
 }

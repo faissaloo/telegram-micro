@@ -10,11 +10,8 @@ import crypto.SecureRandomPlus;
 
 import mtproto.CombinatorIds;
 import mtproto.Serialize;
-import mtproto.UnencryptedRequest;
 
-public class SendSetClientDHParams {
-  ByteArrayPlus message_data;
-
+public class SendSetClientDHParams extends SendUnencrypted {
   public SendSetClientDHParams(Integer128 nonce, Integer128 server_nonce, long retry_id, int group_generator, BigInteger diffie_hellman_prime, BigInteger b, byte[] tmp_aes_key, byte[] tmp_aes_iv) {
     message_data = new ByteArrayPlus();
     message_data.append_int(CombinatorIds.set_client_DH_params);
@@ -41,9 +38,5 @@ public class SendSetClientDHParams {
       
     byte[] encrypted_data = AES256IGE.encrypt(tmp_aes_key, tmp_aes_iv, data_with_hash);
     message_data.append_raw_bytes(Serialize.serialize_bytes(encrypted_data));
-  }
-  
-  public void send() {
-    (new UnencryptedRequest(message_data.toByteArray())).send();
   }
 }

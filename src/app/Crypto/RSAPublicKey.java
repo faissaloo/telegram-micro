@@ -2,7 +2,7 @@ package crypto;
 import bouncycastle.BigInteger;
 import support.ByteArrayPlus;
 import support.Decode;
-import mtproto.Serialize;
+import mtproto.Serializer;
 
 public class RSAPublicKey {
   public BigInteger exponent;
@@ -25,10 +25,10 @@ public class RSAPublicKey {
   //https://github.com/tdlib/td/issues/250
   //https://github.com/tdlib/td/blob/4eed84132e1389f2c80c77f0b8d6ca0d81a278d5/td/mtproto/RSA.cpp#L77
   public void update_fingerprint() {
-    ByteArrayPlus to_hash = new ByteArrayPlus();
-    to_hash.append_raw_bytes(Serialize.serialize_bytes(modulus.toByteArray()));
-    to_hash.append_raw_bytes(Serialize.serialize_bytes(exponent.toByteArray()));
-    byte[] to_hash_bytes = to_hash.toByteArray();
+    byte[] to_hash_bytes = (new Serializer())
+      .append_BigInteger(modulus)
+      .append_BigInteger(exponent)
+      .end();
     byte[] full_hash = (new SHA1()).digest(to_hash_bytes);
     fingerprint = Decode.Little.long_decode(full_hash, SHA1.HASH_SIZE-8);
   }

@@ -9,7 +9,7 @@ import crypto.AES256IGE;
 import crypto.SecureRandomPlus;
 
 import mtproto.CombinatorIds;
-import mtproto.Serialize;
+import mtproto.Serializer;
 
 public class SendSetClientDHParams extends SendUnencrypted {
   public SendSetClientDHParams(Integer128 nonce, Integer128 server_nonce, long retry_id, int group_generator, BigInteger diffie_hellman_prime, BigInteger b, byte[] tmp_aes_key, byte[] tmp_aes_iv) {
@@ -26,24 +26,24 @@ public class SendSetClientDHParams extends SendUnencrypted {
       .append_int(CombinatorIds.set_client_DH_params)
       .append_Integer128(nonce)
       .append_Integer128(server_nonce)
-      .append_raw_bytes(Serialize.serialize_bytes(encrypted_data));
+      .append_byte_string(encrypted_data);
   }
   
   public static byte[] inner_data(Integer128 nonce, Integer128 server_nonce, long retry_id, BigInteger group_generator_power_b) {
-    return (new ByteArrayPlus())
+    return (new Serializer())
       .append_int(CombinatorIds.client_DH_inner_data)
       .append_Integer128(nonce)
       .append_Integer128(server_nonce)
       .append_long(retry_id)
-      .append_raw_bytes(Serialize.serialize_bytes(group_generator_power_b.magnitudeToBytes()))
-      .toByteArray();
+      .append_BigInteger(group_generator_power_b)
+      .end();
   }
   
   public static byte[] data_with_hash(byte[] inner_data_hash, byte[] inner_data, SecureRandomPlus random_number_generator) {
-    return (new ByteArrayPlus())
+    return (new Serializer())
       .append_raw_bytes(inner_data_hash)
       .append_raw_bytes(inner_data)
       .pad_to_alignment(16, random_number_generator)
-      .toByteArray();
+      .end();
   }
 }

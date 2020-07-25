@@ -1,11 +1,12 @@
 package mtproto.send;
 import support.ByteArrayPlus;
+import mtproto.Serializer;
 import mtproto.UnencryptedRequest;
 
 public class SendUnencrypted {
-  public ByteArrayPlus message_data = new ByteArrayPlus();
+  public Serializer message_data = new Serializer();
 
   public void send() {
-    (new UnencryptedRequest(message_data.toByteArray())).send();
+    (new UnencryptedRequest(message_data.end())).send();
   }
 }

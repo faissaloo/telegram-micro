@@ -14,7 +14,7 @@ import crypto.SecureRandomPlus;
 
 import support.Debug;
 import mtproto.CombinatorIds;
-import mtproto.Serialize;
+import mtproto.Serializer;
 import mtproto.UnencryptedRequest;
 
 public class SendReqDhParams extends SendUnencrypted {
@@ -25,29 +25,29 @@ public class SendReqDhParams extends SendUnencrypted {
       .append_int(CombinatorIds.req_DH_params)
       .append_Integer128(nonce)
       .append_Integer128(server_nonce)
-      .append_raw_bytes(Serialize.serialize_bytes(ArrayPlus.remove_leading_zeroes(Encode.Big.long_encode(p))))
-      .append_raw_bytes(Serialize.serialize_bytes(ArrayPlus.remove_leading_zeroes(Encode.Big.long_encode(q))))
+      .append_long_as_byte_string(p)
+      .append_long_as_byte_string(q)
       .append_long(public_key.fingerprint)
-      .append_raw_bytes(Serialize.serialize_bytes(encrypted_data_bytes));
+      .append_byte_string(encrypted_data_bytes);
   }
   
   public static byte[] p_q_inner_data(Integer128 nonce, Integer128 server_nonce, long pq, long p, long q, Integer256 new_nonce) {
-    return (new ByteArrayPlus())
+    return (new Serializer())
       .append_int(CombinatorIds.p_q_inner_data)
-      .append_raw_bytes(Serialize.serialize_bytes(ArrayPlus.remove_leading_zeroes(Encode.Big.long_encode(pq))))
-      .append_raw_bytes(Serialize.serialize_bytes(ArrayPlus.remove_leading_zeroes(Encode.Big.long_encode(p))))
-      .append_raw_bytes(Serialize.serialize_bytes(ArrayPlus.remove_leading_zeroes(Encode.Big.long_encode(q))))
+      .append_long_as_byte_string(pq)
+      .append_long_as_byte_string(p)
+      .append_long_as_byte_string(q)
       .append_Integer128(nonce)
       .append_Integer128(server_nonce)
       .append_Integer256(new_nonce)
-      .toByteArray();
+      .end();
   }
   
   public static byte[] data_with_hash(byte[] p_q_inner_data) {
-    return (new ByteArrayPlus())
+    return (new Serializer())
       .append_raw_bytes((new SHA1()).digest(p_q_inner_data))
       .append_raw_bytes(p_q_inner_data)
       .pad_to_length(255, new SecureRandomPlus())
-      .toByteArray();
+      .end();
   }
 }

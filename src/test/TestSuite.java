@@ -6,7 +6,7 @@ public class TestSuite {
     
     TestRunner.register(new ArrayPlusContext.RemoveLeadingZeroesTest());
 
-    TestRunner.register(new SerializeContext.SerializeBytesTest());
+    TestRunner.register(new SerializerContext.AppendByteStringTest());
 
     TestRunner.register(new RSAPublicKeyContext.RSAPublicKeyFingerprintTest());
     TestRunner.register(new RSAContext.RSAEncryptionPrimitiveTest());

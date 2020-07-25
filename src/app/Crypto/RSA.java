@@ -7,6 +7,6 @@ public class RSA {
     BigInteger numeric_plaindata = new BigInteger(1, plaindata);
     BigInteger result = numeric_plaindata.modPow(key.exponent, key.modulus);
 
-    return result.magnitudeToBytes();
+    return result.toByteArray();
   }
 }

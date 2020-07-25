@@ -15,8 +15,8 @@ import java.lang.Integer;
 //https://stackoverflow.com/questions/30661644/how-to-implement-authorization-using-a-telegram-api/32809138#32809138
 public class SendReqPqMulti extends SendUnencrypted {
   public SendReqPqMulti(Integer128 nonce) {
-    message_data = new ByteArrayPlus();
-    message_data.append_int(CombinatorIds.req_pq_multi);
-    message_data.append_Integer128(nonce); //nonce
+    message_data
+      .append_int(CombinatorIds.req_pq_multi)
+      .append_Integer128(nonce);
   }
 }

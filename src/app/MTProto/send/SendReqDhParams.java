@@ -21,28 +21,26 @@ public class SendReqDhParams extends SendUnencrypted {
   public SendReqDhParams(Integer128 nonce, Integer128 server_nonce, long pq, long p, long q, RSAPublicKey public_key, Integer256 new_nonce) {
     byte[] encrypted_data_bytes = RSA.encrypt(public_key, data_with_hash(p_q_inner_data(nonce, server_nonce, pq, p, q, new_nonce)));
     
-    message_data = new ByteArrayPlus();
-    message_data.append_int(CombinatorIds.req_DH_params);
-    message_data.append_Integer128(nonce);
-    message_data.append_Integer128(server_nonce);
-    message_data.append_raw_bytes(Serialize.serialize_bytes(ArrayPlus.remove_leading_zeroes(Encode.Big.long_encode(p))));
-    message_data.append_raw_bytes(Serialize.serialize_bytes(ArrayPlus.remove_leading_zeroes(Encode.Big.long_encode(q))));
-    message_data.append_long(public_key.fingerprint);
-    message_data.append_raw_bytes(Serialize.serialize_bytes(encrypted_data_bytes));
+    message_data 
+      .append_int(CombinatorIds.req_DH_params)
+      .append_Integer128(nonce)
+      .append_Integer128(server_nonce)
+      .append_raw_bytes(Serialize.serialize_bytes(ArrayPlus.remove_leading_zeroes(Encode.Big.long_encode(p))))
+      .append_raw_bytes(Serialize.serialize_bytes(ArrayPlus.remove_leading_zeroes(Encode.Big.long_encode(q))))
+      .append_long(public_key.fingerprint)
+      .append_raw_bytes(Serialize.serialize_bytes(encrypted_data_bytes));
   }
   
   public static byte[] p_q_inner_data(Integer128 nonce, Integer128 server_nonce, long pq, long p, long q, Integer256 new_nonce) {
-    ByteArrayPlus p_q_inner_data = new ByteArrayPlus();
-    {
-      p_q_inner_data.append_int(CombinatorIds.p_q_inner_data);
-      p_q_inner_data.append_raw_bytes(Serialize.serialize_bytes(ArrayPlus.remove_leading_zeroes(Encode.Big.long_encode(pq))));
-      p_q_inner_data.append_raw_bytes(Serialize.serialize_bytes(ArrayPlus.remove_leading_zeroes(Encode.Big.long_encode(p))));
-      p_q_inner_data.append_raw_bytes(Serialize.serialize_bytes(ArrayPlus.remove_leading_zeroes(Encode.Big.long_encode(q))));
-      p_q_inner_data.append_Integer128(nonce);
-      p_q_inner_data.append_Integer128(server_nonce);
-      p_q_inner_data.append_Integer256(new_nonce);
-    }
-    return p_q_inner_data.toByteArray();
+    return (new ByteArrayPlus())
+      .append_int(CombinatorIds.p_q_inner_data)
+      .append_raw_bytes(Serialize.serialize_bytes(ArrayPlus.remove_leading_zeroes(Encode.Big.long_encode(pq))))
+      .append_raw_bytes(Serialize.serialize_bytes(ArrayPlus.remove_leading_zeroes(Encode.Big.long_encode(p))))
+      .append_raw_bytes(Serialize.serialize_bytes(ArrayPlus.remove_leading_zeroes(Encode.Big.long_encode(q))))
+      .append_Integer128(nonce)
+      .append_Integer128(server_nonce)
+      .append_Integer256(new_nonce)
+      .toByteArray();
   }
   
   public static byte[] data_with_hash(byte[] p_q_inner_data) {

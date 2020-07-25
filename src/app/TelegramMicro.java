@@ -25,6 +25,7 @@ import mtproto.SendSetClientDHParams;
 
 import crypto.RSAPublicKey;
 import crypto.SecureRandomPlus;
+import crypto.SHA1;
 
 import support.Integer128;
 import support.Integer256;
@@ -62,6 +63,8 @@ public class TelegramMicro extends MIDlet {
       SecureRandomPlus random_number_generator = new SecureRandomPlus();
       Integer128 nonce = random_number_generator.nextInteger128();
       Integer256 new_nonce = null;
+      byte[] auth_key = null;
+      byte[] auth_key_hash = null;
       long retry_id = 0;
 
       SendReqPqMulti key_exchange = new SendReqPqMulti(nonce);
@@ -119,6 +122,12 @@ public class TelegramMicro extends MIDlet {
               dh_params_ok.tmp_aes_key,
               dh_params_ok.tmp_aes_iv
             );
+            
+            auth_key = dh_params_ok.group_generator_power_a
+              .xor(b)
+              .mod(dh_params_ok.diffie_hellman_prime)
+              .magnitudeToBytes();
+            auth_key_hash = (new SHA1()).digest(auth_key, 8);
             
             set_client_dh_params.send();
             log.append((new Date()).toString());

@@ -49,6 +49,7 @@ public class MTProtoConnection {
     message_recieve_thread.start();
   }
   
+  //https://github.com/Fnux/telegram-mt-elixir/issues/1
   public void get_auth_key() throws IOException {
     Integer128 nonce = random_number_generator.nextInteger128();
     Integer256 new_nonce = null;
@@ -56,12 +57,12 @@ public class MTProtoConnection {
 
     SendReqPqMulti key_exchange = new SendReqPqMulti(nonce);
     key_exchange.send(message_send_thread);
-
+    System.out.println("SENDING REQ PQ MULTI");
     
     message_recieve_thread.wait_for_response();
 
     UnencryptedResponse unencrypted_response = UnencryptedResponse.from_tcp_response(message_recieve_thread.dequeue_response());
-    
+    System.out.println("RECIEVING RES PQ");
     RecieveResPQ pq_data = RecieveResPQ.from_unencrypted_message(unencrypted_response);
     PrimeDecomposer.Coprimes decomposed_pq = PrimeDecomposer.decompose(pq_data.pq);
     TelegramPublicKeys public_keys = new TelegramPublicKeys();
@@ -81,7 +82,8 @@ public class MTProtoConnection {
       new_nonce
     );
     diffie_hellman_params_request.send(message_send_thread);
-    
+    System.out.println("SENDING DH PARAMS");
+
     message_recieve_thread.wait_for_response();
     
     unencrypted_response = UnencryptedResponse.from_tcp_response(message_recieve_thread.dequeue_response());
@@ -101,16 +103,21 @@ public class MTProtoConnection {
     );
     
     set_client_dh_params.send(message_send_thread);
-    message_recieve_thread.wait_for_response();
+    System.out.println("SENDING SET DH PARAMS");
+    
 
     auth_key = dh_params_ok.group_generator_power_a
       .xor(b)
       .mod(dh_params_ok.diffie_hellman_prime)
       .magnitudeToBytes();
     auth_key_hash = (new SHA1()).digest(auth_key, 8);
+    message_recieve_thread.wait_for_response();
     
+    unencrypted_response = UnencryptedResponse.from_tcp_response(message_recieve_thread.dequeue_response());
+
     if (unencrypted_response.type() == CombinatorIds.dh_gen_ok) {
       System.out.println("DH GEN OK");
     }
+    System.out.println("SENDING DONE");
   }
 }

@@ -22,10 +22,12 @@ public class RecieveResponseThread extends Thread {
   
   public synchronized void wait_for_response() {
     waiting.enqueue(this);
-    try {
-      wait();
-    } catch (InterruptedException e) {
-      return;
+    if (!has_responses()) {
+      try {
+          wait();
+      } catch (InterruptedException e) {
+        return;
+      }
     }
   }
 

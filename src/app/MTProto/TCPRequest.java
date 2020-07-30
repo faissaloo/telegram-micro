@@ -24,7 +24,7 @@ public class TCPRequest {
     return request_data.toByteArray();
   }
 
-  public void send(SendRequestThread sender) {
-    sender.enqueue_request(this);
+  public void send(MTProtoConnection sender) {
+    sender.send(this);
   }
 }

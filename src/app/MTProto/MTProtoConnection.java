@@ -49,6 +49,10 @@ public class MTProtoConnection {
     message_recieve_thread.start();
   }
   
+  public void send(TCPRequest request) {
+    message_send_thread.enqueue_request(request);
+  }
+  
   //https://github.com/Fnux/telegram-mt-elixir/issues/1
   public void get_auth_key() throws IOException {
     Integer128 nonce = random_number_generator.nextInteger128();
@@ -56,7 +60,7 @@ public class MTProtoConnection {
     long retry_id = 0;
 
     SendReqPqMulti key_exchange = new SendReqPqMulti(nonce);
-    key_exchange.send(message_send_thread);
+    key_exchange.send(this);
     System.out.println("SENDING REQ PQ MULTI");
     
     message_recieve_thread.wait_for_response();
@@ -81,7 +85,7 @@ public class MTProtoConnection {
       public_key,
       new_nonce
     );
-    diffie_hellman_params_request.send(message_send_thread);
+    diffie_hellman_params_request.send(this);
     System.out.println("SENDING DH PARAMS");
 
     message_recieve_thread.wait_for_response();
@@ -102,7 +106,7 @@ public class MTProtoConnection {
       dh_params_ok.tmp_aes_iv
     );
     
-    set_client_dh_params.send(message_send_thread);
+    set_client_dh_params.send(this);
     System.out.println("SENDING SET DH PARAMS");
     
 

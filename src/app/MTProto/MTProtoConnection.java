@@ -29,6 +29,7 @@ import support.Integer128;
 import support.Integer256;
 import support.RandomPlus;
 import support.Debug;
+import support.Decode;
 
 public class MTProtoConnection {
   SocketConnection api_connection = null;
@@ -37,6 +38,8 @@ public class MTProtoConnection {
   SecureRandomPlus random_number_generator = null;
   public byte[] auth_key = null;
   public byte[] auth_key_hash = null;
+  public byte[] auth_key_full_hash = null;
+  public long auth_key_id = 0;
   
   
   public MTProtoConnection(String ip, String port) throws IOException {
@@ -114,7 +117,11 @@ public class MTProtoConnection {
       .xor(b)
       .mod(dh_params_ok.diffie_hellman_prime)
       .magnitudeToBytes();
-    auth_key_hash = (new SHA1()).digest(auth_key, 8);
+    
+    auth_key_full_hash = (new SHA1()).digest(auth_key);
+    auth_key_hash = (new SHA1()).digest(auth_key, 8); //Optimize me pls
+    auth_key_id = Decode.Little.long_decode(auth_key_full_hash, SHA1.HASH_SIZE-8);
+    
     message_recieve_thread.wait_for_response();
     
     unencrypted_response = UnencryptedResponse.from_tcp_response(message_recieve_thread.dequeue_response());

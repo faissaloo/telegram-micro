@@ -11,8 +11,7 @@ public class EncryptedRequest {
 
   public EncryptedRequest(long auth_key_id, byte[] auth_key, byte[] data) {
     //msg_key_large = SHA256 (substr (auth_key, 88+x, 32) + plaintext + random_padding);
-    SHA256 hash_engine = new SHA256();
-    byte[] msg_key_large = hash_engine.digest(
+    byte[] msg_key_large = (new SHA256()).digest(
       (new ByteArrayPlus())
         .append_raw_bytes_from_up_to(auth_key, 88, 32)
         .append_raw_bytes(data)
@@ -21,6 +20,31 @@ public class EncryptedRequest {
     );
     byte[] msg_key = (new ByteArrayPlus()) //Optimise me, we should just have a static method for ArrayPlus that can extract a chunk from a byte array
       .append_raw_bytes_from_up_to(msg_key_large, 8, 16)
+      .toByteArray();
+      
+    byte[] sha256_a = (new SHA256()).digest(
+      (new ByteArrayPlus())
+        .append_raw_bytes(msg_key)
+        .append_raw_bytes_up_to(auth_key, 36)
+        .toByteArray()
+    );
+    byte[] sha256_b = (new SHA256()).digest(
+      (new ByteArrayPlus())
+        .append_raw_bytes_from_up_to(auth_key, 40, 36)
+        .append_raw_bytes(msg_key)
+        .toByteArray()
+    );
+    
+    byte[] aes_key = (new ByteArrayPlus())
+      .append_raw_bytes_up_to(sha256_a, 8)
+      .append_raw_bytes_from_up_to(sha256_b, 8, 16)
+      .append_raw_bytes_from_up_to(sha256_a, 24, 8)
+      .toByteArray();
+    
+    byte[] aes_iv = (new ByteArrayPlus())
+      .append_raw_bytes_up_to(sha256_b, 8)
+      .append_raw_bytes_from_up_to(sha256_a, 8, 16)
+      .append_raw_bytes_from_up_to(sha256_b, 24, 8)
       .toByteArray();
     
     message_data = new ByteArrayPlus();

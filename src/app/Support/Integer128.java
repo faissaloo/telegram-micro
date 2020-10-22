@@ -30,6 +30,13 @@ public class Integer128 {
     }
   }
 
+  public Integer128() {
+    representation_0 = 0;
+    representation_1 = 0;
+    representation_2 = 0;
+    representation_3 = 0;
+  }
+  
   public Integer128(Integer128 to_copy) {
     set(to_copy);
   }
@@ -39,6 +46,15 @@ public class Integer128 {
     representation_1 = other.representation_1;
     representation_2 = other.representation_2;
     representation_3 = other.representation_3;
+    
+    return this;
+  }
+  
+  public Integer128 set(long upper, long lower) {
+    representation_0 = (int)(lower & 0xFFFFFFFFL);
+    representation_1 = (int)((lower & 0xFFFFFFFF00000000L) >>> 32);
+    representation_2 = (int)(upper & 0xFFFFFFFFL);
+    representation_3 = (int)((upper & 0xFFFFFFFF00000000L) >>> 32);
     
     return this;
   }
@@ -377,14 +393,14 @@ public class Integer128 {
     return fast_unsigned_modulo(other, other.negate());
   }
   
-  public Integer128 fast_unsigned_modulo(Integer128 other, Integer128 negated_other) {
+  public Integer128 fast_unsigned_modulo(Integer128 other, Integer128 negated_other, Integer128 scratch) {
     if (other.equals(zero)) {
       throw new ArithmeticException("Division by zero");
     }
 
     //https://stackoverflow.com/a/33333636/5269447
     if (unsigned_greater_than_equal(other)) {
-      Integer128 remainder = new Integer128(zero);
+      Integer128 remainder = scratch.set(zero);
 
       for (int i = 128; i > 0; i--) {
         remainder.mutating_unsigned_left_shift().mutating_or(get_bit(i-1));
@@ -397,6 +413,10 @@ public class Integer128 {
       set(remainder);
     }
     return this;
+  }
+  
+  public Integer128 fast_unsigned_modulo(Integer128 other, Integer128 negated_other) {
+    return fast_unsigned_modulo(other, negated_other, new Integer128());
   }
   
   public long fast_unsigned_modulo_long(long other) {
@@ -475,8 +495,7 @@ public class Integer128 {
     return (new Integer128(this)).mutating_unsigned_left_shift(shift);
   }
 
-  //https://codereview.stackexchange.com/questions/72286/multiplication-128-x-64-bits
-  public static Integer128 unsigned_long_multiply(long x, long y) {
+  public Integer128 set_unsigned_long_multiply(long x, long y) {
     long high = 0;
     long low = y;
     long y0  = (low & 0xFFFFFFFFL);
@@ -504,6 +523,13 @@ public class Integer128 {
     // Account for the possible carry from the low parts.
     long p2 = (p00 >>> 32) + (p01 & 0xFFFFFFFFL) + (p10 & 0xFFFFFFFFL);
     high += (p2 >>> 32);
-    return new Integer128(high, low);
+    
+    set(high, low);
+    return this;
+  }
+  
+  //https://codereview.stackexchange.com/questions/72286/multiplication-128-x-64-bits
+  public static Integer128 unsigned_long_multiply(long x, long y) {
+    return (new Integer128()).set_unsigned_long_multiply(x,y);
   }
 }

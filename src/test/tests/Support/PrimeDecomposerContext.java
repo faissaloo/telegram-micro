@@ -5,7 +5,7 @@ import mtproto.PrimeDecomposer;
 import support.Integer128;
 
 public class PrimeDecomposerContext {
-  public static class DecomposeTest extends SkippedTest {
+  public static class DecomposeTest extends /*Skipped*/Test {
     public String label() {
       return "It can decompose a prime (~1 min test)";
     }

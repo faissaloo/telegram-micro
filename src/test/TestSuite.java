@@ -52,6 +52,6 @@ public class TestSuite {
 
     TestRunner.register(new PrimeDecomposerContext.FiniteRingTest());
     TestRunner.register(new PrimeDecomposerContext.EuclidianGreatestCommonDenominatorTest());
-    TestRunner.register(new PrimeDecomposerContext.DecomposeTest()); //Warning: SLOW, ~4 mins
+    TestRunner.register(new PrimeDecomposerContext.DecomposeTest()); //Warning: SLOW 20 sec test
   }
 }

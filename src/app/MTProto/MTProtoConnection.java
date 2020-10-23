@@ -74,6 +74,11 @@ public class MTProtoConnection {
     PrimeDecomposer.Coprimes decomposed_pq = PrimeDecomposer.decompose(pq_data.pq);
     TelegramPublicKeys public_keys = new TelegramPublicKeys();
     RSAPublicKey public_key = public_keys.find_public_key(pq_data.server_public_key_fingerprints);
+    for (int i = 0; i < pq_data.server_public_key_fingerprints.length; i++) {
+      System.out.println("Using public key with fingerprint:");
+      System.out.println(pq_data.server_public_key_fingerprints[i]);
+    }
+    
     if (public_key == null) {
       //Couldn't find the public key
     }

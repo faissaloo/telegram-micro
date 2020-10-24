@@ -130,8 +130,10 @@ public class MTProtoConnection {
     message_recieve_thread.wait_for_response();
     
     unencrypted_response = UnencryptedResponse.from_tcp_response(message_recieve_thread.dequeue_response());
-
+    
     if (unencrypted_response.type() == CombinatorIds.dh_gen_ok) {
+      //Something here should provide us with a server salt, we'll need to save that
+      //new_nonce[0..8]^server_nonce[0..8]
       System.out.println("DH GEN OK");
     }
     System.out.println("SENDING DONE");

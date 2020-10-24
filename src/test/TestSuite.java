@@ -5,6 +5,8 @@ public class TestSuite {
     TestRunner.register(new SendReqDhParamsContext.PQInnerDataTest());
     
     TestRunner.register(new ArrayPlusContext.RemoveLeadingZeroesTest());
+    TestRunner.register(new ArrayPlusContext.XorTest());
+    TestRunner.register(new ArrayPlusContext.SubarrayTest());
 
     TestRunner.register(new SerializerContext.AppendByteStringTest());
 

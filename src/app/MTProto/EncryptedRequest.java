@@ -59,15 +59,17 @@ public class EncryptedRequest {
       .append_raw_bytes_from_up_to(sha256_b, 24, 8)
       .toByteArray();
     
+    //https://core.telegram.org/mtproto/description#encrypted-message-encrypted-data
     byte[] encrypted_data = AES256IGE.encrypt(aes_key, aes_iv, unencrypted_data);
-    
-    byte[] message_data = (new ByteArrayPlus())
+    //https://core.telegram.org/mtproto/description#encrypted-message
+    byte[] encrypted_message = (new ByteArrayPlus())
       .append_long(sender.auth_key_id)
-      .append_long(message_id())
-      .append_int(encrypted_data.length)
+      .append_raw_bytes(msg_key)
       .append_raw_bytes(encrypted_data)
       .toByteArray();
     
-    (new TCPRequest(message_data)).send(sender);
+    int seq_no = 0; //temporarily hardcoded, the number of acknowledged messages previously sent
+    
+    (new TCPRequest(encrypted_message)).send(sender);
   }
 }

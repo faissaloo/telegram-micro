@@ -15,4 +15,18 @@ public class ArrayPlus {
     
     return new_array;
   }
+  
+  public static byte[] xor(byte[] xorand, byte[] xorier) {
+    byte[] result = new byte[Math.max(xorand.length, xorier.length)];
+    for (int i = 0; i < xorand.length; i++) {
+      result[i] = (byte)(xorand[i]^xorier[i]);
+    }
+    return result;
+  }
+  
+  public static byte[] subarray(byte[] array, int from, int length) {
+    byte[] new_array = new byte[length];
+    System.arraycopy(array, from, new_array, 0, length);
+    return new_array;
+  }
 }

@@ -29,4 +29,8 @@ public class ArrayPlus {
     System.arraycopy(array, from, new_array, 0, length);
     return new_array;
   }
+  
+  public static byte[] subarray(byte[] array, int length) {
+    return subarray(array, 0, length);
+  }
 }

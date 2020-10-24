@@ -26,7 +26,7 @@ public class EncryptedRequest {
       (new ByteArrayPlus())
         .append_raw_bytes_from_up_to(sender.auth_key, 88, 32)
         .append_raw_bytes(unencrypted_data)
-        .pad_to_length(12) //this padding has to be between 12-1024, so let's just pad 12 on the beginning, we should later randomize this in both length and content
+        .pad_to_length(12) //this padding has to be between 12-1024, so let's just pad 12 for now, we should later randomize this in both length and content
         .pad_to_alignment(16) //this should also have its content randomized
         .toByteArray()
     );
@@ -59,16 +59,27 @@ public class EncryptedRequest {
       .append_raw_bytes_from_up_to(sha256_b, 24, 8)
       .toByteArray();
     
+    int seq_no = 0; //temporarily hardcoded, the number of acknowledged messages previously sent
+      
+    byte[] message_data = AES256IGE.encrypt(aes_key, aes_iv, unencrypted_data);
     //https://core.telegram.org/mtproto/description#encrypted-message-encrypted-data
-    byte[] encrypted_data = AES256IGE.encrypt(aes_key, aes_iv, unencrypted_data);
+    byte[] encrypted_data = (new ByteArrayPlus())
+      .append_raw_bytes(sender.server_salt)
+      .append_long(sender.session_id)
+      .append_long(message_id())
+      .append_int(seq_no)
+      .append_int(message_data.length)
+      .append_raw_bytes(message_data)
+      .pad_to_length(12) //this padding has to be between 12-1024, so let's just pad 12 for now, we should later randomize this in both length and content
+      .pad_to_alignment(16) //this should also have its content randomized, also I'm not actually sure if this has to be padded to alignment
+      .toByteArray();
+    
     //https://core.telegram.org/mtproto/description#encrypted-message
     byte[] encrypted_message = (new ByteArrayPlus())
       .append_long(sender.auth_key_id)
       .append_raw_bytes(msg_key)
       .append_raw_bytes(encrypted_data)
       .toByteArray();
-    
-    int seq_no = 0; //temporarily hardcoded, the number of acknowledged messages previously sent
     
     (new TCPRequest(encrypted_message)).send(sender);
   }

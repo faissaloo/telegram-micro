@@ -44,6 +44,7 @@ public class MTProtoConnection {
   public byte[] auth_key_full_hash = null;
   public byte[] server_salt = null;
   public long auth_key_id = 0;
+  public long session_id = 0;
   
   
   public MTProtoConnection(String ip, String port) throws IOException {
@@ -137,9 +138,8 @@ public class MTProtoConnection {
     
     if (unencrypted_response.type() == CombinatorIds.dh_gen_ok) {
       RecieveServerDHGenOk dh_gen_ok = RecieveServerDHGenOk.from_unencrypted_message(unencrypted_response);
-      //Something here should provide us with a server salt, we'll need to save that
       server_salt = ArrayPlus.xor(ArrayPlus.subarray(Encode.Integer256_encode(new_nonce), 8), ArrayPlus.subarray(Encode.Integer128_encode(dh_gen_ok.server_nonce), 8));
-      
+      session_id = random_number_generator.nextLong();
       System.out.println("DH GEN OK");
     }
     System.out.println("SENDING DONE");

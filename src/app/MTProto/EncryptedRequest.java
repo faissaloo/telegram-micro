@@ -5,17 +5,29 @@ import java.io.IOException;
 import support.Encode;
 import support.ByteArrayPlus;
 import crypto.SHA256;
+import crypto.AES256IGE;
 
 public class EncryptedRequest {
-  ByteArrayPlus message_data;
+  byte[] unencrypted_data;
+  //https://core.telegram.org/mtproto/description#defining-aes-key-and-initialization-vector
+  public EncryptedRequest(byte[] data) {
+    this.unencrypted_data = unencrypted_data;
+  }
 
-  public EncryptedRequest(long auth_key_id, byte[] auth_key, byte[] data) {
+  private long message_id() {
+    //https://core.telegram.org/mtproto/description#message-identifier-msg-id
+    return (System.currentTimeMillis()/1000L)*4294967296L;
+  }
+
+  public void send(MTProtoConnection sender) {
+    //we should get the auth_key_id and auth_key from the MTProtoConnection
     //msg_key_large = SHA256 (substr (auth_key, 88+x, 32) + plaintext + random_padding);
     byte[] msg_key_large = (new SHA256()).digest(
       (new ByteArrayPlus())
-        .append_raw_bytes_from_up_to(auth_key, 88, 32)
-        .append_raw_bytes(data)
-        .pad_to_alignment(16)
+        .append_raw_bytes_from_up_to(sender.auth_key, 88, 32)
+        .append_raw_bytes(unencrypted_data)
+        .pad_to_length(12) //this padding has to be between 12-1024, so let's just pad 12 on the beginning, we should later randomize this in both length and content
+        .pad_to_alignment(16) //this should also have its content randomized
         .toByteArray()
     );
     byte[] msg_key = (new ByteArrayPlus()) //Optimise me, we should just have a static method for ArrayPlus that can extract a chunk from a byte array
@@ -25,12 +37,12 @@ public class EncryptedRequest {
     byte[] sha256_a = (new SHA256()).digest(
       (new ByteArrayPlus())
         .append_raw_bytes(msg_key)
-        .append_raw_bytes_up_to(auth_key, 36)
+        .append_raw_bytes_up_to(sender.auth_key, 36)
         .toByteArray()
     );
     byte[] sha256_b = (new SHA256()).digest(
       (new ByteArrayPlus())
-        .append_raw_bytes_from_up_to(auth_key, 40, 36)
+        .append_raw_bytes_from_up_to(sender.auth_key, 40, 36)
         .append_raw_bytes(msg_key)
         .toByteArray()
     );
@@ -47,19 +59,15 @@ public class EncryptedRequest {
       .append_raw_bytes_from_up_to(sha256_b, 24, 8)
       .toByteArray();
     
-    message_data = new ByteArrayPlus();
-    message_data.append_long(auth_key_id);
-    message_data.append_long(message_id());
-    message_data.append_int(data.length);
-    message_data.append_raw_bytes(data);
-  }
-
-  private long message_id() {
-    //https://core.telegram.org/mtproto/description#message-identifier-msg-id
-    return (System.currentTimeMillis()/1000L)*4294967296L;
-  }
-
-  public void send(MTProtoConnection sender) {
-    (new TCPRequest(message_data.toByteArray())).send(sender);
+    byte[] encrypted_data = AES256IGE.encrypt(aes_key, aes_iv, unencrypted_data);
+    
+    byte[] message_data = (new ByteArrayPlus())
+      .append_long(sender.auth_key_id)
+      .append_long(message_id())
+      .append_int(encrypted_data.length)
+      .append_raw_bytes(encrypted_data)
+      .toByteArray();
+    
+    (new TCPRequest(message_data)).send(sender);
   }
 }

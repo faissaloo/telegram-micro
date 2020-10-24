@@ -83,6 +83,11 @@ public class Serializer {
     return this;
   }
   
+  public Serializer pad_to_length(int length) {
+    data.pad_to_length(length);
+    return this;
+  }
+  
   public Serializer pad_to_length(int length, RandomPlus random_number_generator) {
     data.pad_to_length(length, random_number_generator);
     return this;

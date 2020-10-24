@@ -2,10 +2,12 @@ package mtproto;
 
 import java.io.IOException;
 
-import support.Encode;
-import support.ByteArrayPlus;
 import crypto.SHA256;
 import crypto.AES256IGE;
+
+import support.Encode;
+import support.ByteArrayPlus;
+import support.ArrayPlus;
 
 public class EncryptedRequest {
   byte[] unencrypted_data;
@@ -30,9 +32,8 @@ public class EncryptedRequest {
         .pad_to_alignment(16) //this should also have its content randomized
         .toByteArray()
     );
-    byte[] msg_key = (new ByteArrayPlus()) //Optimise me, we should just have a static method for ArrayPlus that can extract a chunk from a byte array
-      .append_raw_bytes_from_up_to(msg_key_large, 8, 16)
-      .toByteArray();
+    
+    byte[] msg_key = ArrayPlus.subarray(msg_key_large, 8, 16);
       
     byte[] sha256_a = (new SHA256()).digest(
       (new ByteArrayPlus())

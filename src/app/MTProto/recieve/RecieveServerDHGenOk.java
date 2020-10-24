@@ -24,7 +24,7 @@ public class RecieveServerDHGenOk {
     byte[] data = message.data();
     int message_type = message.type();
 
-    if (message_type == CombinatorIds.server_DH_params_ok) {
+    if (message_type == CombinatorIds.dh_gen_ok) {
       Integer128 nonce = Decode.Little.Integer128_decode(data, skip);
       skip += 16;
       Integer128 server_nonce = Decode.Little.Integer128_decode(data, skip);
@@ -32,7 +32,7 @@ public class RecieveServerDHGenOk {
       Integer128 new_nonce_hash1 = Decode.Little.Integer128_decode(data, skip);
       return new RecieveServerDHGenOk(nonce, server_nonce, new_nonce_hash1);
     } else {
-      throw new TypeMismatchException("Expected a %(server_DH_gen_ok)");
+      throw new TypeMismatchException("Expected a %(DH_gen_ok)");
     }
   }
   

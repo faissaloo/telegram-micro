@@ -34,6 +34,7 @@ public class Serializer {
   public Serializer append_long_as_byte_string(long to_write) {
     return append_byte_string(ArrayPlus.remove_leading_zeroes(Encode.Big.long_encode(to_write)));
   }
+  
   public Serializer append_BigInteger(BigInteger to_write) {
     return append_byte_string(to_write.magnitudeToBytes());
   }

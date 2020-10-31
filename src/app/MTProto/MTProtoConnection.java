@@ -2,18 +2,12 @@ package mtproto;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.lang.SecurityException;
+
 import javax.microedition.io.Connector;
 import javax.microedition.io.SocketConnection;
 
 import bouncycastle.BigInteger;
-/*
-import mtproto.TelegramPublicKeys;
-import mtproto.RecieveResponseThread;
-import mtproto.SendRequestThread;
-import mtproto.UnencryptedResponse;
-import mtproto.PrimeDecomposer;
-import mtproto.CombinatorIds;
-*/
 import mtproto.recieve.RecieveResPQ;
 import mtproto.recieve.RecieveServerDHParamsOk;
 import mtproto.recieve.RecieveServerDHGenOk;
@@ -39,15 +33,31 @@ public class MTProtoConnection {
   SendRequestThread message_send_thread = null;
   RecieveResponseThread message_recieve_thread = null;
   SecureRandomPlus random_number_generator = null;
+  
   public byte[] auth_key = null;
   public byte[] auth_key_hash = null;
   public byte[] auth_key_full_hash = null;
   public byte[] server_salt = null;
   public long auth_key_id = 0;
   public long session_id = 0;
+  public int seq_no = 0;
   
+  //Constructor for the default port
+  public MTProtoConnection(String ip) throws IOException {
+    this(ip, "5222");
+  }
   
   public MTProtoConnection(String ip, String port) throws IOException {
+    if (port.equals("80") || port.equals("8080") || port.equals("443") || port.equals("http") || port.equals("https")) {
+      throw new SecurityException(
+        "Ports 80, 8080 & 443 are reserved under JSR 185," +
+        " rendering the ports unusable on most devices. JSR 185 requires" +
+        " that applications using these ports be signed but most J2ME devices" +
+        " no longer hold valid certificates to be signed against." + 
+        " In the interests of writing compatible programs these ports" +
+        " have been disabled entirely."
+      );
+    }
     random_number_generator = new SecureRandomPlus();
     api_connection = (SocketConnection) Connector.open("socket://"+ip+":"+port);
     message_send_thread = new SendRequestThread(api_connection);
@@ -55,14 +65,19 @@ public class MTProtoConnection {
     
     message_send_thread.start(); //Should we have these start when they're instantiated?
     message_recieve_thread.start();
+    
+    perform_handshake();
   }
   
   public void send(TCPRequest request) {
     message_send_thread.enqueue_request(request);
   }
   
-  //https://github.com/Fnux/telegram-mt-elixir/issues/1
-  public void get_auth_key() throws IOException {
+  public void wait_for_response() {
+    message_recieve_thread.wait_for_response();
+  }
+  
+  public void perform_handshake() throws IOException {
     Integer128 nonce = random_number_generator.nextInteger128();
     Integer256 new_nonce = null;
     long retry_id = 0;
@@ -71,7 +86,7 @@ public class MTProtoConnection {
     key_exchange.send(this);
     System.out.println("SENDING REQ PQ MULTI");
     
-    message_recieve_thread.wait_for_response();
+    wait_for_response();
 
     UnencryptedResponse unencrypted_response = UnencryptedResponse.from_tcp_response(message_recieve_thread.dequeue_response());
     System.out.println("RECIEVING RES PQ");
@@ -101,7 +116,7 @@ public class MTProtoConnection {
     diffie_hellman_params_request.send(this);
     System.out.println("SENDING DH PARAMS");
 
-    message_recieve_thread.wait_for_response();
+    wait_for_response();
     
     unencrypted_response = UnencryptedResponse.from_tcp_response(message_recieve_thread.dequeue_response());
     
@@ -132,7 +147,7 @@ public class MTProtoConnection {
     auth_key_hash = (new SHA1()).digest(auth_key, 8); //Optimize me pls
     auth_key_id = Decode.Little.long_decode(auth_key_full_hash, SHA1.HASH_SIZE-8);
     
-    message_recieve_thread.wait_for_response();
+    wait_for_response();
     
     unencrypted_response = UnencryptedResponse.from_tcp_response(message_recieve_thread.dequeue_response());
     

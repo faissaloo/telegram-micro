@@ -9,6 +9,7 @@ import javax.microedition.midlet.MIDlet;
 import javax.microedition.io.Connector;
 
 import mtproto.MTProtoConnection;
+import mtproto.send.SendPing;
 
 import bouncycastle.BigInteger;
 
@@ -27,9 +28,12 @@ public class TelegramMicro extends MIDlet {
     display.setCurrent(log);
 
     try {
-      MTProtoConnection connection = new MTProtoConnection("149.154.175.10", "5222");
-      connection.get_auth_key();
-      System.out.println(connection.auth_key_hash);
+      MTProtoConnection connection = new MTProtoConnection("149.154.175.10");
+      System.out.println("SENDING PING");
+      (new SendPing(25565)).send(connection);
+      System.out.println("WAITING FOR RESPONSE");
+      connection.wait_for_response();
+      System.out.println("GOT RESPONSE");
     } catch (IOException e) {
       e.printStackTrace();
     }

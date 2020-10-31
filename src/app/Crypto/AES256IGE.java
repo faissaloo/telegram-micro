@@ -63,7 +63,6 @@ public class AES256IGE {
     byte[] previous_block = new byte[16];
     System.arraycopy(initialization_vector, 16, previous_block, 0, 16);
 
-
     for (int i = 0; i < data.length; i += 16) {
       byte[] encrypted_block;
       byte[] garbled_block;

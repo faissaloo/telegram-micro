@@ -21,7 +21,7 @@ public class RecieveResPQ {
       skip += 16;
       Integer128 server_nonce = Decode.Little.Integer128_decode(data, skip);
       skip += 16;
-      long pq = Decode.Big.long_decode(Deserialize.bytes_deserialize(data, skip), 0);
+      long pq = Decode.Big.long_decode(Deserialize.bytes_deserialize(data, skip), 0); //this probably deserializes some stuff wrong on rare occasions
 
       skip += Deserialize.bytes_length_deserialize(data, skip);
       long[] server_public_key_fingerprints = Deserialize.vector_long_deserialize(data, skip);

@@ -16,11 +16,9 @@ public class EncryptedRequest {
     this.unencrypted_data = unencrypted_data;
   }
 
-  //real talk i'm not entirely sure if this works in the slightest since 
-  //unencrypted communication doesn't seem to care about what you slap in here
   private long message_id() {
     //https://core.telegram.org/mtproto/description#message-identifier-msg-id
-    return (System.currentTimeMillis()/1000L)*4294967296L;
+    return (System.currentTimeMillis()/1000L)<<32;
   }
 
   public void send(MTProtoConnection sender) {
@@ -34,13 +32,13 @@ public class EncryptedRequest {
     //msg_key_large = SHA256 (substr (auth_key, 88+x, 32) + plaintext + random_padding);
     byte[] msg_key_large = (new SHA256()).digest(
       (new ByteArrayPlus())
-        .append_raw_bytes_from_up_to(sender.auth_key, 88, 32)
+        .append_raw_bytes_from_up_to(sender.auth_key, 88, 32) //88 from client to server, 88+8 from server to client
         .append_raw_bytes(padded_unencrypted_data)
         .toByteArray()
-    );
+    ); //Apparently we should only be getting the middle 128 bits of this???
     
     byte[] msg_key = ArrayPlus.subarray(msg_key_large, 8, 16);
-      
+
     byte[] sha256_a = (new SHA256()).digest(
       (new ByteArrayPlus())
         .append_raw_bytes(msg_key)
@@ -69,7 +67,7 @@ public class EncryptedRequest {
     byte[] message_data = AES256IGE.encrypt(aes_key, aes_iv, padded_unencrypted_data);
     //https://core.telegram.org/mtproto/description#encrypted-message-encrypted-data
     byte[] encrypted_data = (new ByteArrayPlus())
-      .append_raw_bytes(sender.server_salt)
+      .append_long(sender.server_salt) //the salt needs to be encoded as an int64... does that mean it's little endian too?
       .append_long(sender.session_id)
       .append_long(message_id())
       .append_int(sender.seq_no)

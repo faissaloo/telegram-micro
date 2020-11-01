@@ -88,13 +88,13 @@ public class SHA1 {
 		// integer
 		long N = (long) n * 8;
 		byte h8 = (byte) (N & 0xFF);
-		byte h7 = (byte) ((N >> 8) & 0xFF);
-		byte h6 = (byte) ((N >> 16) & 0xFF);
-		byte h5 = (byte) ((N >> 24) & 0xFF);
-		byte h4 = (byte) ((N >> 32) & 0xFF);
-		byte h3 = (byte) ((N >> 40) & 0xFF);
-		byte h2 = (byte) ((N >> 48) & 0xFF);
-		byte h1 = (byte) (N >> 56);
+		byte h7 = (byte) ((N >>> 8) & 0xFF);
+		byte h6 = (byte) ((N >>> 16) & 0xFF);
+		byte h5 = (byte) ((N >>> 24) & 0xFF);
+		byte h4 = (byte) ((N >>> 32) & 0xFF);
+		byte h3 = (byte) ((N >>> 40) & 0xFF);
+		byte h2 = (byte) ((N >>> 48) & 0xFF);
+		byte h1 = (byte) (N >>> 56);
 		newbyte[l++] = h1;
 		newbyte[l++] = h2;
 		newbyte[l++] = h3;

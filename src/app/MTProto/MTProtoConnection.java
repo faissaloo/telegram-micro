@@ -31,13 +31,12 @@ import support.ArrayPlus;
 public class MTProtoConnection {
   SocketConnection api_connection = null;
   SendRequestThread message_send_thread = null;
-  RecieveResponseThread message_recieve_thread = null;
+  public RecieveResponseThread message_recieve_thread = null;
   SecureRandomPlus random_number_generator = null;
   
   public byte[] auth_key = null;
-  public byte[] auth_key_hash = null;
   public byte[] auth_key_full_hash = null;
-  public byte[] server_salt = null;
+  public long server_salt = 0;
   public long auth_key_id = 0;
   public long session_id = 0;
   public int seq_no = 0;
@@ -119,6 +118,7 @@ public class MTProtoConnection {
     wait_for_response();
     
     unencrypted_response = UnencryptedResponse.from_tcp_response(message_recieve_thread.dequeue_response());
+
     
     RecieveServerDHParamsOk dh_params_ok = RecieveServerDHParamsOk.from_unencrypted_message(unencrypted_response, new_nonce);
     
@@ -136,16 +136,13 @@ public class MTProtoConnection {
     
     set_client_dh_params.send(this);
     System.out.println("SENDING SET DH PARAMS");
-    
 
-    auth_key = dh_params_ok.group_generator_power_a
-      .xor(b)
-      .mod(dh_params_ok.diffie_hellman_prime)
-      .magnitudeToBytes();
+    //We need to write some tests to ensure auth key generation is correct based on the values in
+    //https://core.telegram.org/mtproto/samples-auth_key#7-computing-auth-key-using-formula-gab-mod-dh-prime
+    auth_key = generate_auth_key(dh_params_ok.group_generator_power_a, b, dh_params_ok.diffie_hellman_prime);
     
     auth_key_full_hash = (new SHA1()).digest(auth_key);
-    auth_key_hash = (new SHA1()).digest(auth_key, 8); //Optimize me pls
-    auth_key_id = Decode.Little.long_decode(auth_key_full_hash, SHA1.HASH_SIZE-8);
+    auth_key_id = Decode.Big.long_decode(auth_key_full_hash, SHA1.HASH_SIZE-8); //these should be the 64 lower-order bits right?
     
     wait_for_response();
     
@@ -153,10 +150,16 @@ public class MTProtoConnection {
     
     if (unencrypted_response.type() == CombinatorIds.dh_gen_ok) {
       RecieveServerDHGenOk dh_gen_ok = RecieveServerDHGenOk.from_unencrypted_message(unencrypted_response);
-      server_salt = ArrayPlus.xor(ArrayPlus.subarray(Encode.Integer256_encode(new_nonce), 8), ArrayPlus.subarray(Encode.Integer128_encode(dh_gen_ok.server_nonce), 8));
+      server_salt = Decode.Big.long_decode(ArrayPlus.subarray(Encode.Integer256_encode(new_nonce), 8), 0) ^ Decode.Big.long_decode(ArrayPlus.subarray(Encode.Integer128_encode(dh_gen_ok.server_nonce), 8), 0);
       session_id = random_number_generator.nextLong();
       System.out.println("DH GEN OK");
     }
     System.out.println("SENDING DONE");
+  }
+  
+  public static byte[] generate_auth_key(BigInteger group_generator_power_a, BigInteger b, BigInteger diffie_hellman_prime) {
+    return group_generator_power_a
+      .modPow(b, diffie_hellman_prime)
+      .magnitudeToBytes();
   }
 }

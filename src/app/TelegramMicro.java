@@ -10,6 +10,7 @@ import javax.microedition.io.Connector;
 
 import mtproto.MTProtoConnection;
 import mtproto.send.SendPing;
+import mtproto.UnencryptedResponse;
 
 import bouncycastle.BigInteger;
 
@@ -34,6 +35,13 @@ public class TelegramMicro extends MIDlet {
       System.out.println("WAITING FOR RESPONSE");
       connection.wait_for_response();
       System.out.println("GOT RESPONSE");
+      UnencryptedResponse unencrypted_response = UnencryptedResponse.from_tcp_response(connection.message_recieve_thread.dequeue_response());
+      //We're getting 404 for some reason...
+      if (unencrypted_response == null) {
+        System.out.println("RESPONSE WAS ENCRYPTED");
+      } else {
+        System.out.println("RESPONSE WAS NOT ENCRYPTED");
+      }
     } catch (IOException e) {
       e.printStackTrace();
     }

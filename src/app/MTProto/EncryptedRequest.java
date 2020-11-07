@@ -28,6 +28,9 @@ public class EncryptedRequest {
       .pad_to_alignment(16) //this should also have its content randomized
       .toByteArray();
      
+      System.out.println("Generating message key");
+      //We're getting array out of bounds here, why?
+      System.out.println(sender.auth_key.length); //whym'st are you 0
     //we should get the auth_key_id and auth_key from the MTProtoConnection
     //msg_key_large = SHA256 (substr (auth_key, 88+x, 32) + plaintext + random_padding);
     byte[] msg_key_large = (new SHA256()).digest(
@@ -36,6 +39,7 @@ public class EncryptedRequest {
         .append_raw_bytes(padded_unencrypted_data)
         .toByteArray()
     ); //Apparently we should only be getting the middle 128 bits of this???
+    System.out.println("Message key generated");
     
     byte[] msg_key = ArrayPlus.subarray(msg_key_large, 8, 16);
 

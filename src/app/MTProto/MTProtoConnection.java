@@ -140,7 +140,6 @@ public class MTProtoConnection {
     //We need to write some tests to ensure auth key generation is correct based on the values in
     //https://core.telegram.org/mtproto/samples-auth_key#7-computing-auth-key-using-formula-gab-mod-dh-prime
     auth_key = generate_auth_key(dh_params_ok.group_generator_power_a, b, dh_params_ok.diffie_hellman_prime);
-    
     auth_key_full_hash = (new SHA1()).digest(auth_key);
     auth_key_id = Decode.Big.long_decode(auth_key_full_hash, SHA1.HASH_SIZE-8); //these should be the 64 lower-order bits right?
     

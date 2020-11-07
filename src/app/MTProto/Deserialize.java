@@ -21,13 +21,13 @@ public class Deserialize {
   }
 
   public static int bytes_length_deserialize(byte[] data, int offset) {
-    int bytes_length = data[offset];
+    int bytes_length = data[offset]&0xFF;
     int bytes_offset = 1;
     if (bytes_length >= 254) {
       bytes_length = Decode.Little.int24_decode(data, offset+1);
       bytes_offset = 4;
     }
-    int bytes_padding = (4-(bytes_length+bytes_offset)%4)%4;
+    int bytes_padding = (4-bytes_length%4)%4;
 
     return bytes_offset+bytes_length+bytes_padding;
   }

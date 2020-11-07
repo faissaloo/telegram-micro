@@ -4,7 +4,7 @@ import mtproto.MTProtoConnection;
 import bouncycastle.BigInteger;
 
 public class MTProtoConnectionContext {
-  public static class GenerateAuthKeyTest extends Test {
+  public static class GenerateAuthKeyTest extends SkippedTest {
     public String label() {
       return "It can generate auth keys correctly";
     }

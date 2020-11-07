@@ -2,6 +2,7 @@ package test;
 
 public class TestSuite {
   public static void register_all_tests() {
+    TestRunner.register(new RecieveServerDHParamsOkContext.DeserializeTest());
     TestRunner.register(new MTProtoConnectionContext.GenerateAuthKeyTest());
     TestRunner.register(new SendReqDhParamsContext.PQInnerDataTest());
     

@@ -7,7 +7,7 @@ import support.Integer128;
 public class PrimeDecomposerContext {
   public static class DecomposeTest extends SkippedTest {
     public String label() {
-      return "It can decompose a prime (~1 min test)";
+      return "It can decompose a prime (~30 second test)";
     }
     public void test() throws TestFailureException {
       PrimeDecomposer.Coprimes result = PrimeDecomposer.decompose(0x211cafa9555101f5L);

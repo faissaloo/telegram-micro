@@ -141,7 +141,7 @@ public class MTProtoConnection {
     //https://core.telegram.org/mtproto/samples-auth_key#7-computing-auth-key-using-formula-gab-mod-dh-prime
     auth_key = generate_auth_key(dh_params_ok.group_generator_power_a, b, dh_params_ok.diffie_hellman_prime);
     auth_key_full_hash = (new SHA1()).digest(auth_key);
-    auth_key_id = Decode.Big.long_decode(auth_key_full_hash, SHA1.HASH_SIZE-8); //these should be the 64 lower-order bits right?
+    auth_key_id = Decode.Little.long_decode(auth_key_full_hash, SHA1.HASH_SIZE-8); //these should be the 64 lower-order bits right?
     
     wait_for_response();
     
@@ -149,7 +149,9 @@ public class MTProtoConnection {
     
     if (unencrypted_response.type() == CombinatorIds.dh_gen_ok) {
       RecieveServerDHGenOk dh_gen_ok = RecieveServerDHGenOk.from_unencrypted_message(unencrypted_response);
-      server_salt = Decode.Big.long_decode(ArrayPlus.subarray(Encode.Integer256_encode(new_nonce), 8), 0) ^ Decode.Big.long_decode(ArrayPlus.subarray(Encode.Integer128_encode(dh_gen_ok.server_nonce), 8), 0);
+      //Not sure if this is correct
+      server_salt = Decode.Little.long_decode(ArrayPlus.subarray(Encode.Integer256_encode(new_nonce), 8), 0) ^ Decode.Little.long_decode(ArrayPlus.subarray(Encode.Integer128_encode(dh_gen_ok.server_nonce), 8), 0);
+      //https://github.com/badoualy/kotlogram/blob/master/mtproto/src/main/kotlin/com/github/badoualy/telegram/mtproto/auth/AuthKeyCreation.kt#L193
       session_id = random_number_generator.nextLong();
       System.out.println("DH GEN OK");
     }

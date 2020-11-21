@@ -24,14 +24,10 @@ public class EncryptedRequest {
   public void send(MTProtoConnection sender) {
     byte[] padded_unencrypted_data = (new ByteArrayPlus())
       .append_raw_bytes(unencrypted_data)
-      .pad_to_length(12) //this padding has to be between 12-1024, so let's just pad 12 for now, we should later randomize this in both length and content
       .pad_to_alignment(16) //this should also have its content randomized
-      .toByteArray();
+      .pad_to_length(1024) //this padding has to be between 12-1024, so let's just pad 12 for now, we should later randomize this in both length and content
+      .toByteArray(); //the resulting message length should be divisible by 16, the question is what counts as the message
      
-      System.out.println("Generating message key");
-      //We're getting array out of bounds here, why?
-      System.out.println(sender.auth_key.length); //whym'st are you 0
-    //we should get the auth_key_id and auth_key from the MTProtoConnection
     //msg_key_large = SHA256 (substr (auth_key, 88+x, 32) + plaintext + random_padding);
     byte[] msg_key_large = (new SHA256()).digest(
       (new ByteArrayPlus())
@@ -42,6 +38,8 @@ public class EncryptedRequest {
     System.out.println("Message key generated");
     
     byte[] msg_key = ArrayPlus.subarray(msg_key_large, 8, 16);
+    System.out.println("Message key length (should be 16)");
+    System.out.println(msg_key.length);
 
     byte[] sha256_a = (new SHA256()).digest(
       (new ByteArrayPlus())
@@ -56,12 +54,14 @@ public class EncryptedRequest {
         .toByteArray()
     );
     
+    //aes_key = substr (sha256_a, 0, 8) + substr (sha256_b, 8, 16) + substr (sha256_a, 24, 8);
     byte[] aes_key = (new ByteArrayPlus())
       .append_raw_bytes_up_to(sha256_a, 8)
       .append_raw_bytes_from_up_to(sha256_b, 8, 16)
       .append_raw_bytes_from_up_to(sha256_a, 24, 8)
       .toByteArray();
     
+    //aes_iv = substr (sha256_b, 0, 8) + substr (sha256_a, 8, 16) + substr (sha256_b, 24, 8);
     byte[] aes_iv = (new ByteArrayPlus())
       .append_raw_bytes_up_to(sha256_b, 8)
       .append_raw_bytes_from_up_to(sha256_a, 8, 16)
@@ -77,8 +77,8 @@ public class EncryptedRequest {
       .append_int(sender.seq_no)
       .append_int(message_data.length)
       .append_raw_bytes(message_data)
-      .pad_to_length(12) //this padding has to be between 12-1024, so let's just pad 12 for now, we should later randomize this in both length and content
       .pad_to_alignment(16) //this should also have its content randomized, also I'm not actually sure if this has to be padded to alignment
+      .pad_to_length(1024) //this padding has to be between 12-1024, so let's just pad 12 for now, we should later randomize this in both length and content
       .toByteArray();
     
     //https://core.telegram.org/mtproto/description#encrypted-message

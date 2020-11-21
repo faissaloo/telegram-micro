@@ -6,6 +6,7 @@ import support.Decode;
 
 public class Deserialize {
   //https://core.telegram.org/type/bytes
+  //https://core.telegram.org/type/string
   public static byte[] bytes_deserialize(byte[] data, int offset) {
     int bytes_length = data[offset]&0xFF;
     offset += 1;
@@ -22,14 +23,10 @@ public class Deserialize {
 
   public static int bytes_length_deserialize(byte[] data, int offset) {
     int bytes_length = data[offset]&0xFF;
-    int bytes_offset = 1;
     if (bytes_length >= 254) {
       bytes_length = Decode.Little.int24_decode(data, offset+1);
-      bytes_offset = 4;
     }
-    int bytes_padding = (4-bytes_length%4)%4;
-
-    return bytes_offset+bytes_length+bytes_padding;
+    return ((bytes_length/4)+1)*4;
   }
 
   //https://core.telegram.org/type/string

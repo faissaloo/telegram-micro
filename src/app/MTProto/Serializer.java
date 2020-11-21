@@ -15,6 +15,7 @@ public class Serializer {
     data = new ByteArrayPlus();
   }
   
+  //this may be padding incorrectly
   public Serializer append_byte_string(byte[] data) {
     Serializer to_append = new Serializer();
     if (data.length <= 253) {

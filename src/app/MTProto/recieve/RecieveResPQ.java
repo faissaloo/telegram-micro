@@ -23,7 +23,10 @@ public class RecieveResPQ {
       skip += 16;
       long pq = Decode.Big.long_decode(Deserialize.bytes_deserialize(data, skip), 0); //this probably deserializes some stuff wrong on rare occasions
 
-      skip += Deserialize.bytes_length_deserialize(data, skip);
+      System.out.println("BYTES LENGTH");
+      System.out.println(Deserialize.bytes_length_deserialize(data, skip));
+      skip += Deserialize.bytes_length_deserialize(data, skip); //this breaks without including the offset in the calculation
+      
       long[] server_public_key_fingerprints = Deserialize.vector_long_deserialize(data, skip);
       return new RecieveResPQ(nonce, server_nonce, pq, server_public_key_fingerprints);
     } else {

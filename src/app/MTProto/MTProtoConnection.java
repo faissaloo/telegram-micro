@@ -150,12 +150,17 @@ public class MTProtoConnection {
     if (unencrypted_response.type() == CombinatorIds.dh_gen_ok) {
       RecieveServerDHGenOk dh_gen_ok = RecieveServerDHGenOk.from_unencrypted_message(unencrypted_response);
       //Not sure if this is correct
-      server_salt = Decode.Little.long_decode(ArrayPlus.subarray(Encode.Integer256_encode(new_nonce), 8), 0) ^ Decode.Little.long_decode(ArrayPlus.subarray(Encode.Integer128_encode(dh_gen_ok.server_nonce), 8), 0);
+      server_salt = generate_server_salt(new_nonce, dh_gen_ok.server_nonce);
       //https://github.com/badoualy/kotlogram/blob/master/mtproto/src/main/kotlin/com/github/badoualy/telegram/mtproto/auth/AuthKeyCreation.kt#L193
       session_id = random_number_generator.nextLong();
       System.out.println("DH GEN OK");
     }
     System.out.println("SENDING DONE");
+  }
+  
+  public static long generate_server_salt(Integer256 new_nonce, Integer128 server_nonce) {
+    return Decode.Little.long_decode(ArrayPlus.subarray(Encode.Integer256_encode(new_nonce), 8), 0) ^
+      Decode.Little.long_decode(ArrayPlus.subarray(Encode.Integer128_encode(server_nonce), 8), 0);
   }
   
   public static byte[] generate_auth_key(BigInteger group_generator_power_a, BigInteger b, BigInteger diffie_hellman_prime) {

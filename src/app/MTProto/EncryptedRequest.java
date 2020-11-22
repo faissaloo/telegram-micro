@@ -8,6 +8,8 @@ import crypto.AES256IGE;
 import support.Encode;
 import support.ByteArrayPlus;
 import support.ArrayPlus;
+import support.RandomPlus;
+import crypto.SecureRandomPlus;
 
 public class EncryptedRequest {
   byte[] unencrypted_data;
@@ -21,13 +23,17 @@ public class EncryptedRequest {
     return (System.currentTimeMillis()/1000L)<<32;
   }
 
-  public void send(MTProtoConnection sender) {
-    byte[] padded_unencrypted_data = (new ByteArrayPlus())
-      .append_raw_bytes(unencrypted_data)
-      .pad_to_alignment(16) //this should also have its content randomized
-      .pad_to_length(1024) //this padding has to be between 12-1024, so let's just pad 12 for now, we should later randomize this in both length and content
+  public static byte[] pad_unencrypted_data(byte[] data_to_pad, RandomPlus random_number_generator) {
+    return (new ByteArrayPlus())
+      .append_raw_bytes(data_to_pad)
+      .pad_to_length(12, random_number_generator) //this padding has to be between 12-1024, so let's just pad 12 for now, we should later randomize this in both length and content
+      .pad_to_alignment(16, random_number_generator) //this should also have its content randomized
       .toByteArray(); //the resulting message length should be divisible by 16, the question is what counts as the message
-     
+  }
+  
+  public void send(MTProtoConnection sender) {
+    SecureRandomPlus random_number_generator = new SecureRandomPlus();
+    byte[] padded_unencrypted_data = pad_unencrypted_data(unencrypted_data, random_number_generator);
     //msg_key_large = SHA256 (substr (auth_key, 88+x, 32) + plaintext + random_padding);
     byte[] msg_key_large = (new SHA256()).digest(
       (new ByteArrayPlus())
@@ -77,8 +83,8 @@ public class EncryptedRequest {
       .append_int(sender.seq_no)
       .append_int(message_data.length)
       .append_raw_bytes(message_data)
+      .pad_to_length(12) //this padding has to be between 12-1024, so let's just pad 12 for now, we should later randomize this in both length and content
       .pad_to_alignment(16) //this should also have its content randomized, also I'm not actually sure if this has to be padded to alignment
-      .pad_to_length(1024) //this padding has to be between 12-1024, so let's just pad 12 for now, we should later randomize this in both length and content
       .toByteArray();
     
     //https://core.telegram.org/mtproto/description#encrypted-message

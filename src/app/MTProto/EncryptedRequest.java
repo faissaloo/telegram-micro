@@ -76,6 +76,10 @@ public class EncryptedRequest {
     
     byte[] message_data = AES256IGE.encrypt(aes_key, aes_iv, padded_unencrypted_data);
     //https://core.telegram.org/mtproto/description#encrypted-message-encrypted-data
+    //I'm pretty sure encrypted_data is what needs to be encrypted not padded_unencrypted_data
+    //this encrypted_data should also be used when generating the message_key
+    //instead of just the plain padded unencrypted data
+    //according to https://core.telegram.org/mtproto/description#protocol-description
     byte[] encrypted_data = (new ByteArrayPlus())
       .append_long(sender.server_salt) //the salt needs to be encoded as an int64... does that mean it's little endian too?
       .append_long(sender.session_id)

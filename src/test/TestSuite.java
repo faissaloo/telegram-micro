@@ -4,8 +4,6 @@ public class TestSuite {
   public static void register_all_tests() {
     TestRunner.register(new RecieveServerDHParamsOkContext.DeserializeTest());
     
-    TestRunner.register(new EncryptedRequestContext.GeneratePaddedEncryptedDataTest());
-    
     TestRunner.register(new MTProtoConnectionContext.GenerateServerSaltTest());
     TestRunner.register(new MTProtoConnectionContext.GenerateAuthKeyTest());
     

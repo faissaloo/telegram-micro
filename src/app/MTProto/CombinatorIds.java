@@ -12,4 +12,5 @@ public class CombinatorIds {
   public static int set_client_DH_params = 0xf5045f1f;
   public static int client_DH_inner_data = 0x6643b654;
   public static int dh_gen_ok = 0x3bcbf734;
+  public static int msg_container = 0x73f1f8dc;
 }

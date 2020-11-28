@@ -33,4 +33,12 @@ public class ArrayPlus {
   public static byte[] subarray(byte[] array, int length) {
     return subarray(array, 0, length);
   }
+  
+  public static byte[] reverse(byte[] to_reverse) {
+    byte[] result = new byte[to_reverse.length];
+    for (int i = 0; i < result.length; i++) {
+      result[result.length-i-1] = to_reverse[i];
+    }
+    return result;
+  }
 }

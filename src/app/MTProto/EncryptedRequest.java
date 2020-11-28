@@ -45,11 +45,8 @@ public class EncryptedRequest {
         .append_raw_bytes(unencrypted_data)
         .toByteArray()
     );
-    System.out.println("Message key generated");
     
     byte[] msg_key = ArrayPlus.subarray(msg_key_large, 8, 16);
-    System.out.println("Message key length (should be 16)");
-    System.out.println(msg_key.length);
 
     byte[] sha256_a = (new SHA256()).digest(
       (new ByteArrayPlus())

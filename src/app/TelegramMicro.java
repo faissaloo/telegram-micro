@@ -13,6 +13,7 @@ import mtproto.send.SendPing;
 import mtproto.UnencryptedResponse;
 import mtproto.EncryptedResponse;
 import mtproto.CombinatorIds;
+import mtproto.recieve.RecieveMsgContainer;
 
 import bouncycastle.BigInteger;
 
@@ -39,9 +40,9 @@ public class TelegramMicro extends MIDlet {
       System.out.println("GOT RESPONSE");
       EncryptedResponse encrypted_response = EncryptedResponse.from_tcp_response(connection.message_recieve_thread.dequeue_response(), connection);
 
-      if (encrypted_response.type == CombinatorIds.msg_container) {
-        System.out.println("RESPONSE WAS AN ENCRYPTED MESSAGE CONTAINER");
-      }
+      RecieveMsgContainer msg_container = RecieveMsgContainer.from_encrypted_message(encrypted_response);
+      System.out.println("MSG_CONTAINER_RECIEVED");
+      System.out.println(msg_container.messages.length);
     } catch (IOException e) {
       e.printStackTrace();
     }

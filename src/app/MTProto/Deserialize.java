@@ -40,7 +40,7 @@ public class Deserialize {
 
   //https://core.telegram.org/mtproto/serialize#built-in-composite-types-vectors-and-associative-arrays
   public static long[] vector_long_deserialize(byte[] data, int offset) throws TypeMismatchException {
-    if (Decode.Little.int_decode(data, offset) == 0x1cb5c415) {
+    if (Decode.Little.int_decode(data, offset) == CombinatorIds.vector) {
       offset += 4;
       int length = Decode.Little.int_decode(data, offset);
       offset += 4;

@@ -14,4 +14,5 @@ public class CombinatorIds {
   public static int dh_gen_ok = 0x3bcbf734;
   public static int msg_container = 0x73f1f8dc;
   public static int vector = 0x1cb5c415;
+  public static int new_session_created = 0x9ec20908;
 }

@@ -14,6 +14,8 @@ import mtproto.UnencryptedResponse;
 import mtproto.EncryptedResponse;
 import mtproto.CombinatorIds;
 import mtproto.recieve.RecieveMsgContainer;
+import mtproto.recieve.RecieveNewSessionCreated;
+import mtproto.recieve.RecievePong;
 
 import bouncycastle.BigInteger;
 
@@ -41,8 +43,22 @@ public class TelegramMicro extends MIDlet {
       EncryptedResponse encrypted_response = EncryptedResponse.from_tcp_response(connection.message_recieve_thread.dequeue_response(), connection);
 
       RecieveMsgContainer msg_container = RecieveMsgContainer.from_encrypted_message(encrypted_response);
-      System.out.println("MSG_CONTAINER_RECIEVED");
-      System.out.println(msg_container.messages.length);
+      RecieveNewSessionCreated new_session_created = RecieveNewSessionCreated.from_encrypted_message(msg_container.messages[0]);
+      System.out.println("NEW SESSION CREATED");
+      System.out.println("First message id");
+      System.out.println(new_session_created.first_msg_id);
+      System.out.println("Unique id");
+      System.out.println(new_session_created.unique_id);
+      System.out.println("Server salt");
+      System.out.println(new_session_created.server_salt);
+      
+      RecievePong pong = RecievePong.from_encrypted_message(msg_container.messages[1]);
+      System.out.println("PONG");
+      System.out.println("message id");
+      System.out.println(pong.message_id);
+      System.out.println("ping id");
+      System.out.println(pong.ping_id);
+      //process the pong too
     } catch (IOException e) {
       e.printStackTrace();
     }

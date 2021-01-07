@@ -15,7 +15,15 @@ public class Serializer {
     data = new ByteArrayPlus();
   }
   
-  //this may be padding incorrectly
+  public Serializer append_vector_long(long[] values) {
+    append_int(CombinatorIds.vector);
+    append_int(values.length);
+    for (int i = 0; i < values.length; i += 1) {
+      append_long(values[i]);
+    }
+    return this;
+  }
+  
   public Serializer append_byte_string(byte[] data) {
     Serializer to_append = new Serializer();
     if (data.length <= 253) {

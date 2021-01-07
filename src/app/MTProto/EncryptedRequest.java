@@ -84,7 +84,7 @@ public class EncryptedRequest {
       .append_raw_bytes(encrypted_data)
       .toByteArray();
     
-    sender.seq_no += 1; //this might be a race condition idk lol
+    //sender.seq_no += 1; //this might be a race condition idk lol
     
     (new TCPRequest(encrypted_message)).send(sender);
   }

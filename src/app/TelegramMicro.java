@@ -16,6 +16,9 @@ import mtproto.CombinatorIds;
 import mtproto.recieve.RecieveMsgContainer;
 import mtproto.recieve.RecieveNewSessionCreated;
 import mtproto.recieve.RecievePong;
+import mtproto.recieve.RecieveBadMsgNotification;
+import mtproto.recieve.RecieveRpcResult;
+import mtproto.send.SendMsgsAck;
 
 import bouncycastle.BigInteger;
 
@@ -43,6 +46,8 @@ public class TelegramMicro extends MIDlet {
       EncryptedResponse encrypted_response = EncryptedResponse.from_tcp_response(connection.message_recieve_thread.dequeue_response(), connection);
 
       RecieveMsgContainer msg_container = RecieveMsgContainer.from_encrypted_message(encrypted_response);
+      //this apparently needs acknowledgement
+      //https://core.telegram.org/mtproto/service_messages_about_messages
       RecieveNewSessionCreated new_session_created = RecieveNewSessionCreated.from_encrypted_message(msg_container.messages[0]);
       System.out.println("NEW SESSION CREATED");
       System.out.println("First message id");
@@ -59,6 +64,29 @@ public class TelegramMicro extends MIDlet {
       System.out.println("ping id");
       System.out.println(pong.ping_id);
       //process the pong too
+      //We only want to acknowledge the new session created
+      connection.seq_no = 0;
+      System.out.println("SENDING MSGS ACK");
+      (new SendMsgsAck(new long[] {msg_container.messages[0].message_id})).send(connection);
+      connection.wait_for_response();
+      System.out.println("GOT RESPONSE");
+      encrypted_response = EncryptedResponse.from_tcp_response(connection.message_recieve_thread.dequeue_response(), connection);
+      //bad_msg_notification
+      if (encrypted_response.type == CombinatorIds.bad_msg_notification) {
+        RecieveBadMsgNotification bad_msg_notif = RecieveBadMsgNotification.from_encrypted_message(encrypted_response);
+        System.out.println("BAD MSG NOTIFICATION");
+        System.out.println("Error code");
+        System.out.println(bad_msg_notif.error_code);
+      } else if (encrypted_response.type == CombinatorIds.rpc_result) {
+        RecieveRpcResult rpc_result = RecieveRpcResult.from_encrypted_message(encrypted_response);
+        System.out.println("RPC RESULT");
+        System.out.println("Message id");
+        System.out.println(rpc_result.req_msg_id);
+      } else {
+        System.out.println("Some other type recieved");
+        System.out.println(Integer.toHexString(encrypted_response.type));
+      }
+
     } catch (IOException e) {
       e.printStackTrace();
     }

@@ -15,4 +15,6 @@ public class CombinatorIds {
   public static int msg_container = 0x73f1f8dc;
   public static int vector = 0x1cb5c415;
   public static int new_session_created = 0x9ec20908;
+  public static int bad_msg_notification = 0xa7eff811;
+  public static int rpc_result = 0xf35c6d01;
 }

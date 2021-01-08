@@ -21,8 +21,8 @@ import mtproto.Deserialize;
 public class RecieveServerDHParamsOk {
   public static RecieveServerDHParamsOk from_unencrypted_message(UnencryptedResponse message, Integer256 new_nonce) throws TypeMismatchException {
     int skip = 0;
-    byte[] data = message.data();
-    int message_type = message.type();
+    byte[] data = message.data;
+    int message_type = message.type;
 
     if (message_type == CombinatorIds.server_DH_params_ok) {
       Integer128 nonce = Decode.Little.Integer128_decode(data, skip);

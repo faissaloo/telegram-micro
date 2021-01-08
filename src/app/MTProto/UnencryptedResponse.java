@@ -7,13 +7,13 @@ import support.ByteArrayPlus;
 import support.Decode;
 
 public class UnencryptedResponse {
-  long auth_key_id;
-  long message_id;
-  int type;
-  byte[] data;
+  public long auth_key_id;
+  public long message_id;
+  public int type;
+  public byte[] data;
 
   public static UnencryptedResponse from_tcp_response(TCPResponse response) throws IOException {
-    byte[] response_data = response.data();
+    byte[] response_data = response.data;
     if (response_data.length == 4) {
       int error_value = Decode.Little.int_decode(response_data, 0);
       throw new IOException("Recieved error "+error_value+" from server");
@@ -41,18 +41,5 @@ public class UnencryptedResponse {
     this.message_id = message_id;
     this.type = type;
     this.data = data;
-  }
-
-  public long auth_key_id() {
-    return auth_key_id;
-  }
-  public long message_id() {
-    return message_id;
-  }
-  public int type() {
-    return type;
-  }
-  public byte[] data() {
-    return data;
   }
 }

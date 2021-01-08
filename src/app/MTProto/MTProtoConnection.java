@@ -153,13 +153,17 @@ public class MTProtoConnection {
     
     unencrypted_response = UnencryptedResponse.from_tcp_response(message_recieve_thread.dequeue_response());
     
-    if (unencrypted_response.type() == CombinatorIds.dh_gen_ok) {
+    if (unencrypted_response.type == CombinatorIds.dh_gen_ok) {
       RecieveServerDHGenOk dh_gen_ok = RecieveServerDHGenOk.from_unencrypted_message(unencrypted_response);
       //Not sure if this is correct
       server_salt = generate_server_salt(new_nonce, dh_gen_ok.server_nonce);
       //https://github.com/badoualy/kotlogram/blob/master/mtproto/src/main/kotlin/com/github/badoualy/telegram/mtproto/auth/AuthKeyCreation.kt#L193
       session_id = random_number_generator.nextLong();
       System.out.println("DH GEN OK");
+    } else if (unencrypted_response.type == CombinatorIds.dh_gen_retry) {
+      
+    } else if (unencrypted_response.type == CombinatorIds.dh_gen_fail) {
+      
     }
     System.out.println("SENDING DONE");
   }

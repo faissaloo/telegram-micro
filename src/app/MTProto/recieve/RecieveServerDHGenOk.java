@@ -21,8 +21,8 @@ import mtproto.Deserialize;
 public class RecieveServerDHGenOk {
   public static RecieveServerDHGenOk from_unencrypted_message(UnencryptedResponse message) throws TypeMismatchException {
     int skip = 0;
-    byte[] data = message.data();
-    int message_type = message.type();
+    byte[] data = message.data;
+    int message_type = message.type;
 
     if (message_type == CombinatorIds.dh_gen_ok) {
       Integer128 nonce = Decode.Little.Integer128_decode(data, skip);

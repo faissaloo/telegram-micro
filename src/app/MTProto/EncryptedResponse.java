@@ -19,7 +19,7 @@ public class EncryptedResponse {
   public byte[] data;
 
   public static EncryptedResponse from_tcp_response(TCPResponse response, MTProtoConnection reciever) throws IOException {
-    byte[] response_data = response.data();
+    byte[] response_data = response.data;
     if (response_data.length == 4) {
       int error_value = Decode.Little.int_decode(response_data, 0);
       throw new IOException("Recieved error "+error_value+" from server");

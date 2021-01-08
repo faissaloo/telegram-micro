@@ -10,7 +10,7 @@ import support.ByteArrayPlus;
 import support.Debug;
 
 public class TCPResponse {
-  byte[] data;
+  public byte[] data;
 
   public static TCPResponse from_stream(InputStream response_stream) throws IOException {
     int response_byte = 0;
@@ -38,9 +38,5 @@ public class TCPResponse {
 
   public TCPResponse(byte[] data) throws IOException {
     this.data = data;
-  }
-
-  public byte[] data() {
-    return data;
   }
 }

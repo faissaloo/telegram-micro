@@ -99,7 +99,7 @@ public class MTProtoConnection {
     }
     
     if (public_key == null) {
-      //Couldn't find the public key
+      throw new SecurityException("Could not find public key for any of the fingerprints recieved");
     }
     new_nonce = random_number_generator.nextInteger256();
     

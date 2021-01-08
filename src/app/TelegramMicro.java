@@ -38,7 +38,8 @@ public class TelegramMicro extends MIDlet {
 
     try {
       MTProtoConnection connection = new MTProtoConnection("149.154.175.10");
-      System.out.println("SENDING PING");
+      connection.main_loop();
+      /*System.out.println("SENDING PING");
       (new SendPing(25565)).send(connection);
       System.out.println("WAITING FOR RESPONSE");
       connection.wait_for_response();
@@ -87,7 +88,7 @@ public class TelegramMicro extends MIDlet {
         System.out.println("Some other type recieved");
         System.out.println(Integer.toHexString(encrypted_response.type));
       }
-
+*/
     } catch (IOException e) {
       e.printStackTrace();
     }

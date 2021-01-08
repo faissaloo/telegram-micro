@@ -42,6 +42,9 @@ public class MTProtoConnection {
   public long auth_key_id = 0;
   public long session_id = 0;
   public int seq_no = 0;
+  public long retry_id = 0;
+  public Integer128 nonce;
+  public Integer256 new_nonce;
   
   public Hashtable callbacks; //hash by combinator_id of hash by callback id
   
@@ -51,15 +54,105 @@ public class MTProtoConnection {
     public boolean takes_encrypted_responses;
     public Object context;
     
-    public MTProtoCallback(int combinator_id, MTProtoConnection connection, Object context /*can be null if you want*/) {
+    public MTProtoCallback(int combinator_id, MTProtoConnection connection) {
       this.connection = connection;
       this.combinator_id = combinator_id;
-      this.takes_encrypted_responses = takes_encrypted_responses;
+      context = null;
+    }
+    
+    public MTProtoCallback(int combinator_id, MTProtoConnection connection, Object context) {
+      this.connection = connection;
+      this.combinator_id = combinator_id;
       this.context = context;
     }
     
     public abstract void execute(Response response);
   }
+  
+  
+  public static class HandleRecieveResPQ extends MTProtoConnection.MTProtoCallback {
+    public HandleRecieveResPQ(int combinator_id, MTProtoConnection connection) {
+      super(combinator_id, connection);
+    }
+    
+    public void execute(Response response) {
+      UnencryptedResponse unencrypted_response = (UnencryptedResponse)response;
+      System.out.println("RECIEVING RES PQ");
+      RecieveResPQ pq_data = RecieveResPQ.from_unencrypted_message(unencrypted_response);
+      PrimeDecomposer.Coprimes decomposed_pq = PrimeDecomposer.decompose(pq_data.pq);
+      TelegramPublicKeys public_keys = new TelegramPublicKeys();
+      RSAPublicKey public_key = public_keys.find_public_key(pq_data.server_public_key_fingerprints);
+      if (public_key == null) {
+        throw new SecurityException("Could not find public key for any of the fingerprints recieved");
+      }
+      connection.new_nonce = connection.random_number_generator.nextInteger256();
+      
+      SendReqDhParams diffie_hellman_params_request = new SendReqDhParams(
+        connection.random_number_generator,
+        connection.nonce,
+        pq_data.server_nonce,
+        pq_data.pq,
+        decomposed_pq.lesser_prime,
+        decomposed_pq.greater_prime,
+        public_key,
+        connection.new_nonce
+      );
+      diffie_hellman_params_request.send(connection);
+      System.out.println("SENDING DH PARAMS");
+    }
+  }
+  
+  public static class HandleRecieveDHParamsOk extends MTProtoCallback {
+    public HandleRecieveDHParamsOk(int combinator_id, MTProtoConnection connection) {
+      super(combinator_id, connection);
+    }
+    
+    public void execute(Response response) {
+      UnencryptedResponse unencrypted_response = (UnencryptedResponse)response;
+      RecieveServerDHParamsOk dh_params_ok = RecieveServerDHParamsOk.from_unencrypted_message(unencrypted_response, connection.new_nonce);
+      
+      BigInteger b = new BigInteger(1, connection.random_number_generator.nextBytes(2048));
+      if (!validate_diffie_hellman_prime(dh_params_ok.group_generator, dh_params_ok.diffie_hellman_prime)) {
+        throw new SecurityException("Diffie hellman prime is not known and may be insecure");
+      }
+      
+      SendSetClientDHParams set_client_dh_params = new SendSetClientDHParams(
+        connection.random_number_generator,
+        dh_params_ok.nonce,
+        dh_params_ok.server_nonce,
+        connection.retry_id,
+        dh_params_ok.group_generator,
+        dh_params_ok.diffie_hellman_prime,
+        b,
+        dh_params_ok.tmp_aes_key,
+        dh_params_ok.tmp_aes_iv
+      );
+      
+      set_client_dh_params.send(connection);
+      System.out.println("SENDING SET DH PARAMS");
+      
+      connection.auth_key = connection.generate_auth_key(dh_params_ok.group_generator_power_a, b, dh_params_ok.diffie_hellman_prime);
+      connection.auth_key_full_hash = (new SHA1()).digest(connection.auth_key);
+      connection.auth_key_id = Decode.Little.long_decode(connection.auth_key_full_hash, SHA1.HASH_SIZE-8); //these should be the 64 lower-order bits right?
+    }
+  }
+  
+  public static class HandleRecieveServerDHGenOk extends MTProtoCallback {
+    public HandleRecieveServerDHGenOk(int combinator_id, MTProtoConnection connection) {
+      super(combinator_id, connection);
+    }
+    
+    public void execute(Response response) {
+      UnencryptedResponse unencrypted_response = (UnencryptedResponse)response;
+      RecieveServerDHGenOk dh_gen_ok = RecieveServerDHGenOk.from_unencrypted_message(unencrypted_response);
+      //Not sure if this is correct
+      connection.server_salt = connection.generate_server_salt(connection.new_nonce, dh_gen_ok.server_nonce);
+      //https://github.com/badoualy/kotlogram/blob/master/mtproto/src/main/kotlin/com/github/badoualy/telegram/mtproto/auth/AuthKeyCreation.kt#L193
+      connection.session_id = connection.random_number_generator.nextLong();
+      System.out.println("DH GEN OK");
+    }
+  }
+  
   
   //Constructor for the default port
   public MTProtoConnection(String ip) throws IOException {
@@ -86,10 +179,12 @@ public class MTProtoConnection {
     message_recieve_thread.start();
     
     callbacks = new Hashtable();
-    perform_handshake();
+    bind_callback(new HandleRecieveResPQ(CombinatorIds.resPQ, this));
+    bind_callback(new HandleRecieveDHParamsOk(CombinatorIds.server_DH_params_ok, this));
+    bind_callback(new HandleRecieveServerDHGenOk(CombinatorIds.dh_gen_ok, this));
   }
   
-  public int bindCallback(MTProtoCallback callback) {
+  public int bind_callback(MTProtoCallback callback) {
     //returns id for callback
     //check first if there exists a hash
     Integer combinator_id_obj = new Integer(callback.combinator_id);
@@ -104,7 +199,7 @@ public class MTProtoConnection {
     return callback_id;
   }
   
-  public void removeCallback(int combinator_id, int callback_id) {
+  public void remove_callback(int combinator_id, int callback_id) {
     Integer combinator_id_obj = new Integer(combinator_id);
     Integer callback_id_obj = new Integer(callback_id);
     Hashtable combinator_callbacks = (Hashtable)callbacks.get(combinator_id_obj);
@@ -115,24 +210,38 @@ public class MTProtoConnection {
     }
   }
   
-  public Enumeration getCallbacks(int combinator_id) {
+  public Enumeration get_callbacks(int combinator_id) {
     Integer combinator_id_obj = new Integer(combinator_id);
     Hashtable combinator_callbacks = (Hashtable)callbacks.get(combinator_id_obj);
     return combinator_callbacks.elements();
   }
   
+  public void begin_handshake() {
+    nonce = random_number_generator.nextInteger128();
+    new_nonce = null;
+    retry_id = 0;
+
+    SendReqPqMulti key_exchange = new SendReqPqMulti(nonce);
+    key_exchange.send(this);
+    System.out.println("SENDING REQ PQ MULTI");
+  }
+
   public void main_loop() throws IOException {
-    //we'llhave a different set of callbacks for RPC responses
-    wait_for_response();
-    TCPResponse tcp_response = message_recieve_thread.dequeue_response();
-    Response response = UnencryptedResponse.from_tcp_response(tcp_response);
-    if (response == null) { //we need a way to check which one it is beforehand this is ugly
-      response = EncryptedResponse.from_tcp_response(tcp_response, this);
-    }
+    begin_handshake();
     
-    for (Enumeration e = getCallbacks(response.type); e.hasMoreElements();) {
-      MTProtoCallback callback = (MTProtoCallback)e.nextElement();
-      callback.execute(response);
+    while (true) {
+      //we'll have a different set of callbacks for RPC responses
+      wait_for_response();
+      TCPResponse tcp_response = message_recieve_thread.dequeue_response();
+      Response response = UnencryptedResponse.from_tcp_response(tcp_response);
+      if (response == null) { //we need a way to check which one it is beforehand this is ugly
+        response = EncryptedResponse.from_tcp_response(tcp_response, this);
+      }
+      
+      for (Enumeration e = get_callbacks(response.type); e.hasMoreElements();) {
+        MTProtoCallback callback = (MTProtoCallback)e.nextElement();
+        callback.execute(response);
+      }
     }
   }
   
@@ -142,98 +251,6 @@ public class MTProtoConnection {
   
   public void wait_for_response() {
     message_recieve_thread.wait_for_response();
-  }
-  
-  public void perform_handshake() throws IOException {
-    Integer128 nonce = random_number_generator.nextInteger128();
-    Integer256 new_nonce = null;
-    long retry_id = 0;
-
-    SendReqPqMulti key_exchange = new SendReqPqMulti(nonce);
-    key_exchange.send(this);
-    System.out.println("SENDING REQ PQ MULTI");
-    
-    wait_for_response();
-
-    UnencryptedResponse unencrypted_response = UnencryptedResponse.from_tcp_response(message_recieve_thread.dequeue_response());
-    System.out.println("RECIEVING RES PQ");
-    RecieveResPQ pq_data = RecieveResPQ.from_unencrypted_message(unencrypted_response);
-    PrimeDecomposer.Coprimes decomposed_pq = PrimeDecomposer.decompose(pq_data.pq);
-    TelegramPublicKeys public_keys = new TelegramPublicKeys();
-    RSAPublicKey public_key = public_keys.find_public_key(pq_data.server_public_key_fingerprints);
-    for (int i = 0; i < pq_data.server_public_key_fingerprints.length; i++) {
-      System.out.println("Using public key with fingerprint:");
-      System.out.println(pq_data.server_public_key_fingerprints[i]);
-    }
-    
-    if (public_key == null) {
-      throw new SecurityException("Could not find public key for any of the fingerprints recieved");
-    }
-    new_nonce = random_number_generator.nextInteger256();
-    
-    SendReqDhParams diffie_hellman_params_request = new SendReqDhParams(
-      random_number_generator,
-      nonce,
-      pq_data.server_nonce,
-      pq_data.pq,
-      decomposed_pq.lesser_prime,
-      decomposed_pq.greater_prime,
-      public_key,
-      new_nonce
-    );
-    diffie_hellman_params_request.send(this);
-    System.out.println("SENDING DH PARAMS");
-
-    wait_for_response();
-    
-    unencrypted_response = UnencryptedResponse.from_tcp_response(message_recieve_thread.dequeue_response());
-
-    
-    RecieveServerDHParamsOk dh_params_ok = RecieveServerDHParamsOk.from_unencrypted_message(unencrypted_response, new_nonce);
-    
-    BigInteger b = new BigInteger(1, random_number_generator.nextBytes(2048));
-    if (!validate_diffie_hellman_prime(dh_params_ok.group_generator, dh_params_ok.diffie_hellman_prime)) {
-      throw new SecurityException("Diffie hellman prime is not known and may be insecure");
-    }
-    
-    SendSetClientDHParams set_client_dh_params = new SendSetClientDHParams(
-      random_number_generator,
-      dh_params_ok.nonce,
-      dh_params_ok.server_nonce,
-      retry_id,
-      dh_params_ok.group_generator,
-      dh_params_ok.diffie_hellman_prime,
-      b,
-      dh_params_ok.tmp_aes_key,
-      dh_params_ok.tmp_aes_iv
-    );
-    
-    set_client_dh_params.send(this);
-    System.out.println("SENDING SET DH PARAMS");
-
-    //We need to write some tests to ensure auth key generation is correct based on the values in
-    //https://core.telegram.org/mtproto/samples-auth_key#7-computing-auth-key-using-formula-gab-mod-dh-prime
-    auth_key = generate_auth_key(dh_params_ok.group_generator_power_a, b, dh_params_ok.diffie_hellman_prime);
-    auth_key_full_hash = (new SHA1()).digest(auth_key);
-    auth_key_id = Decode.Little.long_decode(auth_key_full_hash, SHA1.HASH_SIZE-8); //these should be the 64 lower-order bits right?
-    
-    wait_for_response();
-    
-    unencrypted_response = UnencryptedResponse.from_tcp_response(message_recieve_thread.dequeue_response());
-    
-    if (unencrypted_response.type == CombinatorIds.dh_gen_ok) {
-      RecieveServerDHGenOk dh_gen_ok = RecieveServerDHGenOk.from_unencrypted_message(unencrypted_response);
-      //Not sure if this is correct
-      server_salt = generate_server_salt(new_nonce, dh_gen_ok.server_nonce);
-      //https://github.com/badoualy/kotlogram/blob/master/mtproto/src/main/kotlin/com/github/badoualy/telegram/mtproto/auth/AuthKeyCreation.kt#L193
-      session_id = random_number_generator.nextLong();
-      System.out.println("DH GEN OK");
-    } else if (unencrypted_response.type == CombinatorIds.dh_gen_retry) {
-      
-    } else if (unencrypted_response.type == CombinatorIds.dh_gen_fail) {
-      
-    }
-    System.out.println("SENDING DONE");
   }
   
   public static long generate_server_salt(Integer256 new_nonce, Integer128 server_nonce) {

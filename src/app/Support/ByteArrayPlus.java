@@ -48,15 +48,22 @@ public class ByteArrayPlus extends ByteArrayOutputStream {
     return this;
   }
   
-  public ByteArrayPlus pad_to_length(int length) {
-    for (int i = 0; i < length; i++) {
+  public ByteArrayPlus pad_random_to_length(int min_length, int up_to, RandomPlus random_number_generator) {
+    int max_length = up_to-size();
+    int length = min_length+random_number_generator.nextInt(max_length-min_length);
+    append_raw_bytes(random_number_generator.nextBytes(length));
+    return this;
+  }
+  
+  public ByteArrayPlus pad_to_length(int up_to) {
+    for (int i = 0; i < up_to-size(); i++) {
       append_byte((byte)0);
     }
     return this;
   }
   
-  public ByteArrayPlus pad_to_length(int length, RandomPlus random_number_generator) {
-    int to_pad = length-size();
+  public ByteArrayPlus pad_to_length(int up_to, RandomPlus random_number_generator) {
+    int to_pad = up_to-size();
     append_raw_bytes(random_number_generator.nextBytes(to_pad));
     return this;
   }

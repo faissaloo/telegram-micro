@@ -24,24 +24,23 @@ public class EncryptedRequest {
   }
   
   public void send(MTProtoConnection sender) {
-    SecureRandomPlus random_number_generator = new SecureRandomPlus();
     //https://core.telegram.org/mtproto/description#encrypted-message-encrypted-data
     //https://core.telegram.org/mtproto/description#protocol-description
     byte[] unencrypted_data = (new ByteArrayPlus())
-      .append_long(sender.server_salt) //the salt needs to be encoded as an int64... does that mean it's little endian too?
+      .append_long(sender.server_salt)
       .append_long(sender.session_id)
       .append_long(message_id())
       .append_int(sender.seq_no)
       .append_int(message_data.length)
       .append_raw_bytes(message_data)
-      .pad_to_length(12) //this padding has to be between 12-1024, so let's just pad 12 for now, we should later randomize this in both length and content
-      .pad_to_alignment(16) //this should also have its content randomized, also I'm not actually sure if this has to be padded to alignment
+      .pad_random_to_length(12, 1024, sender.random_number_generator)
+      .pad_to_alignment(16, sender.random_number_generator)
       .toByteArray();
       
     //msg_key_large = SHA256 (substr (auth_key, 88+x, 32) + plaintext + random_padding);
     byte[] msg_key_large = (new SHA256()).digest(
       (new ByteArrayPlus())
-        .append_raw_bytes_from_up_to(sender.auth_key, 88, 32) //88 from client to server, 88+8 from server to client
+        .append_raw_bytes_from_up_to(sender.auth_key, 88, 32)
         .append_raw_bytes(unencrypted_data)
         .toByteArray()
     );
@@ -83,8 +82,6 @@ public class EncryptedRequest {
       .append_raw_bytes(msg_key)
       .append_raw_bytes(encrypted_data)
       .toByteArray();
-    
-    //sender.seq_no += 1; //this might be a race condition idk lol
     
     (new TCPRequest(encrypted_message)).send(sender);
   }

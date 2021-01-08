@@ -12,13 +12,12 @@ import mtproto.CombinatorIds;
 import mtproto.Serializer;
 
 public class SendSetClientDHParams extends SendUnencrypted {
-  public SendSetClientDHParams(Integer128 nonce, Integer128 server_nonce, long retry_id, int group_generator, BigInteger diffie_hellman_prime, BigInteger b, byte[] tmp_aes_key, byte[] tmp_aes_iv) {
+  public SendSetClientDHParams(SecureRandomPlus random_number_generator, Integer128 nonce, Integer128 server_nonce, long retry_id, int group_generator, BigInteger diffie_hellman_prime, BigInteger b, byte[] tmp_aes_key, byte[] tmp_aes_iv) {
     BigInteger group_generator_power_b = BigInteger.valueOf(group_generator).modPow(b, diffie_hellman_prime);
     
     byte[] inner_data = inner_data(nonce, server_nonce, retry_id, group_generator_power_b);
     byte[] inner_data_hash = (new SHA1()).digest(inner_data);
     
-    SecureRandomPlus random_number_generator = new SecureRandomPlus();
     byte[] data_with_hash = data_with_hash(inner_data_hash, inner_data, random_number_generator);
     byte[] encrypted_data = AES256IGE.encrypt(tmp_aes_key, tmp_aes_iv, data_with_hash);
     

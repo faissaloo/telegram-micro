@@ -18,8 +18,8 @@ import mtproto.Serializer;
 import mtproto.UnencryptedRequest;
 
 public class SendReqDhParams extends SendUnencrypted {
-  public SendReqDhParams(Integer128 nonce, Integer128 server_nonce, long pq, long p, long q, RSAPublicKey public_key, Integer256 new_nonce) {
-    byte[] encrypted_data_bytes = RSA.encrypt(public_key, data_with_hash(p_q_inner_data(nonce, server_nonce, pq, p, q, new_nonce)));
+  public SendReqDhParams(SecureRandomPlus random_number_generator, Integer128 nonce, Integer128 server_nonce, long pq, long p, long q, RSAPublicKey public_key, Integer256 new_nonce) {
+    byte[] encrypted_data_bytes = RSA.encrypt(public_key, data_with_hash(random_number_generator, p_q_inner_data(nonce, server_nonce, pq, p, q, new_nonce)));
     
     message_data 
       .append_int(CombinatorIds.req_DH_params)
@@ -43,11 +43,11 @@ public class SendReqDhParams extends SendUnencrypted {
       .end();
   }
   
-  public static byte[] data_with_hash(byte[] p_q_inner_data) {
+  public static byte[] data_with_hash(SecureRandomPlus random_number_generator, byte[] p_q_inner_data) {
     return (new Serializer())
       .append_raw_bytes((new SHA1()).digest(p_q_inner_data))
       .append_raw_bytes(p_q_inner_data)
-      .pad_to_length(255, new SecureRandomPlus())
+      .pad_to_length(255, random_number_generator)
       .end();
   }
 }

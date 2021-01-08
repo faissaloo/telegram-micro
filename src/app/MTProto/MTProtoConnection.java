@@ -104,6 +104,7 @@ public class MTProtoConnection {
     new_nonce = random_number_generator.nextInteger256();
     
     SendReqDhParams diffie_hellman_params_request = new SendReqDhParams(
+      random_number_generator,
       nonce,
       pq_data.server_nonce,
       pq_data.pq,
@@ -128,6 +129,7 @@ public class MTProtoConnection {
     }
     
     SendSetClientDHParams set_client_dh_params = new SendSetClientDHParams(
+      random_number_generator,
       dh_params_ok.nonce,
       dh_params_ok.server_nonce,
       retry_id,

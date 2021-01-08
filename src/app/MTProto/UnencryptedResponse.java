@@ -6,10 +6,9 @@ import support.Encode;
 import support.ByteArrayPlus;
 import support.Decode;
 
-public class UnencryptedResponse {
+public class UnencryptedResponse extends Response {
   public long auth_key_id;
   public long message_id;
-  public int type;
   public byte[] data;
 
   public static UnencryptedResponse from_tcp_response(TCPResponse response) throws IOException {

@@ -3,6 +3,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.SecurityException;
+import java.util.Hashtable;
+import java.util.Enumeration;
 
 import javax.microedition.io.Connector;
 import javax.microedition.io.SocketConnection;
@@ -41,6 +43,24 @@ public class MTProtoConnection {
   public long session_id = 0;
   public int seq_no = 0;
   
+  public Hashtable callbacks; //hash by combinator_id of hash by callback id
+  
+  public static abstract class MTProtoCallback {
+    public MTProtoConnection connection;
+    public int combinator_id;
+    public boolean takes_encrypted_responses;
+    public Object context;
+    
+    public MTProtoCallback(int combinator_id, MTProtoConnection connection, Object context /*can be null if you want*/) {
+      this.connection = connection;
+      this.combinator_id = combinator_id;
+      this.takes_encrypted_responses = takes_encrypted_responses;
+      this.context = context;
+    }
+    
+    public abstract void execute(Response response);
+  }
+  
   //Constructor for the default port
   public MTProtoConnection(String ip) throws IOException {
     this(ip, "5222");
@@ -65,7 +85,55 @@ public class MTProtoConnection {
     message_send_thread.start(); //Should we have these start when they're instantiated?
     message_recieve_thread.start();
     
+    callbacks = new Hashtable();
     perform_handshake();
+  }
+  
+  public int bindCallback(MTProtoCallback callback) {
+    //returns id for callback
+    //check first if there exists a hash
+    Integer combinator_id_obj = new Integer(callback.combinator_id);
+    if (callbacks.get(combinator_id_obj) == null) {
+      callbacks.put(combinator_id_obj, new Hashtable());
+    }
+    
+    Hashtable combinator_callbacks = (Hashtable) callbacks.get(combinator_id_obj);
+    int callback_id = combinator_callbacks.size()+1;
+    Integer callback_id_obj = new Integer(callback_id);
+    combinator_callbacks.put(callback_id_obj, callback);
+    return callback_id;
+  }
+  
+  public void removeCallback(int combinator_id, int callback_id) {
+    Integer combinator_id_obj = new Integer(combinator_id);
+    Integer callback_id_obj = new Integer(callback_id);
+    Hashtable combinator_callbacks = (Hashtable)callbacks.get(combinator_id_obj);
+    
+    combinator_callbacks.remove(callback_id_obj);
+    if (combinator_callbacks.size() == 0) {
+      callbacks.remove(combinator_id_obj);
+    }
+  }
+  
+  public Enumeration getCallbacks(int combinator_id) {
+    Integer combinator_id_obj = new Integer(combinator_id);
+    Hashtable combinator_callbacks = (Hashtable)callbacks.get(combinator_id_obj);
+    return combinator_callbacks.elements();
+  }
+  
+  public void main_loop() throws IOException {
+    //we'llhave a different set of callbacks for RPC responses
+    wait_for_response();
+    TCPResponse tcp_response = message_recieve_thread.dequeue_response();
+    Response response = UnencryptedResponse.from_tcp_response(tcp_response);
+    if (response == null) { //we need a way to check which one it is beforehand this is ugly
+      response = EncryptedResponse.from_tcp_response(tcp_response, this);
+    }
+    
+    for (Enumeration e = getCallbacks(response.type); e.hasMoreElements();) {
+      MTProtoCallback callback = (MTProtoCallback)e.nextElement();
+      callback.execute(response);
+    }
   }
   
   public void send(TCPRequest request) {

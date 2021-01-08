@@ -10,12 +10,11 @@ import support.Integer128;
 import crypto.AES256IGE;
 import crypto.SHA256;
 
-public class EncryptedResponse {
+public class EncryptedResponse extends Response {
   public long salt;
   public long session_id;
   public long message_id;
   public int seq_no;
-  public int type;
   public byte[] data;
 
   public static EncryptedResponse from_tcp_response(TCPResponse response, MTProtoConnection reciever) throws IOException {

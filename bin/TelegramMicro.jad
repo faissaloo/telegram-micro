@@ -1,6 +1,6 @@
 MIDlet-1: TestRunner, , test.TestRunner
 MIDlet-2: TelegramMicro, TelegramMicro.png, TelegramMicro
-MIDlet-Jar-Size: 127570
+MIDlet-Jar-Size: 85317
 MIDlet-Jar-URL: TelegramMicro.jar
 MIDlet-Name: TelegramMicro
 MIDlet-Vendor: Unknown

@@ -40,7 +40,6 @@ public class TelegramMicro extends MIDlet {
       MTProtoConnection connection = new MTProtoConnection("149.154.175.10");
       connection.main_loop();
       /*System.out.println("SENDING PING");
-      (new SendPing(25565)).send(connection);
       System.out.println("WAITING FOR RESPONSE");
       connection.wait_for_response();
       System.out.println("GOT RESPONSE");

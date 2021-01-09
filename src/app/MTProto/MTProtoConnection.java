@@ -13,10 +13,13 @@ import bouncycastle.BigInteger;
 import mtproto.recieve.RecieveResPQ;
 import mtproto.recieve.RecieveServerDHParamsOk;
 import mtproto.recieve.RecieveServerDHGenOk;
+import mtproto.recieve.RecieveMsgContainer;
+import mtproto.recieve.RecieveNewSessionCreated;
 import mtproto.send.SendSetClientDHParams;
 import mtproto.send.SendReqPqMulti;
 import mtproto.send.SendReqDhParams;
 import mtproto.send.SendPing;
+import mtproto.send.SendMsgsAck;
 
 import crypto.RSAPublicKey;
 import crypto.SecureRandomPlus;
@@ -62,8 +65,8 @@ public class MTProtoConnection {
   
   
   public static class HandleRecieveResPQ extends MTProtoConnection.MTProtoCallback {
-    public HandleRecieveResPQ(int combinator_id, MTProtoConnection connection) {
-      super(combinator_id, connection);
+    public HandleRecieveResPQ(MTProtoConnection connection) {
+      super(CombinatorIds.resPQ, connection);
     }
     
     public void execute(Response response) {
@@ -94,8 +97,8 @@ public class MTProtoConnection {
   }
   
   public static class HandleRecieveDHParamsOk extends MTProtoCallback {
-    public HandleRecieveDHParamsOk(int combinator_id, MTProtoConnection connection) {
-      super(combinator_id, connection);
+    public HandleRecieveDHParamsOk(MTProtoConnection connection) {
+      super(CombinatorIds.server_DH_params_ok, connection);
     }
     
     public void execute(Response response) {
@@ -129,8 +132,8 @@ public class MTProtoConnection {
   }
   
   public static class HandleRecieveServerDHGenOk extends MTProtoCallback {
-    public HandleRecieveServerDHGenOk(int combinator_id, MTProtoConnection connection) {
-      super(combinator_id, connection);
+    public HandleRecieveServerDHGenOk(MTProtoConnection connection) {
+      super(CombinatorIds.dh_gen_ok, connection);
     }
     
     public void execute(Response response) {
@@ -139,10 +142,40 @@ public class MTProtoConnection {
       connection.server_salt = connection.generate_server_salt(connection.new_nonce, dh_gen_ok.server_nonce);
       //https://github.com/badoualy/kotlogram/blob/master/mtproto/src/main/kotlin/com/github/badoualy/telegram/mtproto/auth/AuthKeyCreation.kt#L193
       connection.session_id = connection.random_number_generator.nextLong();
-      System.out.println("DH GEN OK");
+      System.out.println("DH GEN OK, sending ping...");
+      //We're just piggybacking off this callback for now 
+      (new SendPing(25565)).send(connection);
     }
   }
   
+  public static class HandleRecieveMsgContainer extends MTProtoCallback {
+    public HandleRecieveMsgContainer(MTProtoConnection connection) {
+      super(CombinatorIds.msg_container, connection);
+    }
+    
+    public void execute(Response response) {
+      EncryptedResponse encrypted_response = (EncryptedResponse)response;
+      RecieveMsgContainer recieve_msg_container = RecieveMsgContainer.from_encrypted_message(encrypted_response);
+      System.out.println("Recieved message container, triggering callbacks...");
+      for (int i = 0; i < recieve_msg_container.messages.length; i += 1) {
+        connection.trigger_callbacks(recieve_msg_container.messages[i]);
+      }
+    }
+  }
+  
+  public static class HandleRecieveNewSessionCreated extends MTProtoCallback {
+    public HandleRecieveNewSessionCreated(MTProtoConnection connection) {
+      super(CombinatorIds.new_session_created, connection);
+    }
+    
+    public void execute(Response response) {
+      System.out.println("Session created in "+Long.toString(System.currentTimeMillis()-connection.handshake_start)+"ms");
+      EncryptedResponse encrypted_response = (EncryptedResponse)response;
+      RecieveNewSessionCreated recieve_new_session_created = RecieveNewSessionCreated.from_encrypted_message(encrypted_response);
+      System.out.println("NEW SESSION CREATED, sending ack...");
+      (new SendMsgsAck(new long[] {encrypted_response.message_id})).send(connection);
+    }
+  }
   
   //Constructor for the default port
   public MTProtoConnection(String ip) throws IOException {
@@ -169,9 +202,11 @@ public class MTProtoConnection {
     message_recieve_thread.start();
     
     callbacks = new Hashtable();
-    bind_callback(new HandleRecieveResPQ(CombinatorIds.resPQ, this));
-    bind_callback(new HandleRecieveDHParamsOk(CombinatorIds.server_DH_params_ok, this));
-    bind_callback(new HandleRecieveServerDHGenOk(CombinatorIds.dh_gen_ok, this));
+    bind_callback(new HandleRecieveResPQ(this));
+    bind_callback(new HandleRecieveDHParamsOk(this));
+    bind_callback(new HandleRecieveServerDHGenOk(this));
+    bind_callback(new HandleRecieveMsgContainer(this));
+    bind_callback(new HandleRecieveNewSessionCreated(this));
   }
   
   public int bind_callback(MTProtoCallback callback) {
@@ -203,14 +238,21 @@ public class MTProtoConnection {
   public Enumeration get_callbacks(int combinator_id) {
     Integer combinator_id_obj = new Integer(combinator_id);
     Hashtable combinator_callbacks = (Hashtable)callbacks.get(combinator_id_obj);
-    return combinator_callbacks.elements();
+    
+    if (combinator_callbacks == null) {
+      return null;
+    } else {
+      return combinator_callbacks.elements();
+    }
   }
   
+  public long handshake_start = 0; //benchmarking
   public void begin_handshake() {
     nonce = random_number_generator.nextInteger128();
     new_nonce = null;
     retry_id = 0;
 
+    handshake_start = System.currentTimeMillis();
     SendReqPqMulti key_exchange = new SendReqPqMulti(nonce);
     key_exchange.send(this);
     System.out.println("SENDING REQ PQ MULTI");
@@ -228,7 +270,16 @@ public class MTProtoConnection {
         response = EncryptedResponse.from_tcp_response(tcp_response, this);
       }
       
-      for (Enumeration e = get_callbacks(response.type); e.hasMoreElements();) {
+      trigger_callbacks(response);
+    }
+  }
+  
+  public void trigger_callbacks(Response response) {
+    Enumeration e = get_callbacks(response.type);
+    if (e == null) {
+      return;
+    } else {
+      for (;e.hasMoreElements();) {
         MTProtoCallback callback = (MTProtoCallback)e.nextElement();
         callback.execute(response);
       }

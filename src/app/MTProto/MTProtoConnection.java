@@ -51,19 +51,10 @@ public class MTProtoConnection {
   public static abstract class MTProtoCallback {
     public MTProtoConnection connection;
     public int combinator_id;
-    public boolean takes_encrypted_responses;
-    public Object context;
     
     public MTProtoCallback(int combinator_id, MTProtoConnection connection) {
       this.connection = connection;
       this.combinator_id = combinator_id;
-      context = null;
-    }
-    
-    public MTProtoCallback(int combinator_id, MTProtoConnection connection, Object context) {
-      this.connection = connection;
-      this.combinator_id = combinator_id;
-      this.context = context;
     }
     
     public abstract void execute(Response response);

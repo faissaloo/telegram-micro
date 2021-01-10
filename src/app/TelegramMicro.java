@@ -9,22 +9,33 @@ import javax.microedition.midlet.MIDlet;
 import javax.microedition.io.Connector;
 
 import mtproto.MTProtoConnection;
-import mtproto.send.SendPing;
+import mtproto.Response;
+import mtproto.handle.MTProtoCallback;
 import mtproto.UnencryptedResponse;
 import mtproto.EncryptedResponse;
 import mtproto.CombinatorIds;
-import mtproto.recieve.RecieveMsgContainer;
-import mtproto.recieve.RecieveNewSessionCreated;
-import mtproto.recieve.RecievePong;
-import mtproto.recieve.RecieveBadMsgNotification;
-import mtproto.recieve.RecieveRpcResult;
-import mtproto.send.SendMsgsAck;
 
 import bouncycastle.BigInteger;
 
 public class TelegramMicro extends MIDlet {
   private Form form;
   private Display display;
+
+  public static class HandleRecieveNewSessionCreated extends MTProtoCallback {
+    Display display;
+    Form log;
+    
+    public HandleRecieveNewSessionCreated(MTProtoConnection connection, Display display, Form log) {
+      super(CombinatorIds.new_session_created, connection);
+      this.display = display;
+      this.log = log;
+    }
+    
+    public void execute(Response response) {
+      log.append("Session created in "+Long.toString(System.currentTimeMillis()-connection.handshake_start)+"ms");
+      display.setCurrent(log);
+    }
+  }
 
   public TelegramMicro() {
     super();
@@ -38,6 +49,7 @@ public class TelegramMicro extends MIDlet {
 
     try {
       MTProtoConnection connection = new MTProtoConnection("149.154.175.10");
+      connection.bind_callback(new HandleRecieveNewSessionCreated(connection, display, log));
       connection.main_loop();
       /*System.out.println("SENDING PING");
       System.out.println("WAITING FOR RESPONSE");

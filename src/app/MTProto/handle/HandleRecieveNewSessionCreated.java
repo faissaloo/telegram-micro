@@ -13,10 +13,8 @@ public class HandleRecieveNewSessionCreated extends MTProtoCallback {
   }
   
   public void execute(Response response) {
-    System.out.println("Session created in "+Long.toString(System.currentTimeMillis()-connection.handshake_start)+"ms");
     EncryptedResponse encrypted_response = (EncryptedResponse)response;
     RecieveNewSessionCreated recieve_new_session_created = RecieveNewSessionCreated.from_encrypted_message(encrypted_response);
-    System.out.println("NEW SESSION CREATED, sending ack...");
     (new SendMsgsAck(new long[] {encrypted_response.message_id})).send(connection);
   }
 }

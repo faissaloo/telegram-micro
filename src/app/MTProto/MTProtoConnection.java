@@ -15,6 +15,9 @@ import mtproto.handle.HandleRecieveDHParamsOk;
 import mtproto.handle.HandleRecieveMsgContainer;
 import mtproto.handle.HandleRecieveServerDHGenOk;
 import mtproto.handle.HandleRecieveNewSessionCreated;
+import mtproto.handle.HandleRecieveUnknown;
+import mtproto.handle.HandleRecieveRPCResult;
+import mtproto.handle.HandleRecieveRPCError;
 import mtproto.send.SendReqPqMulti;
 
 import crypto.SecureRandomPlus;
@@ -70,6 +73,9 @@ public class MTProtoConnection {
     bind_callback(new HandleRecieveServerDHGenOk(this));
     bind_callback(new HandleRecieveMsgContainer(this));
     bind_callback(new HandleRecieveNewSessionCreated(this));
+    bind_callback(new HandleRecieveRPCResult(this));
+    bind_callback(new HandleRecieveUnknown(this));
+    bind_callback(new HandleRecieveRPCError(this));
   }
   
   public int bind_callback(MTProtoCallback callback) {
@@ -140,12 +146,14 @@ public class MTProtoConnection {
   public void trigger_callbacks(Response response) {
     Enumeration e = get_callbacks(response.type);
     if (e == null) {
-      return;
-    } else {
-      for (;e.hasMoreElements();) {
-        MTProtoCallback callback = (MTProtoCallback)e.nextElement();
-        callback.execute(response);
+      e = get_callbacks(CombinatorIds.unknown);
+      if (e == null) {
+        return;
       }
+    }
+    for (;e.hasMoreElements();) {
+      MTProtoCallback callback = (MTProtoCallback)e.nextElement();
+      callback.execute(response);
     }
   }
   

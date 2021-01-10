@@ -1,6 +1,8 @@
 package mtproto;
 
 public class CombinatorIds {
+  public static int unknown = 0; //pseudo-combinator
+  
   public static int p_q_inner_data = 0x83c95aec;
   public static int req_DH_params = 0xd712e4be;
   public static int resPQ = 0x05162463;
@@ -20,5 +22,7 @@ public class CombinatorIds {
   public static int vector = 0x1cb5c415;
   public static int new_session_created = 0x9ec20908;
   public static int bad_msg_notification = 0xa7eff811;
+  
   public static int rpc_result = 0xf35c6d01;
+  public static int rpc_error = 0x2144ca19;
 }

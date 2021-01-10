@@ -31,8 +31,6 @@ public class RecieveRpcResult {
       long req_msg_id = Decode.Little.long_decode(data, skip);
       skip += 8;
       byte[] result = ArrayPlus.subarray(data, skip, data.length-skip);
-      System.out.println("OBJECT TYPE");
-      System.out.println(Integer.toHexString(Decode.Little.int_decode(data, skip))); //rpc_error#2144ca19
       return new RecieveRpcResult(req_msg_id, result);
     } else {
       throw new TypeMismatchException("Expected a %(rpc_result)");
@@ -40,10 +38,10 @@ public class RecieveRpcResult {
   }
   
   public long req_msg_id;
-  public byte[] result;
+  public byte[] body;
   
-  public RecieveRpcResult(long req_msg_id, byte[] result) {
+  public RecieveRpcResult(long req_msg_id, byte[] body) {
     this.req_msg_id = req_msg_id;
-    this.result = result;
+    this.body = body;
   }
 }

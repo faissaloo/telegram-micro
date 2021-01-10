@@ -24,7 +24,7 @@ public class UnencryptedResponse extends Response {
         int type = Decode.Little.int_decode(response_data, 20);
         
         //Then get the data
-        ByteArrayPlus message_data = new ByteArrayPlus();
+        ByteArrayPlus message_data = new ByteArrayPlus(); //we can just use arrayplus for this now
         for (int i = 4; i < message_data_length; i++) {
           message_data.append_byte(response_data[20+i]);
         }

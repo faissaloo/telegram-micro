@@ -34,6 +34,15 @@ public class TelegramMicro extends MIDlet {
     public void execute(Response response) {
       log.append("Session created in "+Long.toString(System.currentTimeMillis()-connection.handshake_start)+"ms");
       display.setCurrent(log);
+      /*
+      System.out.println("Closing connection, goodbye!");
+      try {
+        connection.close();
+      } catch (Exception e) {
+        System.out.println("EXCEPTION WHEN TRYING TO CLOSE CONNECTION:");
+        e.printStackTrace();
+      }
+      */
     }
   }
 

@@ -48,11 +48,13 @@ public class SendRequestThread extends Thread {
       }
 
       System.out.println("CLOSING REQUEST STREAM");
-      request_stream.close();
-      connection.close();
+      close();
     } catch (IOException exception) {
-      exception.printStackTrace();
     }
+  }
+  
+  public void close() throws IOException {
+    request_stream.close();
   }
   
   //https://core.telegram.org/mtproto/mtproto-transports

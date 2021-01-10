@@ -15,6 +15,7 @@ public class RecieveResponseThread extends Thread {
   Queue responses = new Queue();
   Queue waiting = new Queue();
   SocketConnection connection;
+  InputStream response_stream;
 
   public TCPResponse dequeue_response() {
     return (TCPResponse) responses.dequeue();
@@ -41,7 +42,7 @@ public class RecieveResponseThread extends Thread {
 
   public void run() {
     try {
-      InputStream response_stream = connection.openInputStream();
+      response_stream = connection.openInputStream();
       connection.setSocketOption(SocketConnection.LINGER, 5);
 
       // THE NETWORK MONITOR IS A LIE
@@ -60,10 +61,12 @@ public class RecieveResponseThread extends Thread {
         }
       }
 
-      response_stream.close();
-      connection.close();
+      close();
     } catch (IOException exception) {
-      exception.printStackTrace();
     }
+  }
+  
+  public void close() throws IOException {
+    response_stream.close();
   }
 }

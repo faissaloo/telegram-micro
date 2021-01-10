@@ -78,6 +78,12 @@ public class MTProtoConnection {
     bind_callback(new HandleRecieveRPCError(this));
   }
   
+  public void close() throws IOException {
+    message_send_thread.close();
+    message_recieve_thread.close();
+    api_connection.close();
+  }
+  
   public int bind_callback(MTProtoCallback callback) {
     //returns id for callback
     //check first if there exists a hash

@@ -83,7 +83,6 @@ public class ByteArrayPlus extends ByteArrayOutputStream {
   
   public ByteArrayPlus pad_random_align_range(int alignment, int minimum, int maximum, RandomPlus random_number_generator) {
     int to_pad = align_range_length(size(), alignment, minimum, maximum, random_number_generator);
-    System.out.println("Padding "+Integer.toString(size())+" bytes with "+Integer.toString(to_pad)+" bytes");
     append_raw_bytes(random_number_generator.nextBytes(to_pad));
     return this;
   }

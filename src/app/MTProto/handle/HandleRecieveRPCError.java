@@ -19,9 +19,9 @@ public class HandleRecieveRPCError extends MTProtoCallback {
     RPCResponse rpc_response = (RPCResponse)response;
     RecieveRPCError recieve_rpc_error = RecieveRPCError.from_rpc_response(rpc_response);
     try {
-      System.out.println("RECIEVED RPC ERROR "+Integer.toString(recieve_rpc_error.error_code)+": "+recieve_rpc_error.error_message.ascii_string());
+      System.out.println("ERROR: RPC "+Integer.toString(recieve_rpc_error.error_code)+": "+recieve_rpc_error.error_message.ascii_string());
     } catch (UnsupportedEncodingException e) {
-      System.out.println("RECIEVED RPC ERROR "+Integer.toString(recieve_rpc_error.error_code)+": <invalid encoding>");
+      System.out.println("ERROR: RPC "+Integer.toString(recieve_rpc_error.error_code)+": <invalid encoding>");
     }
   }
 }

@@ -18,6 +18,7 @@ import mtproto.handle.HandleRecieveNewSessionCreated;
 import mtproto.handle.HandleRecieveUnknown;
 import mtproto.handle.HandleRecieveRPCResult;
 import mtproto.handle.HandleRecieveRPCError;
+import mtproto.handle.HandleRecieveBadMsgNotification;
 import mtproto.send.SendReqPqMulti;
 
 import crypto.SecureRandomPlus;
@@ -76,6 +77,7 @@ public class MTProtoConnection {
     bind_callback(new HandleRecieveRPCResult(this));
     bind_callback(new HandleRecieveUnknown(this));
     bind_callback(new HandleRecieveRPCError(this));
+    bind_callback(new HandleRecieveBadMsgNotification(this));
   }
   
   public void close() throws IOException {

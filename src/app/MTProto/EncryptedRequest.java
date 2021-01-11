@@ -20,7 +20,7 @@ public class EncryptedRequest {
 
   private long message_id() {
     //https://core.telegram.org/mtproto/description#message-identifier-msg-id
-    return System.currentTimeMillis()*((1L<<32)/1000L); //We're doing it this way in order to maintain at least something in the lower 32-bits
+    return (System.currentTimeMillis()*((1L<<32)/1000L))&(~0x3); //make sure the seconds are in the upper part of the long, and mask off the lower 2 bits 
   }
   
   public void send(MTProtoConnection sender) {

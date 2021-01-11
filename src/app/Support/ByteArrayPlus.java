@@ -55,13 +55,6 @@ public class ByteArrayPlus extends ByteArrayOutputStream {
     return this;
   }
   
-  public ByteArrayPlus pad_to_length(int up_to) {
-    for (int i = 0; i < up_to-size(); i++) {
-      append_byte((byte)0);
-    }
-    return this;
-  }
-  
   public ByteArrayPlus pad_to_length(int up_to, RandomPlus random_number_generator) {
     int to_pad = up_to-size();
     append_raw_bytes(random_number_generator.nextBytes(to_pad));
@@ -73,6 +66,25 @@ public class ByteArrayPlus extends ByteArrayOutputStream {
     for (int i = 0; i < to_pad; i++) {
       append_byte((byte)0);
     }
+    return this;
+  }
+  
+  //bro my brain just like vomitted this up so if you don't get it you're on your own
+  public static int align_range_length(int size, int alignment, int minimum, int maximum, RandomPlus random_number_generator) {
+    int aligned_by = ((alignment-(size%alignment))%alignment);
+    int needed_to_meet_minimum = minimum-aligned_by;
+    int aligned_needed_to_meet_minimum = needed_to_meet_minimum + ((alignment-(needed_to_meet_minimum%alignment))%alignment);
+    int aligned_bytes_needed = aligned_by + aligned_needed_to_meet_minimum;
+    
+    int times_alignment_fits_into_remaining_bytes = (maximum-aligned_bytes_needed)/alignment;
+    int bytes_to_add = alignment*random_number_generator.nextInt(times_alignment_fits_into_remaining_bytes);
+    return aligned_bytes_needed+bytes_to_add;
+  }
+  
+  public ByteArrayPlus pad_random_align_range(int alignment, int minimum, int maximum, RandomPlus random_number_generator) {
+    int to_pad = align_range_length(size(), alignment, minimum, maximum, random_number_generator);
+    System.out.println("Padding "+Integer.toString(size())+" bytes with "+Integer.toString(to_pad)+" bytes");
+    append_raw_bytes(random_number_generator.nextBytes(to_pad));
     return this;
   }
   

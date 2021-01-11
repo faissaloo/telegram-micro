@@ -32,11 +32,14 @@ public class EncryptedRequest {
       .append_long(message_id())
       .append_int(sender.seq_no)
       .append_int(message_data.length)
-      .append_raw_bytes(message_data)
-      .pad_random_to_length(12, 1024, sender.random_number_generator)
-      .pad_to_alignment(16, sender.random_number_generator)
+      .append_raw_bytes(
+        (new ByteArrayPlus())
+          .append_raw_bytes(message_data)
+          .pad_random_align_range(16, 12, 1024, sender.random_number_generator)
+          .toByteArray()
+      )
       .toByteArray();
-      
+    
     //msg_key_large = SHA256 (substr (auth_key, 88+x, 32) + plaintext + random_padding);
     byte[] msg_key_large = (new SHA256()).digest(
       (new ByteArrayPlus())

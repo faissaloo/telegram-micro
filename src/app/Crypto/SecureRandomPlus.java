@@ -38,7 +38,7 @@ public class SecureRandomPlus extends RandomPlus {
     }
     
     int bit_mask = (1 << bits) - 1;
-    return unmasked_bytes | bit_mask;
+    return unmasked_bytes | bit_mask; // you idiot you utter buffoon, does this look correct to you? THis should be an &, hang your head in shame
     
   }
 }

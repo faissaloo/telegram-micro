@@ -20,26 +20,23 @@ public class EncryptedRequest {
 
   private long message_id() {
     //https://core.telegram.org/mtproto/description#message-identifier-msg-id
-    return (System.currentTimeMillis()*((1L<<32)/1000L))&(~0x3); //make sure the seconds are in the upper part of the long, and mask off the lower 2 bits 
+    long time_ms = System.currentTimeMillis();
+    return (time_ms/1000L)<<32;
   }
   
   public void send(MTProtoConnection sender) {
     //https://core.telegram.org/mtproto/description#encrypted-message-encrypted-data
     //https://core.telegram.org/mtproto/description#protocol-description
+    long message_id = message_id();
     byte[] unencrypted_data = (new ByteArrayPlus())
       .append_long(sender.server_salt)
       .append_long(sender.session_id)
-      .append_long(message_id())
+      .append_long(message_id)
       .append_int(sender.seq_no)
       .append_int(message_data.length)
-      .append_raw_bytes(
-        (new ByteArrayPlus())
-          .append_raw_bytes(message_data)
-          .pad_random_align_range(16, 12, 1024, sender.random_number_generator)
-          .toByteArray()
-      )
+      .append_raw_bytes(message_data)
+      .pad_random_align_range(16, 12, 1024, sender.random_number_generator)
       .toByteArray();
-    
     //msg_key_large = SHA256 (substr (auth_key, 88+x, 32) + plaintext + random_padding);
     byte[] msg_key_large = (new SHA256()).digest(
       (new ByteArrayPlus())

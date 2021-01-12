@@ -77,13 +77,15 @@ public class ByteArrayPlus extends ByteArrayOutputStream {
     int aligned_bytes_needed = aligned_by + aligned_needed_to_meet_minimum;
     
     int times_alignment_fits_into_remaining_bytes = (maximum-aligned_bytes_needed)/alignment;
-    int bytes_to_add = alignment*random_number_generator.nextInt(times_alignment_fits_into_remaining_bytes);
-    return aligned_bytes_needed+bytes_to_add;
+    int variable_pad_needed = random_number_generator.nextInt(times_alignment_fits_into_remaining_bytes);
+    int variable_padding = alignment*variable_pad_needed;
+    return aligned_bytes_needed+variable_padding;
   }
   
   public ByteArrayPlus pad_random_align_range(int alignment, int minimum, int maximum, RandomPlus random_number_generator) {
     int to_pad = align_range_length(size(), alignment, minimum, maximum, random_number_generator);
-    append_raw_bytes(random_number_generator.nextBytes(to_pad));
+    byte[] pad_bytes = random_number_generator.nextBytes(to_pad);
+    append_raw_bytes(pad_bytes); //check that next bytes is producing the right number of bytes
     return this;
   }
   

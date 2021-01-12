@@ -18,7 +18,8 @@ public class UnencryptedRequest {
 
   private long message_id() {
     //https://core.telegram.org/mtproto/description#message-identifier-msg-id
-    return (System.currentTimeMillis()/1000L)<<32;
+    long time_ms = System.currentTimeMillis();
+    return (time_ms/1000L)<<32;
   }
 
   public void send(MTProtoConnection sender) {

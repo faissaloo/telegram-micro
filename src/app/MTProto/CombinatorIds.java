@@ -25,4 +25,6 @@ public class CombinatorIds {
   
   public static int rpc_result = 0xf35c6d01;
   public static int rpc_error = 0x2144ca19;
+  
+  public static int msgs_ack = 0x62d6b459;
 }

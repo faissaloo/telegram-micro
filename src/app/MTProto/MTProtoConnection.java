@@ -138,7 +138,7 @@ public class MTProtoConnection {
   public void main_loop() throws IOException {
     begin_handshake();
     
-    while (true) {
+    while (true) { //if we've disconnected this should stop
       //we'll have a different set of callbacks for RPC responses
       wait_for_response();
       TCPResponse tcp_response = message_recieve_thread.dequeue_response();

@@ -41,6 +41,7 @@ public class MTProtoConnection {
   public long retry_id = 0;
   public Integer128 nonce;
   public Integer256 new_nonce;
+  public boolean connection_open = false;
   
   public Hashtable callbacks; //hash by combinator_id of hash by callback id
   
@@ -67,6 +68,7 @@ public class MTProtoConnection {
     
     message_send_thread.start(); //Should we have these start when they're instantiated?
     message_recieve_thread.start();
+    connection_open = true;
     
     callbacks = new Hashtable();
     bind_callback(new HandleRecieveResPQ(this));
@@ -81,6 +83,7 @@ public class MTProtoConnection {
   }
   
   public void close() throws IOException {
+    connection_open = false;
     message_send_thread.close();
     message_recieve_thread.close();
     api_connection.close();
@@ -138,7 +141,7 @@ public class MTProtoConnection {
   public void main_loop() throws IOException {
     begin_handshake();
     
-    while (true) { //if we've disconnected this should stop
+    while (connection_open) { //if we've disconnected this should stop
       //we'll have a different set of callbacks for RPC responses
       wait_for_response();
       TCPResponse tcp_response = message_recieve_thread.dequeue_response();

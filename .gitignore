@@ -2,3 +2,4 @@ classes/*
 bin/TelegramMicro.jar
 tmpclasses/*
 tmplib/*
+server/node_modules

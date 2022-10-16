@@ -4,7 +4,7 @@ import mtproto.MTProtoConnection;
 import mtproto.Response;
 import mtproto.EncryptedResponse;
 import mtproto.recieve.RecieveRpcResult;
-import mtproto.send.SendMsgsAck;
+import mtproto.send.service.SendMsgsAck;
 import mtproto.CombinatorIds;
 import mtproto.RPCResponse;
 

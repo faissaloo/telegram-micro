@@ -1,5 +1,6 @@
-package mtproto.send;
+package mtproto.send.service;
 
+import mtproto.send.SendEncrypted;
 import support.ByteArrayPlus;
 
 import mtproto.CombinatorIds;

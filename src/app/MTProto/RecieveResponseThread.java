@@ -63,6 +63,7 @@ public class RecieveResponseThread extends Thread {
 
       close();
     } catch (IOException exception) {
+      System.out.println(exception);
     }
   }
   

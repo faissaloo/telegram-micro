@@ -1,4 +1,4 @@
-package mtproto.recieve;
+package mtproto.recieve.service;
 
 import support.Decode;
 

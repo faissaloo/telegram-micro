@@ -3,8 +3,8 @@ package mtproto.handle;
 import mtproto.MTProtoConnection;
 import mtproto.Response;
 import mtproto.EncryptedResponse;
-import mtproto.recieve.RecieveBadMsgNotification;
-import mtproto.send.SendMsgsAck;
+import mtproto.recieve.service.RecieveBadMsgNotification;
+import mtproto.send.service.SendMsgsAck;
 import mtproto.CombinatorIds;
 
 public class HandleRecieveBadMsgNotification extends MTProtoCallback {

@@ -2,7 +2,7 @@ package mtproto.handle;
 
 import mtproto.MTProtoConnection;
 import mtproto.recieve.RecieveServerDHGenOk;
-import mtproto.send.SendPing;
+import mtproto.send.service.SendPing;
 import mtproto.CombinatorIds;
 import mtproto.UnencryptedResponse;
 import mtproto.Response;

@@ -20,7 +20,7 @@ import mtproto.handle.HandleRecieveRPCResult;
 import mtproto.handle.HandleRecieveRPCError;
 import mtproto.handle.HandleRecieveBadMsgNotification;
 import mtproto.send.SendReqPqMulti;
-
+import mtproto.Serializer;
 import crypto.SecureRandomPlus;
 
 import support.Integer128;
@@ -45,7 +45,6 @@ public class MTProtoConnection {
   
   public Hashtable callbacks; //hash by combinator_id of hash by callback id
   
-  //Constructor for the default port
   public MTProtoConnection(String ip) throws IOException {
     this(ip, "5222");
   }
@@ -61,10 +60,12 @@ public class MTProtoConnection {
         " have been disabled entirely."
       );
     }
+    
     random_number_generator = new SecureRandomPlus();
     api_connection = (SocketConnection) Connector.open("socket://"+ip+":"+port);
     message_send_thread = new SendRequestThread(api_connection);
     message_recieve_thread = new RecieveResponseThread(api_connection);
+    setBlankMTProtoHeader();
     
     message_send_thread.start(); //Should we have these start when they're instantiated?
     message_recieve_thread.start();
@@ -80,6 +81,38 @@ public class MTProtoConnection {
     bind_callback(new HandleRecieveUnknown(this));
     bind_callback(new HandleRecieveRPCError(this));
     bind_callback(new HandleRecieveBadMsgNotification(this));
+  }
+  
+  public byte[] mtprotoHeader;
+  public void setBlankMTProtoHeader() {
+    mtprotoHeader = new byte[] {};
+  }
+  public void setMTProtoHeader(
+    int layer,
+    int api_id,
+    String device_model,
+    String system_version,
+    String app_version,
+    String system_lang_code,
+    String lang_pack,
+    String lang_code
+  ) {
+    mtprotoHeader = (new Serializer())
+      .append_int(CombinatorIds.invoke_with_layer)
+      .append_int(layer)
+      .append_int(CombinatorIds.init_connection)
+      .append_int(0) //initConnection flags
+      .append_int(api_id)
+      .append_string(device_model)
+      .append_string(system_version)
+      .append_string(app_version)
+      .append_string(system_lang_code)
+      .append_string(lang_pack)
+      .append_string(lang_code)
+      .end();
+  }
+  public byte[] getMTProtoHeader() {
+    return mtprotoHeader;
   }
   
   public void close() throws IOException {
@@ -135,7 +168,6 @@ public class MTProtoConnection {
     handshake_start = System.currentTimeMillis();
     SendReqPqMulti key_exchange = new SendReqPqMulti(nonce);
     key_exchange.send(this);
-    System.out.println("SENDING REQ PQ MULTI");
   }
 
   public void main_loop() throws IOException {
@@ -143,8 +175,12 @@ public class MTProtoConnection {
     
     while (connection_open) { //if we've disconnected this should stop
       //we'll have a different set of callbacks for RPC responses
+      
+      //Why is this just not waiting for a response on certain servers?
       wait_for_response();
       TCPResponse tcp_response = message_recieve_thread.dequeue_response();
+      //
+      
       Response response = UnencryptedResponse.from_tcp_response(tcp_response);
       if (response == null) { //we need a way to check which one it is beforehand this is ugly
         response = EncryptedResponse.from_tcp_response(tcp_response, this);

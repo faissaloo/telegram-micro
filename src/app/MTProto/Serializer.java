@@ -24,6 +24,19 @@ public class Serializer {
     return this;
   }
   
+  public Serializer append_vector_byte_strings(byte[][] data) {
+    append_int(CombinatorIds.vector);
+    append_int(data.length);
+    for (int i = 0; i < data.length; i += 1) {
+      append_byte_string(data[i]);
+    }
+    return this;
+  }
+  
+  public Serializer append_string(String data) {
+    return append_byte_string(data.getBytes());
+  }
+  
   public Serializer append_byte_string(byte[] data) {
     Serializer to_append = new Serializer();
     if (data.length <= 253) {

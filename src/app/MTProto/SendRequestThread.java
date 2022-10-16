@@ -38,6 +38,7 @@ public class SendRequestThread extends Thread {
           //send message
           TCPRequest message = ((TCPRequest) requests.dequeue());
           byte[] message_data = message.request_data();
+          System.out.println("WRITING REQUEST");
           request_stream.write(message_data);
         }
         try {
@@ -50,6 +51,8 @@ public class SendRequestThread extends Thread {
       System.out.println("CLOSING REQUEST STREAM");
       close();
     } catch (IOException exception) {
+      System.out.println("REQUEST STREAM");
+      System.out.println(exception);
     }
   }
   

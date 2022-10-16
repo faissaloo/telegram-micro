@@ -1,6 +1,7 @@
 package mtproto;
 
 public class CombinatorIds {
+  //base layer and service messages
   public static int unknown = 0; //pseudo-combinator
   
   public static int p_q_inner_data = 0x83c95aec;
@@ -24,7 +25,23 @@ public class CombinatorIds {
   public static int bad_msg_notification = 0xa7eff811;
   
   public static int rpc_result = 0xf35c6d01;
+  //https://docs.pyrogram.org/api/errors
   public static int rpc_error = 0x2144ca19;
   
   public static int msgs_ack = 0x62d6b459;
+  
+  //user
+  public static int invoke_with_layer = 0xda9b0d0d;
+  public static int send_code = 0xa677244f;
+  public static int auth_authorization = 0x33fb7bb8;
+  public static int code_settings = 0x8a6469c2;
+  public static int init_connection = 0xc1cd5ea9;
+  
+  //help
+  public static int help_get_config = 0xc4f9186b;
+  public static int config = 0x330b4067;
+  
+  //i'm gonna need to implement gzip aren't i... https://commandlinefanatic.com/cgi-bin/showarticle.cgi?article=art053
+  //https://zlib.net/feldspar.html
+  public static int gzip_packed = 0x3072cfa1;
 }

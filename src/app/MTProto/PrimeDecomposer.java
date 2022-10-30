@@ -40,16 +40,16 @@ public class PrimeDecomposer {
     return b;
   }
 
-  private static long getPrimeFromServer(long product) {
-    ServerConnection serverConnection = new ServerConnection("http://localhost:5221");
+  private static long getPrimeFromServer(long product, String authHelpUrl) {
+    ServerConnection serverConnection = new ServerConnection(authHelpUrl);
     return serverConnection.getPrime(product);
   }
 
-  public static Coprimes decompose(long to_factorise) {
+  public static Coprimes decompose(long to_factorise, String authHelpUrl) {
     if (to_factorise % 2 == 0) {
       return new Coprimes(2L, to_factorise/2);
     } else {
-    long prime = getPrimeFromServer(to_factorise);
+    long prime = getPrimeFromServer(to_factorise, authHelpUrl);
         if (prime != -1)
             return new Coprimes(prime, to_factorise/prime);
         System.out.println("Failed to calculate prime factorization on server. Will do it on device (takes a while)");

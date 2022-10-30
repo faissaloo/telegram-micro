@@ -1,10 +1,11 @@
 package support;
 
+import bouncycastle.BigInteger;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Enumeration;
-import javax.microedition.io.HttpConnection;
+import javax.microedition.io.SocketConnection;
 import java.util.Hashtable;
 import javax.microedition.io.Connector;
 
@@ -15,75 +16,42 @@ public class ServerConnection {
         this.serverUrl = url;
     }
     
-    public long getModPow(String base, long exponent, String modulus) {
-        Hashtable params = new Hashtable(3);
-        params.put("base", base);
-        params.put("exponent", Long.toString(exponent));
-        params.put("modulus", modulus);
-        String response = request("/modpow", params, "POST");
+    public BigInteger getModPow(String base, long exponent, String modulus) {
+        String response = request("m " + base + " " + exponent + " " + modulus);
         if (response.equals(""))
-            return -1;
-        return Long.parseLong(response);
+            return new BigInteger("-1");
+        return new BigInteger(response);
     }
     
     public long getPrime(long product) {
-        Hashtable params = new Hashtable(1);
-        params.put("number", Long.toString(product));
-        String response = request("/primes", params, "POST");
+        String response = request("p " + product);
         if (response.equals(""))
             return -1;
         return Long.parseLong(response);
     }
     
-    private String getParameterString(Hashtable params) {
-        String paramString = "";
-        if (params.size() == 0)
-            return paramString;
-        Enumeration e = params.keys();
-        boolean firstElem = true;
-        while (e.hasMoreElements()){
-            paramString += firstElem ? "" : "&";
-            String key = e.nextElement().toString();
-            String value = params.get(key).toString();
-            paramString += key + '=' + value;
-            firstElem = false;
-        }
-        return paramString;
-    }
-    
-    private String request(String route, Hashtable parameters, String method) {
-        String url = this.serverUrl + route;
-        String paramString = getParameterString(parameters);
-        if (method.equals("GET"))
-            url += "?" + paramString;
-        HttpConnection con = null;
+    private String request(String request) {
+        if (serverUrl == null)
+            return "";
+        SocketConnection con = null;
         InputStream is = null;
+        OutputStream os = null;
         String response = "";
         try {
-            con = (HttpConnection)Connector.open(url);
-            con.setRequestMethod(method);
-            con.setRequestProperty("User-Agent", "Profile/MIDP-2.0 Configuration/CLDC-1.0");
-            
-            if (method.equals("POST")) {
-                con.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");  
-                con.setRequestProperty("Content-length", "" + paramString.getBytes().length);
-                OutputStream os = con.openOutputStream();
-                os.write(paramString.getBytes());
-                //os.flush();
+            con = (SocketConnection)Connector.open("socket://" + serverUrl);
+            con.setSocketOption(SocketConnection.LINGER, 5);
+            is = con.openInputStream();
+            os = con.openOutputStream();
+            StringBuffer sb = new StringBuffer();
+
+            os.write(request.getBytes());
+            os.write("\n".getBytes());
+            int chr = is.read();
+            while (chr != -1 && (char)chr != '.') {
+                sb.append((char) chr);
+                chr = is.read();
             }
-            
-            int responseCode = con.getResponseCode();
-            if (responseCode == HttpConnection.HTTP_OK) {
-                StringBuffer sb = new StringBuffer();
-                is = con.openDataInputStream();
-                int chr;
-                while ((chr = is.read()) != -1)
-                    sb.append((char) chr);
-                response = sb.toString();
-            } else {
-                System.out.println("Could not execute request to " + route + ". HTTP code " + responseCode + ": " + con.getResponseMessage());
-                return "";
-            }
+            response = sb.toString();
         } catch (IOException e) {
             System.out.println("Server connection: Catched " + e.getMessage());
         } finally {
@@ -92,6 +60,10 @@ public class ServerConnection {
                     is.close();
                 if (con != null)
                     con.close();
+                if (is != null)
+                    is.close();
+                if (os != null)
+                    os.close();
             } catch (IOException e){
                 System.out.println("Server connection: Catched " + e.getMessage());
             }

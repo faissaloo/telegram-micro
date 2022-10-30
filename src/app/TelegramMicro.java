@@ -17,7 +17,6 @@ import mtproto.CombinatorIds;
 
 import bouncycastle.BigInteger;
 
-//start making use of JSR 177 to speed things up
 public class TelegramMicro extends MIDlet {
   private Form form;
   private Display display;
@@ -25,18 +24,25 @@ public class TelegramMicro extends MIDlet {
   public static class HandleRecieveNewSessionCreated extends MTProtoCallback {
     Display display;
     Form log;
-    MTProtoConnection connection;
     
     public HandleRecieveNewSessionCreated(MTProtoConnection connection, Display display, Form log) {
       super(CombinatorIds.new_session_created, connection);
       this.display = display;
       this.log = log;
-      this.connection = connection;
     }
     
     public void execute(Response response) {
       log.append("Session created in "+Long.toString(System.currentTimeMillis()-connection.handshake_start)+"ms");
       display.setCurrent(log);
+      /*
+      System.out.println("Closing connection, goodbye!");
+      try {
+        connection.close();
+      } catch (Exception e) {
+        System.out.println("EXCEPTION WHEN TRYING TO CLOSE CONNECTION:");
+        e.printStackTrace();
+      }
+      */
     }
   }
 
@@ -51,7 +57,7 @@ public class TelegramMicro extends MIDlet {
     display.setCurrent(log);
 
     try {
-      MTProtoConnection connection = new MTProtoConnection("149.154.175.100");
+      MTProtoConnection connection = new MTProtoConnection("149.154.175.10", getAppProperty("authHelpUrl"));
       connection.bind_callback(new HandleRecieveNewSessionCreated(connection, display, log));
       connection.main_loop();
       /*System.out.println("SENDING PING");

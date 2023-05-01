@@ -75,7 +75,7 @@ public class MTProtoConnection {
     
     callbacks = new Hashtable();
     bind_callback(new HandleRecieveResPQ(this, authHelpUrl));
-    bind_callback(new HandleRecieveDHParamsOk(this, authHelpUrl));
+    bind_callback(new HandleRecieveDHParamsOk(this));
     bind_callback(new HandleRecieveServerDHGenOk(this));
     bind_callback(new HandleRecieveMsgContainer(this));
     bind_callback(new HandleRecieveNewSessionCreated(this));

@@ -1,32 +1,20 @@
 package mtproto.send;
 import bouncycastle.BigInteger;
+
 import support.ByteArrayPlus;
 import support.Integer128;
+
 import crypto.SHA1;
 import crypto.AES256IGE;
 import crypto.SecureRandomPlus;
+
 import mtproto.CombinatorIds;
 import mtproto.Serializer;
-import support.ServerConnection;
 
 public class SendSetClientDHParams extends SendUnencrypted {
-    private BigInteger getGroupGeneratorPowerBFromServer(BigInteger base, int exponent, BigInteger modulus, String authHelpUrl) {
-        System.out.println(base.toString());
-        ServerConnection srvCon = new ServerConnection(authHelpUrl);
-        BigInteger result = srvCon.getModPow(base.toString(), exponent, modulus.toString());
-        return result;
-    }
+  public SendSetClientDHParams(SecureRandomPlus random_number_generator, Integer128 nonce, Integer128 server_nonce, long retry_id, int group_generator, BigInteger diffie_hellman_prime, BigInteger b, byte[] tmp_aes_key, byte[] tmp_aes_iv) {
+    BigInteger group_generator_power_b = BigInteger.valueOf(group_generator).modPow(b, diffie_hellman_prime);
     
-  public SendSetClientDHParams(SecureRandomPlus random_number_generator, Integer128 nonce, Integer128 server_nonce, long retry_id, int group_generator, BigInteger diffie_hellman_prime, BigInteger b, byte[] tmp_aes_key, byte[] tmp_aes_iv, String authHelpUrl) {
-    BigInteger modpowremote = getGroupGeneratorPowerBFromServer(b, group_generator, diffie_hellman_prime, authHelpUrl);
-    if (modpowremote.intValue() == -1) {
-        System.out.println("Could not calculate mod pow on server. Will calculate on device, takes a while");
-    } else { System.out.println("Received modpow result " + modpowremote); }
-    BigInteger group_generator_power_b = modpowremote.intValue() != -1 ? modpowremote : BigInteger.valueOf(group_generator).modPow(b, diffie_hellman_prime);
-    System.out.println("Base: " + b.toString());
-    System.out.println("Exponent: " + group_generator);
-    System.out.println("Modulus: " + diffie_hellman_prime.toString());
-    System.out.println("Modpow result: " + group_generator_power_b.toString());
     byte[] inner_data = inner_data(nonce, server_nonce, retry_id, group_generator_power_b);
     byte[] inner_data_hash = (new SHA1()).digest(inner_data);
     
@@ -58,4 +46,3 @@ public class SendSetClientDHParams extends SendUnencrypted {
       .end();
   }
 }
-

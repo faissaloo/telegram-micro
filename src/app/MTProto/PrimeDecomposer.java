@@ -49,12 +49,15 @@ public class PrimeDecomposer {
     if (to_factorise % 2 == 0) {
       return new Coprimes(2L, to_factorise/2);
     } else {
-    long prime = getPrimeFromServer(to_factorise, authHelpUrl);
-        if (prime != -1)
-            return new Coprimes(prime, to_factorise/prime);
+      if (authHelpUrl != null) {
+        long prime = getPrimeFromServer(to_factorise, authHelpUrl);
+        if (prime != -1) {
+          return new Coprimes(prime, to_factorise/prime);
+        }
         System.out.println("Failed to calculate prime factorization on server. Will do it on device (takes a while)");
-        prime = calc_prime(to_factorise);
-        return new Coprimes(prime, to_factorise/prime);
+      }
+      long prime = calc_prime(to_factorise);
+      return new Coprimes(prime, to_factorise/prime);
     }
   }
   
@@ -99,4 +102,3 @@ public class PrimeDecomposer {
     return nontrivial_denominator;
   }
 }
-

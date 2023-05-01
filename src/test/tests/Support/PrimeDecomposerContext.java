@@ -10,7 +10,7 @@ public class PrimeDecomposerContext {
       return "It can decompose a prime (~30 second test)";
     }
     public void test() throws TestFailureException {
-      PrimeDecomposer.Coprimes result = PrimeDecomposer.decompose(0x211cafa9555101f5L);
+      PrimeDecomposer.Coprimes result = PrimeDecomposer.decompose(0x211cafa9555101f5L, null);
       expect(result.lesser_prime, 0x59e2945dL);
       expect(result.greater_prime, 0x5e4e4a79L);
     }

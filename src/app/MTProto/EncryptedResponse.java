@@ -17,7 +17,10 @@ public class EncryptedResponse extends Response {
   public int seq_no;
   public byte[] data;
 
-  public static EncryptedResponse from_tcp_response(TCPResponse response, MTProtoConnection reciever) throws IOException {
+  public static EncryptedResponse from_tcp_response(
+    TCPResponse response,
+    MTProtoConnection reciever
+  ) throws IOException {
     byte[] response_data = response.data;
     if (response_data.length == 4) {
       int error_value = Decode.Little.int_decode(response_data, 0);

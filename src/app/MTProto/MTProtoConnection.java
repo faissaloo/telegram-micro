@@ -19,6 +19,7 @@ import mtproto.handle.HandleRecieveUnknown;
 import mtproto.handle.HandleRecieveRPCResult;
 import mtproto.handle.HandleRecieveRPCError;
 import mtproto.handle.HandleRecieveBadMsgNotification;
+import mtproto.handle.HandleRecieveGzipPacked;
 import mtproto.send.SendReqPqMulti;
 import mtproto.Serializer;
 import crypto.SecureRandomPlus;
@@ -81,6 +82,7 @@ public class MTProtoConnection {
     bind_callback(new HandleRecieveUnknown(this));
     bind_callback(new HandleRecieveRPCError(this));
     bind_callback(new HandleRecieveBadMsgNotification(this));
+    bind_callback(new HandleRecieveGzipPacked(this));
   }
   
   public byte[] mtprotoHeader;
@@ -179,15 +181,17 @@ public class MTProtoConnection {
       //Why is this just not waiting for a response on certain servers?
       wait_for_response();
       TCPResponse tcp_response = message_recieve_thread.dequeue_response();
-      //
-      
-      Response response = UnencryptedResponse.from_tcp_response(tcp_response);
-      if (response == null) { //we need a way to check which one it is beforehand this is ugly
-        response = EncryptedResponse.from_tcp_response(tcp_response, this);
-      }
-      
-      trigger_callbacks(response);
+      recieve_tcp_response(tcp_response);
     }
+  }
+  
+  public void recieve_tcp_response(TCPResponse tcp_response) throws IOException {
+    Response response = UnencryptedResponse.from_tcp_response(tcp_response);
+    if (response == null) { //we need a way to check which one it is beforehand this is ugly
+      response = EncryptedResponse.from_tcp_response(tcp_response, this);
+    }
+    
+    trigger_callbacks(response);
   }
   
   public void trigger_callbacks(Response response) {

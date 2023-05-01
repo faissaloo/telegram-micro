@@ -1,6 +1,26 @@
 package support;
+import java.lang.StringBuffer;
 
 public class ArrayPlus {
+  public static String hex_string(byte[] array) {
+    StringBuffer buffer = new StringBuffer();
+    for (int i = 0; i < array.length; i++) {
+      int top_part = ((array[i]&0xF0)>>>4)&0xF;
+      if (top_part > 0x9) {
+        buffer.append((char) (0x41+(top_part-0x9)));
+      } else {
+        buffer.append((char) (0x30+top_part));
+      }
+      int bottom_part = (array[i]&0xF);
+      if (bottom_part > 0x9) {
+        buffer.append((char) (0x41+(bottom_part-0x9)));
+      } else {
+        buffer.append((char) (0x30+bottom_part));
+      }
+      buffer.append(' ');
+    }
+    return buffer.toString();
+  }
   public static byte[] remove_leading_zeroes(byte[] array) {
     if (array.length == 0) {
       return new byte[] {};

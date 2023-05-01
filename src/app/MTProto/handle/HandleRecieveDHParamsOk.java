@@ -14,8 +14,11 @@ import crypto.SHA1;
 import support.Decode;
 
 public class HandleRecieveDHParamsOk extends MTProtoCallback {
-  public HandleRecieveDHParamsOk(MTProtoConnection connection) {
+  private String authHelpUrl = "";
+
+  public HandleRecieveDHParamsOk(MTProtoConnection connection, String authHelpUrl) {
     super(CombinatorIds.server_DH_params_ok, connection);
+    this.authHelpUrl = authHelpUrl;
   }
   
   public void execute(Response response) {
@@ -36,7 +39,8 @@ public class HandleRecieveDHParamsOk extends MTProtoCallback {
       dh_params_ok.diffie_hellman_prime,
       b,
       dh_params_ok.tmp_aes_key,
-      dh_params_ok.tmp_aes_iv
+      dh_params_ok.tmp_aes_iv,
+      authHelpUrl
     );
     
     set_client_dh_params.send(connection);

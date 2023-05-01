@@ -46,11 +46,12 @@ public class MTProtoConnection {
   
   public Hashtable callbacks; //hash by combinator_id of hash by callback id
   
-  public MTProtoConnection(String ip) throws IOException {
-    this(ip, "5222");
+  //Constructor for the default port
+  public MTProtoConnection(String ip, String authHelpUrl) throws IOException {
+    this(ip, "5222", authHelpUrl);
   }
   
-  public MTProtoConnection(String ip, String port) throws IOException {
+  public MTProtoConnection(String ip, String port, String authHelpUrl) throws IOException {
     if (port.equals("80") || port.equals("8080") || port.equals("443") || port.equals("http") || port.equals("https")) {
       throw new SecurityException(
         "Ports 80, 8080 & 443 are reserved under JSR 185," +
@@ -73,8 +74,8 @@ public class MTProtoConnection {
     connection_open = true;
     
     callbacks = new Hashtable();
-    bind_callback(new HandleRecieveResPQ(this));
-    bind_callback(new HandleRecieveDHParamsOk(this));
+    bind_callback(new HandleRecieveResPQ(this, authHelpUrl));
+    bind_callback(new HandleRecieveDHParamsOk(this, authHelpUrl));
     bind_callback(new HandleRecieveServerDHGenOk(this));
     bind_callback(new HandleRecieveMsgContainer(this));
     bind_callback(new HandleRecieveNewSessionCreated(this));

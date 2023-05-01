@@ -51,7 +51,7 @@ public class TelegramMicro extends MIDlet {
     display.setCurrent(log);
 
     try {
-      MTProtoConnection connection = new MTProtoConnection("149.154.175.100");
+      MTProtoConnection connection = new MTProtoConnection("149.154.175.100", getAppProperty("authHelpUrl"));
       connection.bind_callback(new HandleRecieveNewSessionCreated(connection, display, log));
       connection.main_loop();
       /*System.out.println("SENDING PING");

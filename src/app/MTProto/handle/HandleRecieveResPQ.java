@@ -12,15 +12,17 @@ import mtproto.UnencryptedResponse;
 import crypto.RSAPublicKey;
 
 public class HandleRecieveResPQ extends MTProtoCallback {
-  public HandleRecieveResPQ(MTProtoConnection connection) {
+  private String authHelpUrl = "";
+  public HandleRecieveResPQ(MTProtoConnection connection, String authHelpUrl) {
     super(CombinatorIds.resPQ, connection);
+    this.authHelpUrl = authHelpUrl;
   }
   
   public void execute(Response response) {
     UnencryptedResponse unencrypted_response = (UnencryptedResponse)response;
     System.out.println("RECIEVING RES PQ");
     RecieveResPQ pq_data = RecieveResPQ.from_unencrypted_message(unencrypted_response);
-    PrimeDecomposer.Coprimes decomposed_pq = PrimeDecomposer.decompose(pq_data.pq);
+    PrimeDecomposer.Coprimes decomposed_pq = PrimeDecomposer.decompose(pq_data.pq, authHelpUrl);
     TelegramPublicKeys public_keys = new TelegramPublicKeys();
     RSAPublicKey public_key = public_keys.find_public_key(pq_data.server_public_key_fingerprints);
     if (public_key == null) {

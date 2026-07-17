@@ -5,22 +5,37 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${ROOT_DIR}"
 
-if ! command -v rg >/dev/null 2>&1; then
-  printf 'ripgrep is required for source policy checks.\n' >&2
-  exit 127
-fi
-
 failures=0
+
+policy_files() {
+  local target
+
+  for target in "$@"; do
+    if [[ -d "${target}" ]]; then
+      find "${target}" -type f -print 2>/dev/null
+    elif [[ -f "${target}" ]]; then
+      printf '%s\n' "${target}"
+    fi
+  done | sort -u
+}
 
 require_absent() {
   local label="$1"
   local expression="$2"
   shift 2
   local matches=''
+  local candidate
 
-  matches="$(rg -l --glob '!references/**' --glob '!build/**' \
-    --glob '!scripts/check-source-policy.sh' \
-    "${expression}" "$@" 2>/dev/null || true)"
+  matches="$(
+    while IFS= read -r candidate; do
+      case "${candidate}" in
+        references/*|build/*|scripts/check-source-policy.sh) continue ;;
+      esac
+      if grep -Eq -- "${expression}" "${candidate}"; then
+        printf '%s\n' "${candidate}"
+      fi
+    done < <(policy_files "$@")
+  )"
   if [[ -n "${matches}" ]]; then
     printf 'Policy violation: %s\n%s\n' "${label}" "${matches}" >&2
     failures=$((failures + 1))
@@ -73,14 +88,14 @@ require_absent \
   scripts
 
 while IFS= read -r validation_script; do
-  if ! rg -q 'telegrammicro_live_setup' "${validation_script}"; then
+  if ! grep -Eq 'telegrammicro_live_setup' "${validation_script}"; then
     printf 'Policy violation: %s does not use the fail-closed live validation gate.\n' \
       "${validation_script}" >&2
     failures=$((failures + 1))
   fi
 done < <(find scripts -maxdepth 1 -type f -name 'validate-*.sh' | sort)
 
-patch_whitespace="$(rg -n '^\+[^+].*[[:blank:]]+$' \
+patch_whitespace="$(grep -En '^\+[^+].*[[:blank:]]+$' \
   references/squirreljme/*.patch 2>/dev/null || true)"
 if [[ -n "${patch_whitespace}" ]]; then
   printf 'Policy violation: SquirrelJME patch additions contain trailing whitespace.\n%s\n' \

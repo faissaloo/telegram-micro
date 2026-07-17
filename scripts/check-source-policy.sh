@@ -80,6 +80,14 @@ while IFS= read -r validation_script; do
   fi
 done < <(find scripts -maxdepth 1 -type f -name 'validate-*.sh' | sort)
 
+patch_whitespace="$(rg -n '^\+[^+].*[[:blank:]]+$' \
+  references/squirreljme/*.patch 2>/dev/null || true)"
+if [[ -n "${patch_whitespace}" ]]; then
+  printf 'Policy violation: SquirrelJME patch additions contain trailing whitespace.\n%s\n' \
+    "${patch_whitespace}" >&2
+  failures=$((failures + 1))
+fi
+
 if (( failures > 0 )); then
   exit 1
 fi

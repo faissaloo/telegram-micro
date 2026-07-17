@@ -194,7 +194,7 @@ index 07e75b12ea3a2d72e6b23c0ad8ae34d1f5257da6..8fd5d66c1d27293e5ff0b4bebdcd41e3
  		this._selfApi = __selfApi;
  		this.dyLib = __dyLib;
  	}
-+	
++
 +	/**
 +	 * Returns the current API.
 +	 *
@@ -210,7 +210,7 @@ index 07e75b12ea3a2d72e6b23c0ad8ae34d1f5257da6..8fd5d66c1d27293e5ff0b4bebdcd41e3
 +			throw new IllegalStateException("GONE");
 +		return rv;
 +	}
-+	
++
 +	/**
 +	 * Returns the MCP helper.
 +	 *
@@ -337,7 +337,7 @@ index a39454f97ac1f3f03e07fc393bacc6fbf76111b7..9987589b5866a925ea28b9493035ebe6
 +	{
 +		if (__component == null || __sizeOut == null || __sizeOut.length < 2)
 +			throw new MLECallError("NARG");
-+		
++
 +		return NativeScritchDylib.__componentScreenshot(this.dyLib._stateP,
 +			__component.objectPointer(), __sizeOut);
 +	}
@@ -480,39 +480,39 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +	/** The endpoint path property. */
 +	static final String ENDPOINT_PATH_PROPERTY =
 +		"cc.squirreljme.mcp.path";
-+	
++
 +	/** The port property. */
 +	static final String PORT_PROPERTY =
 +		"cc.squirreljme.mcp.port";
-+	
++
 +	/** The protocol version. */
 +	static final String PROTOCOL_VERSION =
 +		"2025-11-25";
-+	
++
 +	/** The server instance. */
 +	private static volatile DylibMcpServer _INSTANCE;
-+	
++
 +	/** The ScritchUI interface. */
 +	private final DylibScritchInterface _api;
-+	
++
 +	/** The endpoint path. */
 +	private final String _endpointPath;
-+	
++
 +	/** Session identifier. */
 +	private final String _sessionId =
 +		UUID.randomUUID().toString();
-+	
++
 +	/** JSON provider. */
 +	private final JsonProvider _json =
 +		JsonProvider.provider();
-+	
++
 +	/** Known objects. */
 +	private final Map<Long, Node> _nodes =
 +		new LinkedHashMap<>();
-+	
++
 +	/** The HTTP server. */
 +	private volatile HttpServer _server;
-+	
++
 +	/**
 +	 * Initializes the MCP server.
 +	 *
@@ -525,14 +525,14 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +	{
 +		if (__api == null)
 +			throw new NullPointerException("NARG");
-+		
++
 +		this._api = __api;
 +		this._endpointPath = DylibMcpServer.__normalizeEndpointPath(
 +			System.getProperty(DylibMcpServer.ENDPOINT_PATH_PROPERTY, "/mcp"));
-+		
++
 +		this.__startIfRequested();
 +	}
-+	
++
 +	/**
 +	 * Returns the singleton instance.
 +	 *
@@ -552,7 +552,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +			return rv;
 +		}
 +	}
-+	
++
 +	/**
 +	 * Registers the given object.
 +	 *
@@ -563,7 +563,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +	{
 +		if (__object == null)
 +			return;
-+		
++
 +		synchronized (this)
 +		{
 +			long objectP = __object.objectPointer();
@@ -572,7 +572,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +			node.object = __object;
 +		}
 +	}
-+	
++
 +	/**
 +	 * Forgets the given object.
 +	 *
@@ -583,10 +583,10 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +	{
 +		if (__object == null)
 +			return;
-+		
++
 +		this.forget(__object.objectPointer());
 +	}
-+	
++
 +	/**
 +	 * Forgets the given pointer.
 +	 *
@@ -600,7 +600,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +			Node remove = this._nodes.remove(__objectP);
 +			if (remove == null)
 +				return;
-+			
++
 +			this.__detachFromParent(remove);
 +			for (Long childP : new ArrayList<>(remove.children))
 +			{
@@ -610,7 +610,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +			}
 +		}
 +	}
-+	
++
 +	/**
 +	 * Stores the label for the given object.
 +	 *
@@ -622,7 +622,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +	{
 +		if (__object == null)
 +			return;
-+		
++
 +		synchronized (this)
 +		{
 +			Node node = this.__node(__object.objectPointer());
@@ -631,7 +631,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +			node.label = __label;
 +		}
 +	}
-+	
++
 +	/**
 +	 * Adds a component to a container.
 +	 *
@@ -643,7 +643,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +	{
 +		if (__container == null || __component == null)
 +			return;
-+		
++
 +		synchronized (this)
 +		{
 +			this.register(__container);
@@ -652,7 +652,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +				__container.objectPointer(), -1);
 +		}
 +	}
-+	
++
 +	/**
 +	 * Clears all children from the container.
 +	 *
@@ -663,14 +663,14 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +	{
 +		if (__container == null)
 +			return;
-+		
++
 +		synchronized (this)
 +		{
 +			this.register(__container);
 +			this.__clearChildren(__container.objectPointer());
 +		}
 +	}
-+	
++
 +	/**
 +	 * Sets component bounds within a container.
 +	 *
@@ -687,19 +687,19 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +	{
 +		if (__container == null || __component == null)
 +			return;
-+		
++
 +		synchronized (this)
 +		{
 +			this.register(__container);
 +			this.register(__component);
-+			
++
 +			Node node = this.__node(__component.objectPointer());
 +			node.relativeBounds = new int[] {__x, __y, __w, __h};
 +			this.__setParent(__component.objectPointer(),
 +				__container.objectPointer(), -1);
 +		}
 +	}
-+	
++
 +	/**
 +	 * Stores the content minimum size for the window.
 +	 *
@@ -712,7 +712,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +	{
 +		if (__window == null)
 +			return;
-+		
++
 +		synchronized (this)
 +		{
 +			Node node = this.__node(__window.objectPointer());
@@ -721,7 +721,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +			node.minimumContentSize = new int[] {__w, __h};
 +		}
 +	}
-+	
++
 +	/**
 +	 * Stores window visibility.
 +	 *
@@ -733,7 +733,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +	{
 +		if (__window == null)
 +			return;
-+		
++
 +		synchronized (this)
 +		{
 +			Node node = this.__node(__window.objectPointer());
@@ -742,7 +742,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +			node.visible = Boolean.valueOf(__visible);
 +		}
 +	}
-+	
++
 +	/**
 +	 * Sets the menu bar for the given window.
 +	 *
@@ -754,17 +754,17 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +	{
 +		if (__window == null)
 +			return;
-+		
++
 +		synchronized (this)
 +		{
 +			this.register(__window);
 +			Node windowNode = this.__node(__window.objectPointer());
-+			
++
 +			if (windowNode.menuBarPointer != null)
 +				this.__removeChild(windowNode.pointer,
 +					windowNode.menuBarPointer.longValue());
 +			windowNode.menuBarPointer = null;
-+			
++
 +			if (__menuBar != null)
 +			{
 +				this.register(__menuBar);
@@ -774,7 +774,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +			}
 +		}
 +	}
-+	
++
 +	/**
 +	 * Inserts the menu item into the menu tree.
 +	 *
@@ -787,7 +787,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +	{
 +		if (__parent == null || __child == null)
 +			return;
-+		
++
 +		synchronized (this)
 +		{
 +			this.register(__parent);
@@ -796,7 +796,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +				__parent.objectPointer(), __at);
 +		}
 +	}
-+	
++
 +	/**
 +	 * Clears all menu items from the given parent.
 +	 *
@@ -807,14 +807,14 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +	{
 +		if (__parent == null)
 +			return;
-+		
++
 +		synchronized (this)
 +		{
 +			this.register(__parent);
 +			this.__clearChildren(__parent.objectPointer());
 +		}
 +	}
-+	
++
 +	/**
 +	 * Updates the focus state for the given panel.
 +	 *
@@ -828,7 +828,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +	{
 +		if (__panel == null)
 +			return;
-+		
++
 +		synchronized (this)
 +		{
 +			Node node = this.__node(__panel.objectPointer());
@@ -838,7 +838,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +			node.defaultFocus = Boolean.valueOf(__default);
 +		}
 +	}
-+	
++
 +	/**
 +	 * Updates the viewport area for the given view.
 +	 *
@@ -851,7 +851,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +	{
 +		if (__view == null)
 +			return;
-+		
++
 +		synchronized (this)
 +		{
 +			Node node = this.__node(__view.objectPointer());
@@ -860,7 +860,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +			node.viewArea = new int[] {__width, __height};
 +		}
 +	}
-+	
++
 +	/**
 +	 * Adds a new choice entry.
 +	 *
@@ -872,18 +872,18 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +	{
 +		if (__choice == null)
 +			return;
-+		
++
 +		synchronized (this)
 +		{
 +			Node node = this.__node(__choice.objectPointer());
 +			node.kind = this.__kind(__choice);
 +			node.object = __choice;
-+			
++
 +			int at = Math.max(0, Math.min(__at, node.choiceEntries.size()));
 +			node.choiceEntries.add(at, new ChoiceEntry());
 +		}
 +	}
-+	
++
 +	/**
 +	 * Deletes the given choice entry.
 +	 *
@@ -895,18 +895,18 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +	{
 +		if (__choice == null)
 +			return;
-+		
++
 +		synchronized (this)
 +		{
 +			Node node = this.__node(__choice.objectPointer());
 +			node.kind = this.__kind(__choice);
 +			node.object = __choice;
-+			
++
 +			if (__at >= 0 && __at < node.choiceEntries.size())
 +				node.choiceEntries.remove(__at);
 +		}
 +	}
-+	
++
 +	/**
 +	 * Clears all choice entries.
 +	 *
@@ -917,7 +917,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +	{
 +		if (__choice == null)
 +			return;
-+		
++
 +		synchronized (this)
 +		{
 +			Node node = this.__node(__choice.objectPointer());
@@ -926,7 +926,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +			node.choiceEntries.clear();
 +		}
 +	}
-+	
++
 +	/**
 +	 * Sets the choice label.
 +	 *
@@ -939,7 +939,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +	{
 +		if (__choice == null)
 +			return;
-+		
++
 +		synchronized (this)
 +		{
 +			Node node = this.__node(__choice.objectPointer());
@@ -950,7 +950,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +				entry.label = __label;
 +		}
 +	}
-+	
++
 +	/**
 +	 * Sets choice enabled state.
 +	 *
@@ -964,7 +964,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +	{
 +		if (__choice == null)
 +			return;
-+		
++
 +		synchronized (this)
 +		{
 +			Node node = this.__node(__choice.objectPointer());
@@ -975,7 +975,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +				entry.enabled = Boolean.valueOf(__enabled);
 +		}
 +	}
-+	
++
 +	/**
 +	 * Sets choice selected state.
 +	 *
@@ -989,7 +989,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +	{
 +		if (__choice == null)
 +			return;
-+		
++
 +		synchronized (this)
 +		{
 +			Node node = this.__node(__choice.objectPointer());
@@ -1000,7 +1000,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +				entry.selected = Boolean.valueOf(__selected);
 +		}
 +	}
-+	
++
 +	/**
 +	 * Wraps the activate listener.
 +	 *
@@ -1014,7 +1014,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +	{
 +		if (__component == null)
 +			return __listener;
-+		
++
 +		synchronized (this)
 +		{
 +			this.register(__component);
@@ -1024,14 +1024,14 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +				node.activateListener = null;
 +				return null;
 +			}
-+			
++
 +			WrappedActivateListener wrapped =
 +				new WrappedActivateListener(__component.objectPointer(), __listener);
 +			node.activateListener = wrapped;
 +			return wrapped;
 +		}
 +	}
-+	
++
 +	/**
 +	 * Wraps the input listener.
 +	 *
@@ -1045,7 +1045,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +	{
 +		if (__component == null)
 +			return __listener;
-+		
++
 +		synchronized (this)
 +		{
 +			this.register(__component);
@@ -1055,14 +1055,14 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +				node.inputListener = null;
 +				return null;
 +			}
-+			
++
 +			WrappedInputListener wrapped =
 +				new WrappedInputListener(__component.objectPointer(), __listener);
 +			node.inputListener = wrapped;
 +			return wrapped;
 +		}
 +	}
-+	
++
 +	/**
 +	 * Wraps the visible listener.
 +	 *
@@ -1076,7 +1076,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +	{
 +		if (__component == null)
 +			return __listener;
-+		
++
 +		synchronized (this)
 +		{
 +			this.register(__component);
@@ -1086,14 +1086,14 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +				node.visibleListener = null;
 +				return null;
 +			}
-+			
++
 +			WrappedVisibleListener wrapped =
 +				new WrappedVisibleListener(__component.objectPointer(), __listener);
 +			node.visibleListener = wrapped;
 +			return wrapped;
 +		}
 +	}
-+	
++
 +	/**
 +	 * Wraps the close listener.
 +	 *
@@ -1107,7 +1107,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +	{
 +		if (__window == null)
 +			return __listener;
-+		
++
 +		synchronized (this)
 +		{
 +			this.register(__window);
@@ -1117,14 +1117,14 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +				node.closeListener = null;
 +				return null;
 +			}
-+			
++
 +			WrappedCloseListener wrapped =
 +				new WrappedCloseListener(__window.objectPointer(), __listener);
 +			node.closeListener = wrapped;
 +			return wrapped;
 +		}
 +	}
-+	
++
 +	/**
 +	 * Wraps the menu item activation listener.
 +	 *
@@ -1138,7 +1138,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +	{
 +		if (__window == null)
 +			return __listener;
-+		
++
 +		synchronized (this)
 +		{
 +			this.register(__window);
@@ -1148,7 +1148,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +				node.menuItemActivateListener = null;
 +				return null;
 +			}
-+			
++
 +			WrappedMenuItemActivateListener wrapped =
 +				new WrappedMenuItemActivateListener(__window.objectPointer(),
 +					__listener);
@@ -1156,7 +1156,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +			return wrapped;
 +		}
 +	}
-+	
++
 +	/**
 +	 * Starts the HTTP server, if configured.
 +	 *
@@ -1168,11 +1168,11 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +		{
 +			if (this._server != null)
 +				return;
-+			
++
 +			String rawPort = System.getProperty(DylibMcpServer.PORT_PROPERTY);
 +			if (rawPort == null || rawPort.trim().isEmpty())
 +				return;
-+			
++
 +			final int port;
 +			try
 +			{
@@ -1183,10 +1183,10 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +				throw new IllegalArgumentException(String.format(
 +					"Invalid MCP port: %s", rawPort), __e);
 +			}
-+			
++
 +			if (port <= 0)
 +				return;
-+			
++
 +			try
 +			{
 +				HttpServer server = HttpServer.create(
@@ -1196,7 +1196,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +				server.setExecutor(Executors.newCachedThreadPool());
 +				server.start();
 +				this._server = server;
-+				
++
 +				System.err.println(String.format(
 +					"SquirrelJME MCP listening on http://127.0.0.1:%d%s",
 +					port, this._endpointPath));
@@ -1207,7 +1207,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +			}
 +		}
 +	}
-+	
++
 +	/**
 +	 * Normalizes the endpoint path.
 +	 *
@@ -1221,7 +1221,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +	{
 +		if (__path == null)
 +			throw new NullPointerException("NARG");
-+		
++
 +		String path = __path.trim();
 +		if (path.isEmpty())
 +			return "/mcp";
@@ -1229,7 +1229,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +			path = "/" + path;
 +		return path;
 +	}
-+	
++
 +	/**
 +	 * Determines the kind of the given object.
 +	 *
@@ -1255,7 +1255,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +			return "menu-item";
 +		if (__object instanceof DylibMenuObject)
 +			return "menu";
-+		
++
 +		if (__object instanceof DylibChoiceObject)
 +			return "choice";
 +		if (__object instanceof DylibContainerObject)
@@ -1264,7 +1264,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +			return "component";
 +		return "object";
 +	}
-+	
++
 +	/**
 +	 * Returns the node for the given pointer.
 +	 *
@@ -1282,7 +1282,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +		}
 +		return rv;
 +	}
-+	
++
 +	/**
 +	 * Clears all children of the given parent.
 +	 *
@@ -1294,7 +1294,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +		Node parent = this._nodes.get(__parentP);
 +		if (parent == null)
 +			return;
-+		
++
 +		for (Long childP : new ArrayList<>(parent.children))
 +		{
 +			Node child = this._nodes.get(childP);
@@ -1303,7 +1303,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +		}
 +		parent.children.clear();
 +	}
-+	
++
 +	/**
 +	 * Detaches the given node from its parent.
 +	 *
@@ -1314,13 +1314,13 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +	{
 +		if (__node == null || __node.parentPointer == null)
 +			return;
-+		
++
 +		Node parent = this._nodes.get(__node.parentPointer);
 +		if (parent != null)
 +			parent.children.remove(Long.valueOf(__node.pointer));
 +		__node.parentPointer = null;
 +	}
-+	
++
 +	/**
 +	 * Removes the given child from the parent.
 +	 *
@@ -1333,12 +1333,12 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +		Node parent = this._nodes.get(__parentP);
 +		if (parent != null)
 +			parent.children.remove(Long.valueOf(__childP));
-+		
++
 +		Node child = this._nodes.get(__childP);
 +		if (child != null)
 +			child.parentPointer = null;
 +	}
-+	
++
 +	/**
 +	 * Sets the parent-child relationship.
 +	 *
@@ -1351,23 +1351,23 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +	{
 +		Node child = this.__node(__childP);
 +		Node parent = this.__node(__parentP);
-+		
++
 +		if (child.parentPointer != null)
 +		{
 +			Node oldParent = this._nodes.get(child.parentPointer);
 +			if (oldParent != null)
 +				oldParent.children.remove(Long.valueOf(__childP));
 +		}
-+		
++
 +		child.parentPointer = Long.valueOf(__parentP);
 +		parent.children.remove(Long.valueOf(__childP));
-+		
++
 +		if (__at < 0 || __at >= parent.children.size())
 +			parent.children.add(Long.valueOf(__childP));
 +		else
 +			parent.children.add(__at, Long.valueOf(__childP));
 +	}
-+	
++
 +	/**
 +	 * Returns the choice entry at the given index.
 +	 *
@@ -1380,13 +1380,13 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +	{
 +		if (__node == null || __at < 0)
 +			return null;
-+		
++
 +		while (__node.choiceEntries.size() <= __at)
 +			__node.choiceEntries.add(new ChoiceEntry());
-+		
++
 +		return __node.choiceEntries.get(__at);
 +	}
-+	
++
 +	/**
 +	 * Returns the node for the given control ID.
 +	 *
@@ -1400,18 +1400,18 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +	{
 +		if (__controlId == null || __controlId.trim().isEmpty())
 +			throw new ToolException("A control id is required.");
-+		
++
 +		synchronized (this)
 +		{
 +			for (Node node : this._nodes.values())
 +				if (__controlId.equals(node.id))
 +					return node;
 +		}
-+		
++
 +		throw new ToolException(String.format(
 +			"Unknown control: %s", __controlId));
 +	}
-+	
++
 +	/**
 +	 * Records an event against the given object.
 +	 *
@@ -1430,7 +1430,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +			node.lastEventMillis = Long.valueOf(System.currentTimeMillis());
 +		}
 +	}
-+	
++
 +	/**
 +	 * Sends a JSON response.
 +	 *
@@ -1445,16 +1445,16 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +		throws IOException
 +	{
 +		byte[] bytes = this.__jsonString(__payload).getBytes("utf-8");
-+		
++
 +		Headers headers = __exchange.getResponseHeaders();
 +		headers.set("Content-Type", "application/json");
 +		headers.set("MCP-Session-Id", this._sessionId);
 +		headers.set("MCP-Protocol-Version", DylibMcpServer.PROTOCOL_VERSION);
-+		
++
 +		__exchange.sendResponseHeaders(__status, bytes.length);
 +		__exchange.getResponseBody().write(bytes);
 +	}
-+	
++
 +	/**
 +	 * Sends an empty response.
 +	 *
@@ -1471,7 +1471,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +		headers.set("MCP-Protocol-Version", DylibMcpServer.PROTOCOL_VERSION);
 +		__exchange.sendResponseHeaders(__status, -1);
 +	}
-+	
++
 +	/**
 +	 * Returns whether the origin is accepted.
 +	 *
@@ -1483,14 +1483,14 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +	{
 +		if (__origin == null || __origin.trim().isEmpty())
 +			return true;
-+		
++
 +		try
 +		{
 +			URI uri = URI.create(__origin.trim());
 +			String host = uri.getHost();
 +			if (host == null)
 +				return false;
-+			
++
 +			return "localhost".equalsIgnoreCase(host) ||
 +				"127.0.0.1".equals(host) ||
 +				"::1".equals(host) ||
@@ -1501,7 +1501,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +			return false;
 +		}
 +	}
-+	
++
 +	/**
 +	 * Returns the JSON-RPC error payload.
 +	 *
@@ -1517,7 +1517,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +		JsonObjectBuilder error = this._json.createObjectBuilder()
 +			.add("code", __code)
 +			.add("message", (__message == null ? "Unknown error." : __message));
-+		
++
 +		JsonObjectBuilder payload = this._json.createObjectBuilder()
 +			.add("jsonrpc", "2.0")
 +			.add("error", error.build());
@@ -1525,7 +1525,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +			payload.add("id", __id);
 +		return payload.build();
 +	}
-+	
++
 +	/**
 +	 * Returns the JSON-RPC success payload.
 +	 *
@@ -1542,7 +1542,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +			.add("result", __result);
 +		return payload.build();
 +	}
-+	
++
 +	/**
 +	 * Returns the text form of the given JSON structure.
 +	 *
@@ -1556,7 +1556,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +		this._json.createWriter(out).write(__value);
 +		return out.toString();
 +	}
-+	
++
 +	/**
 +	 * Returns a string value from the given object.
 +	 *
@@ -1573,7 +1573,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +			return null;
 +		return __object.getString(__key, null);
 +	}
-+	
++
 +	/**
 +	 * Returns a boolean value from the given object.
 +	 *
@@ -1590,7 +1590,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +			return __defaultValue;
 +		return __object.getBoolean(__key, __defaultValue);
 +	}
-+	
++
 +	/**
 +	 * Returns an integer value from the given object.
 +	 *
@@ -1616,7 +1616,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +				"Invalid integer value for %s.", __key), __e);
 +		}
 +	}
-+	
++
 +	/**
 +	 * Returns a JSON object value from the given object.
 +	 *
@@ -1629,13 +1629,13 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +	{
 +		if (__object == null || __key == null || !__object.containsKey(__key))
 +			return Json.createObjectBuilder().build();
-+		
++
 +		JsonValue value = __object.get(__key);
 +		if (value instanceof JsonObject)
 +			return (JsonObject)value;
 +		return Json.createObjectBuilder().build();
 +	}
-+	
++
 +	/**
 +	 * Calls a tool.
 +	 *
@@ -1664,11 +1664,11 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +			return this.__toolSendInput(__arguments);
 +		if ("scritch.screenshot".equals(__name))
 +			return this.__toolScreenshot(__arguments);
-+		
++
 +		throw new ToolException(String.format(
 +			"Unknown tool: %s", __name));
 +	}
-+	
++
 +	/**
 +	 * Builds the tool list payload.
 +	 *
@@ -1678,7 +1678,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +	private JsonObject __toolListPayload()
 +	{
 +		JsonArrayBuilder tools = this._json.createArrayBuilder();
-+		
++
 +		tools.add(this.__toolDefinition("scritch.snapshot",
 +			"Inspect the live ScritchUI control tree and current state.",
 +			this.__schemaObject(
@@ -1686,19 +1686,19 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +					this.__schemaType("string")),
 +				this.__schemaProperty("includeAll",
 +					this.__schemaType("boolean")))));
-+		
++
 +		tools.add(this.__toolDefinition("scritch.activate",
 +			"Invoke an activate-capable control or menu item.",
 +			this.__schemaObject(true, "id",
 +				this.__schemaProperty("id",
 +					this.__schemaType("string")))));
-+		
++
 +		tools.add(this.__toolDefinition("scritch.close_window",
 +			"Invoke a window close listener directly.",
 +			this.__schemaObject(true, "id",
 +				this.__schemaProperty("id",
 +					this.__schemaType("string")))));
-+		
++
 +		tools.add(this.__toolDefinition("scritch.set_window_visible",
 +			"Show or hide a ScritchUI window.",
 +			this.__schemaObject(true, "id", "visible",
@@ -1706,7 +1706,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +					this.__schemaType("string")),
 +				this.__schemaProperty("visible",
 +					this.__schemaType("boolean")))));
-+		
++
 +		tools.add(this.__toolDefinition("scritch.set_bounds",
 +			"Change a component's bounds within its parent container.",
 +			this.__schemaObject(true, "id", "x", "y", "width", "height",
@@ -1720,7 +1720,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +					this.__schemaType("integer")),
 +				this.__schemaProperty("height",
 +					this.__schemaType("integer")))));
-+		
++
 +		tools.add(this.__toolDefinition("scritch.select_choice",
 +			"Select a choice or list entry by index.",
 +			this.__schemaObject(true, "id", "index",
@@ -1728,7 +1728,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +					this.__schemaType("string")),
 +				this.__schemaProperty("index",
 +					this.__schemaType("integer")))));
-+		
++
 +		tools.add(this.__toolDefinition("scritch.send_input",
 +			"Send a raw input event to a control with an input listener.",
 +			this.__schemaObject(true, "id", "type",
@@ -1762,18 +1762,18 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +					this.__schemaType("integer")),
 +				this.__schemaProperty("l",
 +					this.__schemaType("integer")))));
-+		
++
 +		tools.add(this.__toolDefinition("scritch.screenshot",
 +			"Capture a screenshot of a control, window, or screen.",
 +			this.__schemaObject(
 +				this.__schemaProperty("id",
 +					this.__schemaType("string")))));
-+		
++
 +		return this._json.createObjectBuilder()
 +			.add("tools", tools.build())
 +			.build();
 +	}
-+	
++
 +	/**
 +	 * Builds a tool definition.
 +	 *
@@ -1792,7 +1792,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +			.add("inputSchema", __schema)
 +			.build();
 +	}
-+	
++
 +	/**
 +	 * Builds an object schema.
 +	 *
@@ -1804,7 +1804,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +	{
 +		return this.__schemaObject(false, new String[0], __properties);
 +	}
-+	
++
 +	/**
 +	 * Builds an object schema.
 +	 *
@@ -1821,12 +1821,12 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +		for (JsonObject property : __properties)
 +			for (String key : property.keySet())
 +				props.add(key, property.get(key));
-+		
++
 +		JsonObjectBuilder rv = this._json.createObjectBuilder()
 +			.add("type", "object")
 +			.add("additionalProperties", false)
 +			.add("properties", props.build());
-+		
++
 +		if (__hasRequired && __required.length > 0)
 +		{
 +			JsonArrayBuilder required = this._json.createArrayBuilder();
@@ -1834,10 +1834,10 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +				required.add(key);
 +			rv.add("required", required.build());
 +		}
-+		
++
 +		return rv.build();
 +	}
-+	
++
 +	/**
 +	 * Builds an object schema with required keys.
 +	 *
@@ -1853,7 +1853,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +		return this.__schemaObject(__hasRequired, new String[] {__required},
 +			__properties);
 +	}
-+	
++
 +	/**
 +	 * Builds an object schema with required keys.
 +	 *
@@ -1870,7 +1870,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +		return this.__schemaObject(__hasRequired,
 +			new String[] {__requiredA, __requiredB}, __properties);
 +	}
-+	
++
 +	/**
 +	 * Builds an object schema with required keys.
 +	 *
@@ -1888,7 +1888,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +		return this.__schemaObject(__hasRequired,
 +			new String[] {__requiredA, __requiredB, __requiredC}, __properties);
 +	}
-+	
++
 +	/**
 +	 * Builds an object schema with required keys.
 +	 *
@@ -1910,7 +1910,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +			new String[] {__requiredA, __requiredB, __requiredC, __requiredD,
 +				__requiredE}, __properties);
 +	}
-+	
++
 +	/**
 +	 * Builds a schema property.
 +	 *
@@ -1925,7 +1925,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +			.add(__name, __schema)
 +			.build();
 +	}
-+	
++
 +	/**
 +	 * Builds a basic type schema.
 +	 *
@@ -1939,7 +1939,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +			.add("type", __type)
 +			.build();
 +	}
-+	
++
 +	/**
 +	 * Builds a successful tool result.
 +	 *
@@ -1953,17 +1953,17 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +			.add("type", "text")
 +			.add("text", this.__jsonString(__payload))
 +			.build();
-+		
++
 +		JsonArrayBuilder content = this._json.createArrayBuilder();
 +		content.add(text);
-+		
++
 +		return this._json.createObjectBuilder()
 +			.add("content", content.build())
 +			.add("structuredContent", __payload)
 +			.add("isError", false)
 +			.build();
 +	}
-+	
++
 +	/**
 +	 * Builds a successful tool result with an image.
 +	 *
@@ -1986,14 +1986,14 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +			.add("data", __data)
 +			.add("mimeType", __mimeType)
 +			.build());
-+		
++
 +		return this._json.createObjectBuilder()
 +			.add("content", content.build())
 +			.add("structuredContent", __payload)
 +			.add("isError", false)
 +			.build();
 +	}
-+	
++
 +	/**
 +	 * Builds a tool error result.
 +	 *
@@ -2006,20 +2006,20 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +		JsonObject payload = this._json.createObjectBuilder()
 +			.add("error", (__message == null ? "Unknown error." : __message))
 +			.build();
-+		
++
 +		JsonArrayBuilder content = this._json.createArrayBuilder();
 +		content.add(this._json.createObjectBuilder()
 +			.add("type", "text")
 +			.add("text", payload.getString("error"))
 +			.build());
-+		
++
 +		return this._json.createObjectBuilder()
 +			.add("content", content.build())
 +			.add("structuredContent", payload)
 +			.add("isError", true)
 +			.build();
 +	}
-+	
++
 +	/**
 +	 * Executes work on the ScritchUI event loop.
 +	 *
@@ -2033,10 +2033,10 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +	{
 +		if (__work == null)
 +			throw new NullPointerException("NARG");
-+		
++
 +		final Holder<T> result = new Holder<>();
 +		final Exception[] failure = new Exception[1];
-+		
++
 +		this._api.eventLoop().loopExecuteWait(new Runnable()
 +		{
 +			@Override
@@ -2052,12 +2052,12 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +				}
 +			}
 +		});
-+		
++
 +		if (failure[0] != null)
 +			throw failure[0];
 +		return result.value;
 +	}
-+	
++
 +	/**
 +	 * Returns the snapshot tool result.
 +	 *
@@ -2070,7 +2070,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +		throws Exception
 +	{
 +		final String rootId = DylibMcpServer.__string(__arguments, "rootId");
-+		
++
 +		JsonObject payload = this.__onEventLoop(new Work<JsonObject>()
 +		{
 +			@Override
@@ -2080,10 +2080,10 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +				return DylibMcpServer.this.__snapshot(rootId);
 +			}
 +		});
-+		
++
 +		return this.__toolSuccess(payload);
 +	}
-+	
++
 +	/**
 +	 * Returns the activate tool result.
 +	 *
@@ -2103,13 +2103,13 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +				throws Exception
 +			{
 +				Node node = DylibMcpServer.this.__requireNodeById(controlId);
-+				
++
 +				if (node.activateListener != null &&
 +					node.object instanceof ScritchComponentBracket)
 +				{
 +					node.activateListener.activate(
 +						(ScritchComponentBracket)node.object);
-+					
++
 +					return DylibMcpServer.this._json.createObjectBuilder()
 +						.add("id", node.id)
 +						.add("kind", node.kind)
@@ -2117,7 +2117,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +						.add("mode", "component")
 +						.build();
 +				}
-+				
++
 +				if (node.object instanceof DylibMenuKindObject)
 +				{
 +					Node window = DylibMcpServer.this.__windowForMenuNode(node);
@@ -2126,7 +2126,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +						window.menuItemActivateListener.menuItemActivate(
 +							(ScritchWindowBracket)window.object,
 +							(ScritchMenuKindBracket)node.object);
-+						
++
 +						return DylibMcpServer.this._json.createObjectBuilder()
 +							.add("id", node.id)
 +							.add("kind", node.kind)
@@ -2136,15 +2136,15 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +							.build();
 +					}
 +				}
-+				
++
 +				throw new ToolException(String.format(
 +					"Control %s does not support activation.", node.id));
 +			}
 +		});
-+		
++
 +		return this.__toolSuccess(payload);
 +	}
-+	
++
 +	/**
 +	 * Returns the close window tool result.
 +	 *
@@ -2168,10 +2168,10 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +					node.closeListener == null)
 +					throw new ToolException(String.format(
 +						"Window %s does not have a close listener.", node.id));
-+				
++
 +				boolean cancelled = node.closeListener.closed(
 +					(ScritchWindowBracket)node.object);
-+				
++
 +				return DylibMcpServer.this._json.createObjectBuilder()
 +					.add("id", node.id)
 +					.add("kind", node.kind)
@@ -2180,10 +2180,10 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +					.build();
 +			}
 +		});
-+		
++
 +		return this.__toolSuccess(payload);
 +	}
-+	
++
 +	/**
 +	 * Returns the set window visibility tool result.
 +	 *
@@ -2198,7 +2198,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +		final String controlId = DylibMcpServer.__string(__arguments, "id");
 +		final boolean visible = DylibMcpServer.__boolean(__arguments,
 +			"visible", true);
-+		
++
 +		JsonObject payload = this.__onEventLoop(new Work<JsonObject>()
 +		{
 +			@Override
@@ -2209,10 +2209,10 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +				if (!(node.object instanceof DylibWindowObject))
 +					throw new ToolException(String.format(
 +						"Control %s is not a window.", node.id));
-+				
++
 +				DylibMcpServer.this._api.window().windowSetVisible(
 +					(DylibWindowObject)node.object, visible);
-+				
++
 +				return DylibMcpServer.this._json.createObjectBuilder()
 +					.add("id", node.id)
 +					.add("kind", node.kind)
@@ -2221,10 +2221,10 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +					.build();
 +			}
 +		});
-+		
++
 +		return this.__toolSuccess(payload);
 +	}
-+	
++
 +	/**
 +	 * Returns the set bounds tool result.
 +	 *
@@ -2241,7 +2241,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +		final int y = DylibMcpServer.__requiredInt(__arguments, "y");
 +		final int w = DylibMcpServer.__requiredInt(__arguments, "width");
 +		final int h = DylibMcpServer.__requiredInt(__arguments, "height");
-+		
++
 +		JsonObject payload = this.__onEventLoop(new Work<JsonObject>()
 +		{
 +			@Override
@@ -2255,16 +2255,16 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +				if (node.parentPointer == null)
 +					throw new ToolException(String.format(
 +						"Control %s does not have a parent container.", node.id));
-+				
++
 +				Node parent = DylibMcpServer.this._nodes.get(node.parentPointer);
 +				if (parent == null || !(parent.object instanceof DylibContainerObject))
 +					throw new ToolException(String.format(
 +						"Parent of %s is not a container.", node.id));
-+				
++
 +				DylibMcpServer.this._api.container().containerSetBounds(
 +					(ScritchContainerBracket)parent.object,
 +					(DylibComponentObject)node.object, x, y, w, h);
-+				
++
 +				return DylibMcpServer.this._json.createObjectBuilder()
 +					.add("id", node.id)
 +					.add("kind", node.kind)
@@ -2273,10 +2273,10 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +					.build();
 +			}
 +		});
-+		
++
 +		return this.__toolSuccess(payload);
 +	}
-+	
++
 +	/**
 +	 * Returns the select choice tool result.
 +	 *
@@ -2290,7 +2290,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +	{
 +		final String controlId = DylibMcpServer.__string(__arguments, "id");
 +		final int index = DylibMcpServer.__requiredInt(__arguments, "index");
-+		
++
 +		JsonObject payload = this.__onEventLoop(new Work<JsonObject>()
 +		{
 +			@Override
@@ -2301,10 +2301,10 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +				if (!(node.object instanceof DylibChoiceObject))
 +					throw new ToolException(String.format(
 +						"Control %s is not a choice/list.", node.id));
-+				
++
 +				DylibMcpServer.this._api.choice().choiceSetSelected(
 +					(ScritchChoiceBracket)node.object, index, true);
-+				
++
 +				return DylibMcpServer.this._json.createObjectBuilder()
 +					.add("id", node.id)
 +					.add("kind", node.kind)
@@ -2313,10 +2313,10 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +					.build();
 +			}
 +		});
-+		
++
 +		return this.__toolSuccess(payload);
 +	}
-+	
++
 +	/**
 +	 * Returns the send input tool result.
 +	 *
@@ -2344,7 +2344,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +		final int j = (__arguments.containsKey("j") ? __arguments.getInt("j") : 0);
 +		final int k = (__arguments.containsKey("k") ? __arguments.getInt("k") : 0);
 +		final int l = (__arguments.containsKey("l") ? __arguments.getInt("l") : 0);
-+		
++
 +		JsonObject payload = this.__onEventLoop(new Work<JsonObject>()
 +		{
 +			@Override
@@ -2356,11 +2356,11 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +					node.inputListener == null)
 +					throw new ToolException(String.format(
 +						"Control %s does not have an input listener.", node.id));
-+				
++
 +				node.inputListener.inputEvent(
 +					(ScritchComponentBracket)node.object,
 +					type, time, a, b, c, d, e, f, g, h, i, j, k, l);
-+				
++
 +				return DylibMcpServer.this._json.createObjectBuilder()
 +					.add("id", node.id)
 +					.add("kind", node.kind)
@@ -2370,10 +2370,10 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +					.build();
 +			}
 +		});
-+		
++
 +		return this.__toolSuccess(payload);
 +	}
-+	
++
 +	/**
 +	 * Returns the screenshot tool result.
 +	 *
@@ -2398,17 +2398,17 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +				return DylibMcpServer.this.__captureScreenshot(request);
 +			}
 +		});
-+		
++
 +		if (capture == null || capture.bounds == null || capture.argb == null)
 +			throw new ToolException("Could not capture control pixels.");
-+		
++
 +		BufferedImage image = new BufferedImage(capture.bounds.width,
 +			capture.bounds.height, BufferedImage.TYPE_INT_ARGB);
 +		image.setRGB(0, 0, capture.bounds.width, capture.bounds.height,
 +			capture.argb, 0, capture.bounds.width);
 +		ByteArrayOutputStream png = new ByteArrayOutputStream();
 +		ImageIO.write(image, "png", png);
-+		
++
 +		JsonObjectBuilder payload = this._json.createObjectBuilder()
 +			.add("resolvedId", capture.resolvedId)
 +			.add("kind", capture.kind)
@@ -2416,7 +2416,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +				capture.bounds.y, capture.bounds.width, capture.bounds.height));
 +		if (capture.controlId != null)
 +			payload.add("id", capture.controlId);
-+		
++
 +		return this.__toolSuccessWithImage(payload.build(),
 +			Base64.getEncoder().encodeToString(png.toByteArray()), "image/png");
 +	}
@@ -2434,7 +2434,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +	{
 +		if (__request == null || __request.component == null)
 +			throw new ToolException("No component is available for capture.");
-+		
++
 +		int[] size = new int[2];
 +		int[] argb;
 +		try
@@ -2446,22 +2446,22 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +		{
 +			throw new ToolException("Component capture failed.", __e);
 +		}
-+		
++
 +		if (argb == null || size[0] <= 0 || size[1] <= 0)
 +			throw new ToolException("Component capture returned no pixels.");
 +		if (argb.length < (size[0] * size[1]))
 +			throw new ToolException("Component capture returned truncated pixels.");
-+		
++
 +		Rectangle bounds = __request.bounds;
 +		if (bounds == null)
 +			bounds = new Rectangle(0, 0, size[0], size[1]);
 +		else
 +			bounds = new Rectangle(bounds.x, bounds.y, size[0], size[1]);
-+		
++
 +		return new ScreenshotCapture(__request.controlId, __request.kind,
 +			__request.resolvedId, bounds, argb);
 +	}
-+	
++
 +	/**
 +	 * Builds a snapshot of the current UI state.
 +	 *
@@ -2476,31 +2476,31 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +		Long rootPointer = null;
 +		if (__rootId != null && !__rootId.trim().isEmpty())
 +			rootPointer = Long.valueOf(this.__requireNodeById(__rootId).pointer);
-+		
++
 +		JsonArrayBuilder controls = this._json.createArrayBuilder();
 +		JsonArrayBuilder roots = this._json.createArrayBuilder();
-+		
++
 +		synchronized (this)
 +		{
 +			for (Node node : this._nodes.values())
 +				if (node.parentPointer == null)
 +					roots.add(node.id);
-+			
++
 +			for (Node node : this._nodes.values())
 +				if (rootPointer == null || this.__isUnderRoot(node, rootPointer))
 +					controls.add(this.__snapshotNode(node));
 +		}
-+		
++
 +		JsonObjectBuilder result = this._json.createObjectBuilder()
 +			.add("controls", controls.build())
 +			.add("roots", roots.build());
-+		
++
 +		if (rootPointer != null)
 +			result.add("rootId", this.__node(rootPointer.longValue()).id);
-+		
++
 +		return result.build();
 +	}
-+	
++
 +	/**
 +	 * Returns whether the given node is under the given root.
 +	 *
@@ -2513,7 +2513,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +	{
 +		if (__node == null || __rootPointer == null)
 +			return false;
-+		
++
 +		Node at = __node;
 +		while (at != null)
 +		{
@@ -2525,7 +2525,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +		}
 +		return false;
 +	}
-+	
++
 +	/**
 +	 * Builds a snapshot node payload.
 +	 *
@@ -2539,15 +2539,15 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +			.add("id", __node.id)
 +			.add("pointer", String.format("0x%x", __node.pointer))
 +			.add("kind", __node.kind);
-+		
++
 +		if (__node.parentPointer != null)
 +			out.add("parentId", this.__node(__node.parentPointer).id);
-+		
++
 +		JsonArrayBuilder children = this._json.createArrayBuilder();
 +		for (Long childP : __node.children)
 +			children.add(this.__node(childP.longValue()).id);
 +		out.add("children", children.build());
-+		
++
 +		if (__node.label != null)
 +			out.add("label", __node.label);
 +		if (__node.relativeBounds != null)
@@ -2577,7 +2577,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +				lastEvent.add("time", __node.lastEventMillis.longValue());
 +			out.add("lastEvent", lastEvent.build());
 +		}
-+		
++
 +		if (__node.object instanceof DylibScreenObject)
 +		{
 +			int[] pixels = new int[4];
@@ -2589,7 +2589,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +			out.add("bounds", this.__boundsObject(pixels[0], pixels[1],
 +				pixels[2], pixels[3]));
 +		}
-+		
++
 +		if (__node.object instanceof DylibContainerObject)
 +		{
 +			int[] contentSize = new int[2];
@@ -2605,7 +2605,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +			out.add("contentSize", this.__sizeObject(
 +				contentSize[0], contentSize[1]));
 +		}
-+		
++
 +		if (__node.object instanceof DylibComponentObject)
 +		{
 +			out.add("size", this.__sizeObject(
@@ -2614,17 +2614,17 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +				this._api.component().componentGetHeight(
 +					(DylibComponentObject)__node.object)));
 +		}
-+		
++
 +		if (__node.object instanceof DylibWindowObject)
 +			out.add("visible", this._api.window().windowIsVisible(
 +				(DylibWindowObject)__node.object));
-+		
++
 +		if (__node.object instanceof DylibChoiceObject)
 +		{
 +			int selectedIndex = this._api.choice().choiceGetSelectedIndex(
 +				(ScritchChoiceBracket)__node.object);
 +			out.add("selectedIndex", selectedIndex);
-+			
++
 +			JsonArrayBuilder entries = this._json.createArrayBuilder();
 +			for (int i = 0; i < __node.choiceEntries.size(); i++)
 +			{
@@ -2641,15 +2641,15 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +			}
 +			out.add("choices", entries.build());
 +		}
-+		
++
 +		JsonArrayBuilder actions = this._json.createArrayBuilder();
 +		for (String action : this.__actions(__node))
 +			actions.add(action);
 +		out.add("actions", actions.build());
-+		
++
 +		return out.build();
 +	}
-+	
++
 +	/**
 +	 * Returns available actions for the given node.
 +	 *
@@ -2660,37 +2660,37 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +	private List<String> __actions(Node __node)
 +	{
 +		LinkedHashSet<String> result = new LinkedHashSet<>();
-+		
++
 +		if (__node.activateListener != null)
 +			result.add("activate");
-+		
++
 +		if (__node.object instanceof DylibMenuKindObject &&
 +			this.__windowForMenuNode(__node) != null)
 +			result.add("activate");
-+		
++
 +		if (__node.inputListener != null)
 +			result.add("send_input");
-+		
++
 +		if (__node.object instanceof DylibChoiceObject)
 +			result.add("select_choice");
-+		
++
 +		if (__node.object instanceof DylibWindowObject)
 +		{
 +			result.add("set_window_visible");
 +			if (__node.closeListener != null)
 +				result.add("close_window");
 +		}
-+		
++
 +		if (__node.object instanceof DylibComponentObject &&
 +			__node.parentPointer != null)
 +			result.add("set_bounds");
-+		
++
 +		if (this.__resolvedScreenshotTarget(__node) != null)
 +			result.add("screenshot");
-+		
++
 +		return new ArrayList<>(result);
 +	}
-+	
++
 +	/**
 +	 * Returns the bounds object.
 +	 *
@@ -2710,7 +2710,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +			.add("height", __h)
 +			.build();
 +	}
-+	
++
 +	/**
 +	 * Returns the size object.
 +	 *
@@ -2726,7 +2726,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +			.add("height", __h)
 +			.build();
 +	}
-+	
++
 +	/**
 +	 * Returns the window for a given menu node.
 +	 *
@@ -2748,7 +2748,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +		}
 +		return null;
 +	}
-+	
++
 +	/**
 +	 * Returns the screenshot request for the given control.
 +	 *
@@ -2763,30 +2763,30 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +		Node target = null;
 +		if (__controlId != null && !__controlId.trim().isEmpty())
 +			target = this.__requireNodeById(__controlId);
-+		
++
 +		if (target == null)
 +			target = this.__defaultScreenshotTarget();
 +		else if (target.object instanceof DylibScreenObject)
 +			target = this.__descendantScreenshotTarget(target);
-+		
++
 +		if (target == null)
 +			throw new ToolException("There is no visible application window to capture.");
-+		
++
 +		Node resolved = this.__resolvedScreenshotTarget(target);
 +		if (resolved == null)
 +			throw new ToolException(String.format(
 +				"Control %s cannot be captured.", target.id));
-+		
++
 +		Rectangle bounds = this.__captureBounds(resolved);
 +		if (bounds == null)
 +			throw new ToolException(String.format(
 +				"Control %s does not expose capture bounds.", resolved.id));
-+		
++
 +		return new ScreenshotRequest(__controlId,
 +			(DylibComponentObject)resolved.object, resolved.kind,
 +			resolved.id, bounds);
 +	}
-+	
++
 +	/**
 +	 * Returns the resolved screenshot target.
 +	 *
@@ -2817,20 +2817,20 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +	private Node __defaultScreenshotTarget()
 +	{
 +		Node fallback = null;
-+		
++
 +		synchronized (this)
 +		{
 +			for (Node node : this._nodes.values())
 +				if (node.object instanceof DylibWindowObject &&
 +					this.__nodeVisible(node))
 +					return node;
-+			
++
 +			for (Node node : this._nodes.values())
 +				if (fallback == null &&
 +					node.object instanceof DylibComponentObject)
 +					fallback = node;
 +		}
-+		
++
 +		return fallback;
 +	}
 +
@@ -2845,21 +2845,21 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +	{
 +		if (__root == null)
 +			return null;
-+		
++
 +		Node fallback = null;
 +		for (Long childP : __root.children)
 +		{
 +			Node child = this._nodes.get(childP);
 +			if (child == null)
 +				continue;
-+			
++
 +			if (child.object instanceof DylibWindowObject &&
 +				this.__nodeVisible(child))
 +				return child;
-+			
++
 +			if (fallback == null && child.object instanceof DylibComponentObject)
 +				fallback = child;
-+			
++
 +			Node nested = this.__descendantScreenshotTarget(child);
 +			if (nested != null)
 +				return nested;
@@ -2883,7 +2883,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +				(DylibWindowObject)__node.object);
 +		return (__node.visible == null || __node.visible.booleanValue());
 +	}
-+	
++
 +	/**
 +	 * Returns the capture bounds for the given node.
 +	 *
@@ -2895,10 +2895,10 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +	{
 +		if (__node.object instanceof DylibComponentObject)
 +			return this.__componentBounds(__node);
-+		
++
 +		return null;
 +	}
-+	
++
 +	/**
 +	 * Returns the component bounds.
 +	 *
@@ -2910,23 +2910,23 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +	{
 +		if (__node == null || !(__node.object instanceof DylibComponentObject))
 +			return null;
-+		
++
 +		int width = this._api.component().componentWidth(
 +			(DylibComponentObject)__node.object);
 +		int height = this._api.component().componentGetHeight(
 +			(DylibComponentObject)__node.object);
-+		
++
 +		if (__node.parentPointer == null)
 +			return new Rectangle(0, 0, width, height);
-+		
++
 +		Node parent = this._nodes.get(__node.parentPointer.longValue());
 +		if (parent != null && parent.object instanceof DylibScreenObject)
 +			return new Rectangle(0, 0, width, height);
-+		
++
 +		Point origin = this.__contentOrigin(__node.parentPointer.longValue());
 +		if (origin == null)
 +			return null;
-+		
++
 +		int x = origin.x;
 +		int y = origin.y;
 +		if (__node.relativeBounds != null)
@@ -2936,10 +2936,10 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +			width = __node.relativeBounds[2];
 +			height = __node.relativeBounds[3];
 +		}
-+		
++
 +		return new Rectangle(x, y, width, height);
 +	}
-+	
++
 +	/**
 +	 * Returns the content origin for the given container.
 +	 *
@@ -2952,13 +2952,13 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +		Node parent = this._nodes.get(__containerP);
 +		if (parent == null || !(parent.object instanceof DylibContainerObject))
 +			return null;
-+		
++
 +		int[] content = new int[4];
 +		this._api.container().containerGetFrame(
 +			(ScritchContainerBracket)parent.object, null, null, content);
 +		return new Point(content[0], content[1]);
 +	}
-+	
++
 +	/**
 +	 * HTTP handler for the MCP endpoint.
 +	 *
@@ -2985,7 +2985,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +							"Forbidden Origin."));
 +					return;
 +				}
-+				
++
 +				String method = __exchange.getRequestMethod();
 +				if ("GET".equalsIgnoreCase(method))
 +				{
@@ -2993,43 +2993,43 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +					DylibMcpServer.this.__sendEmpty(__exchange, 405);
 +					return;
 +				}
-+				
++
 +				if (!"POST".equalsIgnoreCase(method))
 +				{
 +					__exchange.getResponseHeaders().set("Allow", "GET, POST");
 +					DylibMcpServer.this.__sendEmpty(__exchange, 405);
 +					return;
 +				}
-+				
++
 +				JsonObject request;
 +				try (InputStream in = __exchange.getRequestBody())
 +				{
 +					request = DylibMcpServer.this._json.createReader(in).readObject();
 +				}
-+				
++
 +				JsonValue id = request.get("id");
 +				String rpcMethod = DylibMcpServer.__string(request, "method");
-+				
++
 +				if (rpcMethod == null)
 +				{
 +					DylibMcpServer.this.__sendEmpty(__exchange, 202);
 +					return;
 +				}
-+				
++
 +				if ("initialize".equals(rpcMethod))
 +				{
 +					JsonObjectBuilder serverInfo =
 +						DylibMcpServer.this._json.createObjectBuilder()
 +							.add("name", "SquirrelJME ScritchUI MCP")
 +							.add("version", "0.3.0");
-+					
++
 +					JsonObjectBuilder capabilities =
 +						DylibMcpServer.this._json.createObjectBuilder()
 +							.add("tools",
 +								DylibMcpServer.this._json.createObjectBuilder()
 +									.add("listChanged", false)
 +									.build());
-+					
++
 +					JsonObject result = DylibMcpServer.this._json.createObjectBuilder()
 +						.add("protocolVersion", DylibMcpServer.PROTOCOL_VERSION)
 +						.add("capabilities", capabilities.build())
@@ -3039,18 +3039,18 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +							"drive activation and input listeners, change " +
 +							"window/component state, and capture screenshots.")
 +						.build();
-+					
++
 +					DylibMcpServer.this.__sendJson(__exchange, 200,
 +						DylibMcpServer.this.__jsonRpcResult(id, result));
 +					return;
 +				}
-+				
++
 +				if (rpcMethod.startsWith("notifications/"))
 +				{
 +					DylibMcpServer.this.__sendEmpty(__exchange, 202);
 +					return;
 +				}
-+				
++
 +				if ("ping".equals(rpcMethod))
 +				{
 +					DylibMcpServer.this.__sendJson(__exchange, 200,
@@ -3059,7 +3059,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +								.build()));
 +					return;
 +				}
-+				
++
 +				if ("tools/list".equals(rpcMethod))
 +				{
 +					DylibMcpServer.this.__sendJson(__exchange, 200,
@@ -3067,14 +3067,14 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +							DylibMcpServer.this.__toolListPayload()));
 +					return;
 +				}
-+				
++
 +				if ("tools/call".equals(rpcMethod))
 +				{
 +					JsonObject params = DylibMcpServer.__object(request, "params");
 +					String name = DylibMcpServer.__string(params, "name");
 +					JsonObject arguments = DylibMcpServer.__object(params,
 +						"arguments");
-+					
++
 +					JsonObject result;
 +					try
 +					{
@@ -3090,12 +3090,12 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +							(__e.getMessage() == null ? __e.toString() :
 +								__e.getMessage()));
 +					}
-+					
++
 +					DylibMcpServer.this.__sendJson(__exchange, 200,
 +						DylibMcpServer.this.__jsonRpcResult(id, result));
 +					return;
 +				}
-+				
++
 +				DylibMcpServer.this.__sendJson(__exchange, 200,
 +					DylibMcpServer.this.__jsonRpcError(id, -32601,
 +						"Method not found."));
@@ -3106,7 +3106,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +			}
 +		}
 +	}
-+	
++
 +	/**
 +	 * Basic control node.
 +	 *
@@ -3117,75 +3117,75 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +		/** Child controls. */
 +		final List<Long> children =
 +			new ArrayList<>();
-+		
++
 +		/** Choice entries. */
 +		final List<ChoiceEntry> choiceEntries =
 +			new ArrayList<>();
-+		
++
 +		/** Control ID. */
 +		final String id;
-+		
++
 +		/** Pointer. */
 +		final long pointer;
-+		
++
 +		/** Default focus state. */
 +		Boolean defaultFocus;
-+		
++
 +		/** Focus enabled state. */
 +		Boolean focusEnabled;
-+		
++
 +		/** Kind of node. */
 +		String kind =
 +			"object";
-+		
++
 +		/** The label text. */
 +		String label;
-+		
++
 +		/** The last event name. */
 +		String lastEvent;
-+		
++
 +		/** The last event detail. */
 +		String lastEventDetail;
-+		
++
 +		/** The last event time. */
 +		Long lastEventMillis;
-+		
++
 +		/** The menu bar pointer. */
 +		Long menuBarPointer;
-+		
++
 +		/** Minimum content size. */
 +		int[] minimumContentSize;
-+		
++
 +		/** Backing object. */
 +		DylibBaseObject object;
-+		
++
 +		/** Parent pointer. */
 +		Long parentPointer;
-+		
++
 +		/** Relative bounds. */
 +		int[] relativeBounds;
-+		
++
 +		/** View area. */
 +		int[] viewArea;
-+		
++
 +		/** Visible state. */
 +		Boolean visible;
-+		
++
 +		/** Activate listener. */
 +		WrappedActivateListener activateListener;
-+		
++
 +		/** Close listener. */
 +		WrappedCloseListener closeListener;
-+		
++
 +		/** Input listener. */
 +		WrappedInputListener inputListener;
-+		
++
 +		/** Menu activation listener. */
 +		WrappedMenuItemActivateListener menuItemActivateListener;
-+		
++
 +		/** Visible listener. */
 +		WrappedVisibleListener visibleListener;
-+		
++
 +		/**
 +		 * Initializes the node.
 +		 *
@@ -3198,7 +3198,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +			this.id = String.format("object:%x", __pointer);
 +		}
 +	}
-+	
++
 +	/**
 +	 * A single choice entry.
 +	 *
@@ -3208,14 +3208,14 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +	{
 +		/** Enabled state. */
 +		Boolean enabled;
-+		
++
 +		/** Entry label. */
 +		String label;
-+		
++
 +		/** Selected state. */
 +		Boolean selected;
 +	}
-+	
++
 +	/**
 +	 * Holder for loop results.
 +	 *
@@ -3227,7 +3227,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +		/** The held value. */
 +		T value;
 +	}
-+	
++
 +	/**
 +	 * Screenshot request state.
 +	 *
@@ -3237,19 +3237,19 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +	{
 +		/** Requested control ID. */
 +		final String controlId;
-+		
++
 +		/** Captured component. */
 +		final DylibComponentObject component;
-+		
++
 +		/** Capture bounds. */
 +		final Rectangle bounds;
-+		
++
 +		/** Resolved control kind. */
 +		final String kind;
-+		
++
 +		/** Resolved control ID. */
 +		final String resolvedId;
-+		
++
 +		/**
 +		 * Initializes the request.
 +		 *
@@ -3281,19 +3281,19 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +	{
 +		/** Requested control ID. */
 +		final String controlId;
-+		
++
 +		/** Captured ARGB pixels. */
 +		final int[] argb;
-+		
++
 +		/** Capture bounds. */
 +		final Rectangle bounds;
-+		
++
 +		/** Resolved control kind. */
 +		final String kind;
-+		
++
 +		/** Resolved control ID. */
 +		final String resolvedId;
-+		
++
 +		/**
 +		 * Initializes the capture.
 +		 *
@@ -3314,7 +3314,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +			this.argb = __argb;
 +		}
 +	}
-+	
++
 +	/**
 +	 * Work item that may throw.
 +	 *
@@ -3333,7 +3333,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +		T run()
 +			throws Exception;
 +	}
-+	
++
 +	/**
 +	 * Tool execution exception.
 +	 *
@@ -3352,7 +3352,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +		{
 +			super(__message);
 +		}
-+		
++
 +		/**
 +		 * Initializes the exception.
 +		 *
@@ -3365,7 +3365,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +			super(__message, __cause);
 +		}
 +	}
-+	
++
 +	/**
 +	 * Activate listener wrapper.
 +	 *
@@ -3376,10 +3376,10 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +	{
 +		/** The delegate listener. */
 +		private final ScritchActivateListener _delegate;
-+		
++
 +		/** Owning object pointer. */
 +		private final long _objectP;
-+		
++
 +		/**
 +		 * Initializes the wrapper.
 +		 *
@@ -3393,7 +3393,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +			this._objectP = __objectP;
 +			this._delegate = __delegate;
 +		}
-+		
++
 +		/**
 +		 * {@inheritDoc}
 +		 * @since 2026/04/20
@@ -3405,7 +3405,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +			this._delegate.activate(__component);
 +		}
 +	}
-+	
++
 +	/**
 +	 * Input listener wrapper.
 +	 *
@@ -3416,10 +3416,10 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +	{
 +		/** The delegate listener. */
 +		private final ScritchInputListener _delegate;
-+		
++
 +		/** The owning pointer. */
 +		private final long _objectP;
-+		
++
 +		/**
 +		 * Initializes the wrapper.
 +		 *
@@ -3432,7 +3432,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +			this._objectP = __objectP;
 +			this._delegate = __delegate;
 +		}
-+		
++
 +		/**
 +		 * {@inheritDoc}
 +		 * @since 2026/04/20
@@ -3449,7 +3449,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +				__c, __d, __e, __f, __g, __h, __i, __j, __k, __l);
 +		}
 +	}
-+	
++
 +	/**
 +	 * Visible listener wrapper.
 +	 *
@@ -3460,10 +3460,10 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +	{
 +		/** Delegate listener. */
 +		private final ScritchVisibleListener _delegate;
-+		
++
 +		/** Owning pointer. */
 +		private final long _objectP;
-+		
++
 +		/**
 +		 * Initializes the wrapper.
 +		 *
@@ -3477,7 +3477,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +			this._objectP = __objectP;
 +			this._delegate = __delegate;
 +		}
-+		
++
 +		/**
 +		 * {@inheritDoc}
 +		 * @since 2026/04/20
@@ -3491,7 +3491,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +			this._delegate.visibilityChanged(__component, __from, __to);
 +		}
 +	}
-+	
++
 +	/**
 +	 * Close listener wrapper.
 +	 *
@@ -3502,10 +3502,10 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +	{
 +		/** Delegate listener. */
 +		private final ScritchCloseListener _delegate;
-+		
++
 +		/** Owning pointer. */
 +		private final long _objectP;
-+		
++
 +		/**
 +		 * Initializes the wrapper.
 +		 *
@@ -3518,7 +3518,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +			this._objectP = __objectP;
 +			this._delegate = __delegate;
 +		}
-+		
++
 +		/**
 +		 * {@inheritDoc}
 +		 * @since 2026/04/20
@@ -3531,7 +3531,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +			return this._delegate.closed(__window);
 +		}
 +	}
-+	
++
 +	/**
 +	 * Menu item activation listener wrapper.
 +	 *
@@ -3542,10 +3542,10 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +	{
 +		/** Delegate listener. */
 +		private final ScritchMenuItemActivateListener _delegate;
-+		
++
 +		/** Owning pointer. */
 +		private final long _objectP;
-+		
++
 +		/**
 +		 * Initializes the wrapper.
 +		 *
@@ -3559,7 +3559,7 @@ index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c199
 +			this._objectP = __objectP;
 +			this._delegate = __delegate;
 +		}
-+		
++
 +		/**
 +		 * {@inheritDoc}
 +		 * @since 2026/04/20
@@ -3700,7 +3700,7 @@ index fcbd3bcc565d3cffb084726296be01c1f0705cea..8ca0eddd824946dc4cc10ec56c6aeae0
  	
 +	/** The MCP helper. */
 +	protected final DylibMcpServer mcp;
-+	
++
  	/** The choice implementation. */
  	protected final DylibChoiceInterface choice;
  	
@@ -3865,7 +3865,7 @@ index c188feec1393ec788194ff5f7ad63793294ed1e2..796880c9c4910847c4bc59fcbef9c300
 +				"cc.squirreljme.mcp.path");
 +			HostedVirtualMachine.__forwardHostProperty(args,
 +				"cc.squirreljme.mcp.port");
-+			
++
  			// Classpath accordingly
  			args.add("-classpath");
  			args.add(supportPath + File.pathSeparator + classPathString);
@@ -3873,7 +3873,7 @@ index c188feec1393ec788194ff5f7ad63793294ed1e2..796880c9c4910847c4bc59fcbef9c300
  		// Not found
  		return null;
  	}
-+	
++
 +	/**
 +	 * Forwards the given host property into the hosted JVM arguments.
 +	 *
@@ -3888,11 +3888,11 @@ index c188feec1393ec788194ff5f7ad63793294ed1e2..796880c9c4910847c4bc59fcbef9c300
 +	{
 +		if (__args == null || __name == null)
 +			throw new NullPointerException("NARG");
-+		
++
 +		String value = System.getProperty(__name);
 +		if (value == null || value.isEmpty())
 +			return;
-+		
++
 +		__args.add(String.format("-D%s=%s", __name, value));
 +	}
  }
@@ -3943,31 +3943,31 @@ index 84b407be67d1f6b4bee35d062c745c101bf3ee45..885d123caef94a1e4ac18dd43ae06a9e
 +		final char[] digits = "0123456789abcdef".toCharArray();
 +		final int shift;
 +		final int mask;
-+		
++
 +		switch (__b)
 +		{
 +			case 2:
 +				shift = 1;
 +				mask = 0x1;
 +				break;
-+			
++
 +			case 8:
 +				shift = 3;
 +				mask = 0x7;
 +				break;
-+			
++
 +			case 16:
 +				shift = 4;
 +				mask = 0xF;
 +				break;
-+			
++
 +			default:
 +				throw new IllegalArgumentException("EB6r");
 +		}
-+		
++
 +		if (__v == 0L)
 +			return "0";
-+		
++
 +		char[] result = new char[64];
 +		int at = result.length;
 +		long value = __v;
@@ -3977,7 +3977,7 @@ index 84b407be67d1f6b4bee35d062c745c101bf3ee45..885d123caef94a1e4ac18dd43ae06a9e
 +			value >>>= shift;
 +		}
 +		while (value != 0L);
-+		
++
 +		return new String(result, at, result.length - at);
  	}
  }
@@ -4008,7 +4008,7 @@ index 6bc04c52955738535fb1f44417e3372a8945460b..7c428a3a7276f9b976e67942c2cb19df
 +	 */
 +	protected abstract String doGetLocalAddress()
 +		throws IOException;
-+	
++
 +	/**
 +	 * Returns the local port of this connection.
 +	 *
@@ -4018,7 +4018,7 @@ index 6bc04c52955738535fb1f44417e3372a8945460b..7c428a3a7276f9b976e67942c2cb19df
 +	 */
 +	protected abstract int doGetLocalPort()
 +		throws IOException;
-+	
++
 +	/**
 +	 * Returns the value of the given socket option.
 +	 *
@@ -4030,7 +4030,7 @@ index 6bc04c52955738535fb1f44417e3372a8945460b..7c428a3a7276f9b976e67942c2cb19df
 +	 */
 +	protected abstract int doGetSocketOption(byte __o)
 +		throws IllegalArgumentException, IOException;
-+	
++
  	/**
  	 * Performs the actual input stream open.
  	 *
@@ -4092,7 +4092,7 @@ index 6bc04c52955738535fb1f44417e3372a8945460b..7c428a3a7276f9b976e67942c2cb19df
 +			__o != SocketConnection.DELAY &&
 +			__o != SocketConnection.TIMEOUT)
 +			throw new IllegalArgumentException("EC0n " + __o);
-+		
++
 +		return this.doGetSocketOption(__o);
  	}
  	
@@ -4116,7 +4116,7 @@ index 6bc04c52955738535fb1f44417e3372a8945460b..7c428a3a7276f9b976e67942c2cb19df
  		// Forward
  		this.doSetSocketOption(__o, __v);
  	}
-+	
++
 +	/**
 +	 * Normalizes the given host name for accessors.
 +	 *
@@ -4128,7 +4128,7 @@ index 6bc04c52955738535fb1f44417e3372a8945460b..7c428a3a7276f9b976e67942c2cb19df
 +	{
 +		if (__host == null)
 +			return null;
-+		
++
 +		if (__host.startsWith("[") && __host.endsWith("]"))
 +			return __host.substring(1, __host.length() - 1);
 +		return __host;
@@ -4265,14 +4265,14 @@ index 02bcfa798563170732a856d78abe04441c0ec4e7..b3de36a6bc97b5ea16409e5240d2175f
 +	{
 +		if (__length < 0)
 +			throw new IndexOutOfBoundsException("IOOB");
-+		
++
 +		synchronized (this.lock)
 +		{
 +			StringBuilder value = this._value;
 +			int n = value.length();
 +			if (__at < 0 || __at > n || (__at + __length) > n)
 +				throw new IndexOutOfBoundsException("IOOB");
-+			
++
 +			value.delete(__at, __at + __length);
 +		}
 +	}
@@ -4294,24 +4294,24 @@ index 02bcfa798563170732a856d78abe04441c0ec4e7..b3de36a6bc97b5ea16409e5240d2175f
 +	{
 +		if (__text == null)
 +			throw new NullPointerException("NARG");
-+		
++
 +		synchronized (this.lock)
 +		{
 +			StringBuilder value = this._value;
 +			int n = value.length();
 +			if (__at < 0 || __at > n)
 +				throw new IndexOutOfBoundsException("IOOB");
-+			
++
 +			StringBuilder next = new StringBuilder(n + __text.length());
 +			next.append(value, 0, __at);
 +			next.append(__text);
 +			next.append(value, __at, n);
-+			
++
 +			/* {@squirreljme.error EB06 Cannot insert the specified string
 +			because it is not valid within the constraints.} */
 +			if (!EditableText.__check(next, this._maxlength, this._constraints))
 +				throw new IllegalArgumentException("EB06");
-+			
++
 +			value.insert(__at, __text);
  		}
  	}
@@ -4539,11 +4539,11 @@ index 9abe67d3c10b3ad63d6d6a16c527d6ade31d2ccb..7beb4b3f641cf7b7b4931b8bab0e8513
 +		Item[] items = this._items;
 +		if (items.length == 0)
 +			return null;
-+		
++
 +		int focusIndex = this._focusIndex;
 +		if (focusIndex < 0 || focusIndex >= items.length)
 +			focusIndex = this.__normalizeFocusIndex(0);
-+		
++
 +		return items[focusIndex];
  	}
  	
@@ -4690,7 +4690,7 @@ index 9abe67d3c10b3ad63d6d6a16c527d6ade31d2ccb..7beb4b3f641cf7b7b4931b8bab0e8513
 +	{
 +		if (__delta == 0)
 +			return false;
-+		
++
 +		ItemTraversalListener listener;
 +		Item oldItem;
 +		Item newItem;
@@ -4699,13 +4699,13 @@ index 9abe67d3c10b3ad63d6d6a16c527d6ade31d2ccb..7beb4b3f641cf7b7b4931b8bab0e8513
 +			int next = this.__nextFocusableIndex(this._focusIndex, __delta);
 +			if (next < 0 || next == this._focusIndex)
 +				return false;
-+			
++
 +			oldItem = this.__itemAt(this._focusIndex);
 +			this._focusIndex = next;
 +			newItem = this._items[next];
 +			listener = this._itemTraversalListener;
 +		}
-+		
++
 +		if (listener != null)
 +		{
 +			if (oldItem != null && oldItem != newItem)
@@ -4713,7 +4713,7 @@ index 9abe67d3c10b3ad63d6d6a16c527d6ade31d2ccb..7beb4b3f641cf7b7b4931b8bab0e8513
 +			if (newItem != null && newItem != oldItem)
 +				listener.itemTraversedIn(newItem);
 +		}
-+		
++
 +		this.__refresh();
 +		return true;
 +	}
@@ -4731,7 +4731,7 @@ index 9abe67d3c10b3ad63d6d6a16c527d6ade31d2ccb..7beb4b3f641cf7b7b4931b8bab0e8513
 +			Item item = this.__itemAt(this._focusIndex);
 +			if (item instanceof TextField)
 +				return (TextField)item;
-+			
++
 +			int focusIndex = this.__normalizeFocusIndex(this._focusIndex);
 +			Item normalized = this.__itemAt(focusIndex);
 +			if (normalized instanceof TextField)
@@ -4740,7 +4740,7 @@ index 9abe67d3c10b3ad63d6d6a16c527d6ade31d2ccb..7beb4b3f641cf7b7b4931b8bab0e8513
 +				return (TextField)normalized;
 +			}
 +		}
-+		
++
 +		return null;
 +	}
 +
@@ -4766,11 +4766,11 @@ index 9abe67d3c10b3ad63d6d6a16c527d6ade31d2ccb..7beb4b3f641cf7b7b4931b8bab0e8513
 +	{
 +		if (__c == '\t')
 +			return this.__advanceFocus(1);
-+		
++
 +		TextField textField = this.__focusedTextField();
 +		if (textField == null)
 +			return false;
-+		
++
 +		try
 +		{
 +			return textField.__accept(__c);
@@ -4835,11 +4835,11 @@ index 9abe67d3c10b3ad63d6d6a16c527d6ade31d2ccb..7beb4b3f641cf7b7b4931b8bab0e8513
 +		int n = items.length;
 +		if (n <= 0)
 +			return -1;
-+		
++
 +		int start = __from;
 +		if (start < 0 || start >= n)
 +			start = 0;
-+		
++
 +		int index = start;
 +		for (int i = 0; i < n; i++)
 +		{
@@ -4848,11 +4848,11 @@ index 9abe67d3c10b3ad63d6d6a16c527d6ade31d2ccb..7beb4b3f641cf7b7b4931b8bab0e8513
 +				index = n - 1;
 +			else if (index >= n)
 +				index = 0;
-+			
++
 +			if (Form.__isFocusable(items[index]))
 +				return index;
 +		}
-+		
++
 +		return __from;
 +	}
 +
@@ -4869,15 +4869,15 @@ index 9abe67d3c10b3ad63d6d6a16c527d6ade31d2ccb..7beb4b3f641cf7b7b4931b8bab0e8513
 +		int n = items.length;
 +		if (n <= 0)
 +			return -1;
-+		
++
 +		if (__preferred >= 0 && __preferred < n &&
 +			Form.__isFocusable(items[__preferred]))
 +			return __preferred;
-+		
++
 +		for (int i = 0; i < n; i++)
 +			if (Form.__isFocusable(items[i]))
 +				return i;
-+		
++
 +		if (__preferred >= 0 && __preferred < n)
 +			return __preferred;
 +		return 0;
@@ -5020,7 +5020,7 @@ index 22041304aa66404d09a11c1e6490cf7a7e81ecb8..610b8fc4e7c2bde0b64fd448787e5912
 +		String value = this.getString();
 +		if (__a == null)
 +			return value.length();
-+		
++
 +		value.getChars(0, value.length(), __a, 0);
 +		return value.length();
  	}
@@ -5073,7 +5073,7 @@ index 22041304aa66404d09a11c1e6490cf7a7e81ecb8..610b8fc4e7c2bde0b64fd448787e5912
 -		throw Debugging.todo();
 +		if (__a == null)
 +			throw new NullPointerException("NARG");
-+		
++
 +		this.insert(new String(__a, __b, __c), __d);
  	}
  	
@@ -5102,7 +5102,7 @@ index 22041304aa66404d09a11c1e6490cf7a7e81ecb8..610b8fc4e7c2bde0b64fd448787e5912
 +			this.setString(null);
 +			return;
 +		}
-+		
++
 +		this.setString(new String(__a, __b, __c));
  	}
  	
@@ -5133,20 +5133,20 @@ index 22041304aa66404d09a11c1e6490cf7a7e81ecb8..610b8fc4e7c2bde0b64fd448787e5912
 +	{
 +		if (!this.__isEditable())
 +			return false;
-+		
++
 +		if (__c == '\r' || __c == '\n')
 +			return false;
-+		
++
 +		if (__c == '\b' || __c == 127)
 +		{
 +			int n = this.size();
 +			if (n <= 0)
 +				return false;
-+			
++
 +			this.delete(n - 1, 1);
 +			return true;
 +		}
-+		
++
 +		this.insert(String.valueOf(__c), this.size());
 +		return true;
 +	}
@@ -5173,7 +5173,7 @@ index 22041304aa66404d09a11c1e6490cf7a7e81ecb8..610b8fc4e7c2bde0b64fd448787e5912
 +		String value = this.getString();
 +		if ((this.getConstraints() & TextField.PASSWORD) == 0)
 +			return value;
-+		
++
 +		int n = value.length();
 +		char[] masked = new char[n];
 +		for (int i = 0; i < n; i++)
@@ -5239,7 +5239,7 @@ index 0000000000000000000000000000000000000000..1e0b85ba68f25fb025ca3450ef22db1d
 +	{
 +		if (__form == null)
 +			throw new NullPointerException("NARG");
-+		
++
 +		this._form = new WeakReference<>(__form);
 +	}
 +
@@ -5255,13 +5255,13 @@ index 0000000000000000000000000000000000000000..1e0b85ba68f25fb025ca3450ef22db1d
 +		Form form = this._form.get();
 +		if (form == null)
 +			return;
-+		
++
 +		switch (__type)
 +		{
 +			case ScritchInputMethodType.KEY_CHAR_PRESSED:
 +				form.__handleCharacter((char)__a);
 +				break;
-+				
++
 +			case ScritchInputMethodType.KEY_PRESSED:
 +				if (__a == '\t')
 +					form.__advanceFocus(1);
@@ -5350,7 +5350,7 @@ index 0000000000000000000000000000000000000000..fc5bcc5aa7e0e6595a77e6508036bfa4
 +		{
 +			Item item = items[itemIndex];
 +			y = this.__paintLabel(gfx, defaultFont, item, x, y, width);
-+			
++
 +			if (item instanceof StringItem)
 +				y = this.__paintString(gfx, defaultFont, (StringItem)item,
 +					x, y, width);
@@ -5391,7 +5391,7 @@ index 0000000000000000000000000000000000000000..fc5bcc5aa7e0e6595a77e6508036bfa4
 +		String label = __item.getLabel();
 +		if (label == null || label.length() == 0)
 +			return __y;
-+		
++
 +		__gfx.setFont(__font);
 +		return this.__paintLines(__gfx, __font, label, __x, __y, __width);
 +	}
@@ -5414,12 +5414,12 @@ index 0000000000000000000000000000000000000000..fc5bcc5aa7e0e6595a77e6508036bfa4
 +		Font useFont = __item._font;
 +		if (useFont == null)
 +			useFont = __defaultFont;
-+		
++
 +		__gfx.setFont(useFont);
 +		String text = __item._text;
 +		if (text == null)
 +			return __y + Math.max(1, useFont.getHeight());
-+		
++
 +		return this.__paintLines(__gfx, useFont, text, __x, __y, __width);
 +	}
 +
@@ -5443,24 +5443,24 @@ index 0000000000000000000000000000000000000000..fc5bcc5aa7e0e6595a77e6508036bfa4
 +		int boxHeight = lineHeight + 8;
 +		int textY = __y + 4;
 +		String text = __field.__renderString();
-+		
++
 +		__gfx.setFont(__font);
 +		if (__focused)
 +			__gfx.setColor(224, 238, 255);
 +		else
 +			__gfx.setColor(245, 245, 245);
 +		__gfx.fillRect(__x, __y, __width, boxHeight);
-+		
++
 +		__gfx.setColor(0, 0, 0);
 +		__gfx.drawRect(__x, __y, Math.max(0, __width - 1),
 +			Math.max(0, boxHeight - 1));
-+		
++
 +		int innerX = __x + 4;
 +		int innerWidth = Math.max(0, __width - 8);
 +		String visibleText = this.__fitTail(__font, text, innerWidth);
 +		__gfx.drawString(visibleText, innerX, textY,
 +			Graphics.TOP | Graphics.LEFT);
-+		
++
 +		if (__focused)
 +		{
 +			int caretX = innerX + __font.stringWidth(visibleText);
@@ -5468,7 +5468,7 @@ index 0000000000000000000000000000000000000000..fc5bcc5aa7e0e6595a77e6508036bfa4
 +				caretX = (__x + __width - 3);
 +			__gfx.drawLine(caretX, __y + 2, caretX, __y + boxHeight - 3);
 +		}
-+		
++
 +		return __y + boxHeight;
 +	}
 +
@@ -5499,7 +5499,7 @@ index 0000000000000000000000000000000000000000..fc5bcc5aa7e0e6595a77e6508036bfa4
 +				__y += lineHeight;
 +				lineStart = i + 1;
 +			}
-+		
++
 +		return __y;
 +	}
 +
@@ -5516,15 +5516,15 @@ index 0000000000000000000000000000000000000000..fc5bcc5aa7e0e6595a77e6508036bfa4
 +	{
 +		if (__text == null || __text.length() == 0 || __width <= 0)
 +			return "";
-+		
++
 +		if (__font.stringWidth(__text) <= __width)
 +			return __text;
-+		
++
 +		int start = __text.length();
 +		while (start > 0 &&
 +			__font.stringWidth(__text.substring(start - 1)) <= __width)
 +			start--;
-+		
++
 +		return __text.substring(start);
 +	}
 +
@@ -5541,14 +5541,14 @@ index 0000000000000000000000000000000000000000..fc5bcc5aa7e0e6595a77e6508036bfa4
 +	{
 +		if (__text == null || __text.length() == 0 || __width <= 0)
 +			return "";
-+		
++
 +		if (__font.stringWidth(__text) <= __width)
 +			return __text;
-+		
++
 +		int end = __text.length();
 +		while (end > 0 && __font.stringWidth(__text.substring(0, end)) > __width)
 +			end--;
-+		
++
 +		return __text.substring(0, end);
 +	}
 +}
@@ -5710,18 +5710,18 @@ index d24ccf497d3ddf7400c96c8fc93de95bbb05247c..0d3d73d2ca8947d42eb1ffbcf64e3134
 +{
 +	sjme_scritchui wrappedState;
 +	sjme_scritchui_uiComponent wrappedComponent;
-+	
++
 +	if (inState == NULL || inComponent == NULL || outRgb == NULL ||
 +		outWidth == NULL || outHeight == NULL)
 +		return SJME_ERROR_NULL_ARGUMENTS;
-+	
++
 +	wrappedState = inState->wrappedState;
 +	wrappedComponent =
 +		inComponent->common.handle[SJME_SUI_FB_H_WRAPPED];
-+	
++
 +	if (wrappedState == NULL || wrappedComponent == NULL)
 +		return SJME_ERROR_ILLEGAL_STATE;
-+	
++
 +	return wrappedState->apiInThread->componentScreenshot(wrappedState,
 +		wrappedComponent, outRgb, outWidth, outHeight);
 +}
@@ -5776,15 +5776,15 @@ index 026db70c3bad188de118878142409adbcd4ada81..909af3316bc07178d4ee8d3582db30f7
 +	gint height, nChannels, rowStride, srcX, srcY, width, xx, yy;
 +	guchar* pixelBytes;
 +	sjme_jint* argb;
-+	
++
 +	if (inState == NULL || inComponent == NULL || outRgb == NULL ||
 +		outWidth == NULL || outHeight == NULL)
 +		return SJME_ERROR_NULL_ARGUMENTS;
-+	
++
 +	*outRgb = NULL;
 +	*outWidth = 0;
 +	*outHeight = 0;
-+	
++
 +	sourceWidget = (GtkWidget*)inComponent->common
 +		.handle[SJME_SUI_GTK2_H_TOP_WIDGET];
 +	if (sourceWidget == NULL)
@@ -5792,18 +5792,18 @@ index 026db70c3bad188de118878142409adbcd4ada81..909af3316bc07178d4ee8d3582db30f7
 +			.handle[SJME_SUI_GTK2_H_WIDGET];
 +	if (sourceWidget == NULL)
 +		return SJME_ERROR_NATIVE_WIDGET_FAILURE;
-+	
++
 +	topLevel = gtk_widget_get_toplevel(sourceWidget);
 +	if (topLevel == NULL || !GTK_IS_WIDGET(topLevel))
 +		topLevel = sourceWidget;
-+	
++
 +	memset(&alloc, 0, sizeof(alloc));
 +	gtk_widget_get_allocation(sourceWidget, &alloc);
 +	width = alloc.width;
 +	height = alloc.height;
 +	if (width <= 0 || height <= 0)
 +		return SJME_ERROR_INVALID_ARGUMENT;
-+	
++
 +	if (inState->apiInThread->componentRevalidate != NULL)
 +		if (sjme_error_is(error = inState->apiInThread->componentRevalidate(
 +			inState, inComponent)))
@@ -5812,16 +5812,16 @@ index 026db70c3bad188de118878142409adbcd4ada81..909af3316bc07178d4ee8d3582db30f7
 +		if (sjme_error_is(error = inState->apiInThread->componentRepaint(
 +			inState, inComponent, 0, 0, width, height)))
 +			return sjme_error_default(error);
-+	
++
 +	while (gtk_events_pending())
 +		gtk_main_iteration_do(FALSE);
-+	
++
 +	sourceWindow = gtk_widget_get_window(topLevel);
 +	if (sourceWindow == NULL)
 +		sourceWindow = gtk_widget_get_window(sourceWidget);
 +	if (sourceWindow == NULL)
 +		return SJME_ERROR_NATIVE_WIDGET_FAILURE;
-+	
++
 +	srcX = 0;
 +	srcY = 0;
 +	if (sourceWidget != topLevel)
@@ -5834,7 +5834,7 @@ index 026db70c3bad188de118878142409adbcd4ada81..909af3316bc07178d4ee8d3582db30f7
 +			srcY = alloc.y;
 +		}
 +	}
-+	
++
 +	drawableW = 0;
 +	drawableH = 0;
 +	gdk_drawable_get_size(GDK_DRAWABLE(sourceWindow), &drawableW, &drawableH);
@@ -5854,19 +5854,19 @@ index 026db70c3bad188de118878142409adbcd4ada81..909af3316bc07178d4ee8d3582db30f7
 +		height = drawableH - srcY;
 +	if (width <= 0 || height <= 0)
 +		return SJME_ERROR_INVALID_ARGUMENT;
-+	
++
 +	gdk_window_process_updates(sourceWindow, TRUE);
-+	
++
 +	colormap = gdk_drawable_get_colormap(GDK_DRAWABLE(sourceWindow));
 +	if (colormap == NULL)
 +		colormap = gdk_colormap_get_system();
-+	
++
 +	pixbuf = gdk_pixbuf_get_from_drawable(NULL,
 +		GDK_DRAWABLE(sourceWindow), colormap,
 +		srcX, srcY, 0, 0, width, height);
 +	if (pixbuf == NULL)
 +		return SJME_ERROR_NATIVE_WIDGET_FAILURE;
-+	
++
 +	argb = NULL;
 +	if (sjme_error_is(error = sjme_alloc(inState->pool,
 +		(width * height) * sizeof(*argb), (void**)&argb)) ||
@@ -5875,7 +5875,7 @@ index 026db70c3bad188de118878142409adbcd4ada81..909af3316bc07178d4ee8d3582db30f7
 +		g_object_unref(pixbuf);
 +		return sjme_error_defaultOr(error, SJME_ERROR_OUT_OF_MEMORY);
 +	}
-+	
++
 +	pixelBytes = gdk_pixbuf_get_pixels(pixbuf);
 +	rowStride = gdk_pixbuf_get_rowstride(pixbuf);
 +	nChannels = gdk_pixbuf_get_n_channels(pixbuf);
@@ -5887,7 +5887,7 @@ index 026db70c3bad188de118878142409adbcd4ada81..909af3316bc07178d4ee8d3582db30f7
 +			argb[(yy * width) + xx] = (alpha << 24) |
 +				(at[0] << 16) | (at[1] << 8) | at[2];
 +		}
-+	
++
 +	g_object_unref(pixbuf);
 +	*outRgb = argb;
 +	*outWidth = width;
@@ -5928,10 +5928,10 @@ index 682878bf57baea74ba1daa56bcbd03f0a72cfa8d..23e67aab18eb54473e0b8d81ffa2eb63
 +	if (inState == NULL || inComponent == NULL || outRgb == NULL ||
 +		outWidth == NULL || outHeight == NULL)
 +		return SJME_ERROR_NULL_ARGUMENTS;
-+	
++
 +	if (inState->impl->componentScreenshot == NULL)
 +		return sjme_error_notImplemented(0);
-+	
++
 +	return inState->impl->componentScreenshot(inState, inComponent,
 +		outRgb, outWidth, outHeight);
 +}

@@ -16,7 +16,7 @@ The supported workflow is scripted SquirrelJME, not the legacy J2MEWTK UI.
 ./scripts/run.sh
 ```
 
-Bootstrap pins SquirrelJME to the commit recorded in `scripts/common.sh`, applies `references/squirreljme/*.patch`, and obtains checksum-pinned JDK/CMake tools when they are absent. Defaults live under `/tmp`; override `TELEGRAM_MICRO_BOOTSTRAP_DIR` and `SQUIRRELJME_DIR` for durable caches.
+Bootstrap pins SquirrelJME to the commit recorded in `scripts/common.sh`, applies `references/squirreljme/*.patch`, and obtains checksum-pinned JDK/CMake tools when they are absent. Defaults live under `/tmp`; the source-checkout directory is keyed by the base commit and patch content so a new patch set never mutates an older checkout. Override `TELEGRAM_MICRO_BOOTSTRAP_DIR` and `SQUIRRELJME_DIR` for durable caches.
 
 Build outputs are:
 

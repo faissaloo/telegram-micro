@@ -7,9 +7,22 @@ BUILD_DIR="${ROOT_DIR}/build"
 DIST_DIR="${BUILD_DIR}/dist"
 BOOTSTRAP_DIR="${TELEGRAM_MICRO_BOOTSTRAP_DIR:-/tmp/telegrammicro-bootstrap}"
 DOWNLOAD_DIR="${BOOTSTRAP_DIR}/downloads"
-SQUIRRELJME_DIR="${SQUIRRELJME_DIR:-/tmp/SquirrelJME}"
 SQUIRRELJME_BASE_COMMIT="${TELEGRAM_MICRO_SQUIRRELJME_BASE_COMMIT:-14b4d02b42f8ee31fa40dcf07b8104f33c2d3b24}"
 SQUIRRELJME_PATCH_DIR="${ROOT_DIR}/references/squirreljme"
+if ! command -v sha256sum >/dev/null 2>&1; then
+  printf 'Missing required command: sha256sum\n' >&2
+  exit 127
+fi
+SQUIRRELJME_PATCH_FINGERPRINT="$(
+  {
+    printf '%s\n' "${SQUIRRELJME_BASE_COMMIT}"
+    while IFS= read -r patch_file; do
+      sha256sum "${patch_file}" | cut -d ' ' -f 1
+    done < <(find "${SQUIRRELJME_PATCH_DIR}" -maxdepth 1 \
+      -type f -name '*.patch' | sort)
+  } | sha256sum | cut -d ' ' -f 1
+)"
+SQUIRRELJME_DIR="${SQUIRRELJME_DIR:-${BOOTSTRAP_DIR}/SquirrelJME-${SQUIRRELJME_PATCH_FINGERPRINT:0:12}}"
 JDK_HOME="${TELEGRAM_MICRO_JDK_HOME:-${BOOTSTRAP_DIR}/jdk17}"
 CMAKE_HOME="${TELEGRAM_MICRO_CMAKE_HOME:-${BOOTSTRAP_DIR}/cmake}"
 GRADLE_CACHE_DIR="${TELEGRAM_MICRO_GRADLE_HOME:-${BOOTSTRAP_DIR}/gradle-home}"
@@ -173,15 +186,7 @@ squirreljme_patch_files() {
 }
 
 squirreljme_patch_fingerprint() {
-  local patch
-
-  {
-    printf '%s\n' "${SQUIRRELJME_BASE_COMMIT}"
-    while IFS= read -r patch; do
-      [[ -n "${patch}" ]] || continue
-      sha256sum "${patch}"
-    done < <(squirreljme_patch_files)
-  } | sha256sum | cut -d ' ' -f 1
+  printf '%s\n' "${SQUIRRELJME_PATCH_FINGERPRINT}"
 }
 
 squirreljme_patches_applied() {

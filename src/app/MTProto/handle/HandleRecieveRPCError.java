@@ -1,7 +1,5 @@
 package mtproto.handle;
 
-import java.io.UnsupportedEncodingException;
-
 import mtproto.MTProtoConnection;
 import mtproto.Response;
 import mtproto.EncryptedResponse;
@@ -20,10 +18,6 @@ public class HandleRecieveRPCError extends MTProtoCallback {
     RecieveRPCError recieve_rpc_error = RecieveRPCError.from_rpc_response(rpc_response);
     //We should handle 303 errors for switching DC, for example: PHONE_MIGRATE_2
     //this should throw something to trigger a reinitialization of the MTProto client
-    try {
-      System.out.println("ERROR: RPC "+Integer.toString(recieve_rpc_error.error_code)+": "+recieve_rpc_error.error_message.ascii_string());
-    } catch (UnsupportedEncodingException e) {
-      System.out.println("ERROR: RPC "+Integer.toString(recieve_rpc_error.error_code)+": <invalid encoding>");
-    }
+    System.out.println("ERROR: RPC "+Integer.toString(recieve_rpc_error.error_code)+": "+recieve_rpc_error.error_message.ascii_string());
   }
 }

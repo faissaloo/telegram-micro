@@ -12,12 +12,14 @@ public class SendEncrypted {
   //or maybe have it set via a function in the MTProtoConnection and then get it and stick it at the beginning before the message is encrypted
 
   public void send(MTProtoConnection sender) {
-    (new EncryptedRequest(
-      (new Serializer())
-        .append_raw_bytes(sender.getMTProtoHeader())
-        .append_raw_bytes(message_data.end())
-        .end()
-      )
-    ).send(sender);
+    send(sender, false, false);
+  }
+
+  protected void send(MTProtoConnection sender, boolean trackRetry, boolean contentRelated) {
+    send(sender, trackRetry, contentRelated, true);
+  }
+
+  protected void send(MTProtoConnection sender, boolean trackRetry, boolean contentRelated, boolean includeHeader) {
+    sender.sendEncryptedPayload(message_data.end(), trackRetry, contentRelated, includeHeader);
   }
 }

@@ -22,7 +22,8 @@ public class HandleRecieveDHParamsOk extends MTProtoCallback {
     UnencryptedResponse unencrypted_response = (UnencryptedResponse)response;
     RecieveServerDHParamsOk dh_params_ok = RecieveServerDHParamsOk.from_unencrypted_message(unencrypted_response, connection.new_nonce);
     
-    BigInteger b = new BigInteger(1, connection.random_number_generator.nextBytes(2048));
+    /* Telegram specifies a 2048-bit client exponent, not 2048 bytes. */
+    BigInteger b = new BigInteger(1, connection.random_number_generator.nextBytes(2048 / 8));
     if (!validate_diffie_hellman_prime(dh_params_ok.group_generator, dh_params_ok.diffie_hellman_prime)) {
       throw new SecurityException("Diffie hellman prime is not known and may be insecure");
     }

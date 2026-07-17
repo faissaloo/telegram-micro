@@ -20,18 +20,14 @@ public class HandleRecieveNewSessionCreated extends MTProtoCallback {
   public void execute(Response response) {
     EncryptedResponse encrypted_response = (EncryptedResponse)response;
     RecieveNewSessionCreated recieve_new_session_created = RecieveNewSessionCreated.from_encrypted_message(encrypted_response);
+    connection.server_salt = recieve_new_session_created.server_salt;
     (new SendMsgsAck(new long[] {encrypted_response.message_id})).send(connection);
-    connection.setMTProtoHeader(
-      139,
-      487068,
-      "Sun Java Wireless Toolkit Emulator",
-      "2.5.2",
-      "indev",
-      "en",
-      "en",
-      "en"
-    );
-    (new SendGetConfig()).send(connection);
+    connection.setDefaultMTProtoHeader();
+    if (!connection.bootstrap_request_inflight &&
+        !connection.direct_authorized_restore) {
+      connection.bootstrap_request_inflight = true;
+      (new SendGetConfig()).send(connection);
+    }
     /*
     try {
       System.out.println("We're done, now closing the connection");

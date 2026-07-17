@@ -1,0 +1,6056 @@
+diff --git a/emulators/emulator-base-native/bundle-script.cmake b/emulators/emulator-base-native/bundle-script.cmake
+index 58a9338ee249dd433412e87b84ba8b1952688826..bc7476e497f432e1fb14386a4201f166472a7866 100644
+--- a/emulators/emulator-base-native/bundle-script.cmake
++++ b/emulators/emulator-base-native/bundle-script.cmake
+@@ -49,10 +49,21 @@ set(scritchAnyLists)
+ list(APPEND scritchAnyLists
+ 	"${SQUIRRELJME_NANOCOAT_BINARY_DIR}/bin/ScritchAudio.list"
+ 	"${SQUIRRELJME_NANOCOAT_BINARY_DIR}/bin/ScritchUi.list")
+-file(STRINGS "${SQUIRRELJME_NANOCOAT_BINARY_DIR}/bin/ScritchAudio.paths"
+-	scritchAudioBins)
+-file(STRINGS "${SQUIRRELJME_NANOCOAT_BINARY_DIR}/bin/ScritchUi.paths"
+-	scritchUiBins)
++
++function(read_scritchany_paths outVar pathFile)
++	set(result)
++	file(STRINGS "${pathFile}" pathLines)
++	foreach(pathLine IN LISTS pathLines)
++		separate_arguments(splitPaths UNIX_COMMAND "${pathLine}")
++		list(APPEND result ${splitPaths})
++	endforeach()
++	set(${outVar} "${result}" PARENT_SCOPE)
++endfunction()
++
++read_scritchany_paths(scritchAudioBins
++	"${SQUIRRELJME_NANOCOAT_BINARY_DIR}/bin/ScritchAudio.paths")
++read_scritchany_paths(scritchUiBins
++	"${SQUIRRELJME_NANOCOAT_BINARY_DIR}/bin/ScritchUi.paths")
+ 
+ # Make sure it exists before we bundle
+ file(MAKE_DIRECTORY "${nativesSubDir}")
+diff --git a/emulators/emulator-base-native/c/mle_scritchuidylib.c b/emulators/emulator-base-native/c/mle_scritchuidylib.c
+index 5f21a357a0aa6e146d5f91a3193efa173d4ed038..06cf93183e8d38ffea447c6467306ad23e6ecb07 100644
+--- a/emulators/emulator-base-native/c/mle_scritchuidylib.c
++++ b/emulators/emulator-base-native/c/mle_scritchuidylib.c
+@@ -77,6 +77,8 @@
+ 	DESC_LONG DESC_LONG ")" DESC_SCRITCHUI_COMPONENT
+ #define FORWARD_DESC___componentHeight "(" \
+ 	DESC_LONG DESC_LONG ")" DESC_INT
++#define FORWARD_DESC___componentScreenshot "(" \
++	DESC_LONG DESC_LONG DESC_ARRAY(DESC_INT) ")" DESC_ARRAY(DESC_INT)
+ #define FORWARD_DESC___componentRepaint "(" \
+ 	DESC_LONG DESC_LONG DESC_INT DESC_INT DESC_INT DESC_INT ")" DESC_VOID
+ #define FORWARD_DESC___componentRevalidate "(" \
+@@ -1321,6 +1323,65 @@ JNIEXPORT jint JNICALL FORWARD_FUNC_NAME(NativeScritchDylib,
+ 	return result;
+ }
+ 
++JNIEXPORT jintArray JNICALL FORWARD_FUNC_NAME(NativeScritchDylib,
++	__componentScreenshot)(JNIEnv* env, jclass classy, jlong stateP,
++	jlong componentP, jintArray sizeOut)
++{
++	sjme_errorCode error;
++	sjme_scritchui state;
++	sjme_scritchui_uiComponent component;
++	sjme_jint* argb;
++	sjme_jint width;
++	sjme_jint height;
++	jintArray result;
++
++	if (stateP == 0 || componentP == 0 || sizeOut == NULL)
++	{
++		sjme_jni_throwMLECallError(env, SJME_ERROR_NULL_ARGUMENTS);
++		return NULL;
++	}
++
++	state = (sjme_scritchui)stateP;
++	component = (sjme_scritchui_uiComponent)componentP;
++
++	argb = NULL;
++	width = 0;
++	height = 0;
++	result = NULL;
++	error = SJME_ERROR_NATIVE_WIDGET_FAILURE;
++	if (state->apiInThread->componentScreenshot == NULL ||
++		sjme_error_is(error = state->apiInThread->componentScreenshot(
++			state, component, &argb, &width, &height)))
++	{
++		sjme_jni_throwMLECallError(env, error);
++		return NULL;
++	}
++
++	result = (*env)->NewIntArray(env, width * height);
++	if (result == NULL)
++	{
++		if (argb != NULL)
++			sjme_alloc_free(argb);
++		return NULL;
++	}
++
++	(*env)->SetIntArrayRegion(env, result, 0, width * height, argb);
++	if (argb != NULL)
++		sjme_alloc_free(argb);
++
++	if (sjme_jni_checkVMException(env))
++		return NULL;
++
++	if (sjme_error_is(sjme_jni_setIntArray(env, sizeOut, 0, 2,
++		width, height)))
++	{
++		sjme_jni_throwMLECallError(env, SJME_ERROR_INDEX_OUT_OF_BOUNDS);
++		return NULL;
++	}
++
++	return result;
++}
++
+ JNIEXPORT void JNICALL FORWARD_FUNC_NAME(NativeScritchDylib,
+ 	__componentRepaint)(JNIEnv* env, jclass classy, jlong stateP,
+ 	jlong componentP, jint x, jint y, jint w, jint h)
+@@ -2993,6 +3054,7 @@ static const JNINativeMethod mleNativeScritchDylibMethods[] =
+ 	FORWARD_list(NativeScritchDylib, __choiceSetString),
+ 	FORWARD_list(NativeScritchDylib, __componentGetParent),
+ 	FORWARD_list(NativeScritchDylib, __componentHeight),
++	FORWARD_list(NativeScritchDylib, __componentScreenshot),
+ 	FORWARD_list(NativeScritchDylib, __componentRepaint),
+ 	FORWARD_list(NativeScritchDylib, __componentRevalidate),
+ 	FORWARD_list(NativeScritchDylib, __componentSetActivateListener),
+diff --git a/emulators/emulator-base/build.gradle b/emulators/emulator-base/build.gradle
+index ea962ac23c10f6476f9f91b306524bc71e1dda28..8edb99097afe0a39f5aa408ddfbe28694075c3d5 100644
+--- a/emulators/emulator-base/build.gradle
++++ b/emulators/emulator-base/build.gradle
+@@ -18,12 +18,14 @@ dependencies
+ {
+ 	api project(":modules:cldc-compact")
+ 	api project(":modules:common-vm")
++	implementation project(":modules:gcf")
+ 	api project(":modules:vendor-api-squirreljme-io")
+ 	api project(":modules:tac")
+ 	api project(":modules:vendor-api-squirreljme-zip")
+ 	api project(":modules:debug-jdwp")
+ 	api project(":modules:debug-jdwp-vm-host")
+ 	api project(":modules:scritch-ui")
++	implementation project(":modules:vendor-api-oracle-json")
+ }
+ 
+ // Native emulator support library
+diff --git a/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/EmulatedBucketShelf.java b/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/EmulatedBucketShelf.java
+index bf4a4dda924ff7596cba089fb78c4dd43deca67d..f97788b153df917682fc2b40964a862dba85871a 100644
+--- a/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/EmulatedBucketShelf.java
++++ b/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/EmulatedBucketShelf.java
+@@ -421,11 +421,9 @@ public class EmulatedBucketShelf
+ 		Path target = ((EmulatedBucketBracket)__bucket).__resolve(__file);
+ 		
+ 		// Depends on the write mode
+-		Path tempFile = null;
+ 		try (InputStream in = new ByteArrayInputStream(__buf, __off, __len))
+ 		{
+-			// Create temporary file
+-			tempFile = Files.createTempFile("squirreljme", ".rms");
++			Files.createDirectories(target.getParent());
+ 			
+ 			// Depends on the mode
+ 			switch (__mode)
+@@ -435,33 +433,16 @@ public class EmulatedBucketShelf
+ 						throw new MLECallError(
+ 							"File offset must be zero.");
+ 					
+-					Files.write(tempFile, StreamUtils.readAll(in));
++					Files.write(target, StreamUtils.readAll(in));
+ 					break;
+ 				
+ 				default:
+ 					throw Debugging.todo(__mode);
+ 			}
+-			
+-			// Replace the original file
+-			Files.createDirectories(target.getParent());
+-			Files.move(tempFile, target,
+-				StandardCopyOption.REPLACE_EXISTING);
+ 		}
+ 		catch (IOException __e)
+ 		{
+ 			throw new MLECallError(__e.getMessage(), __e);
+ 		}
+-		finally
+-		{
+-			// Make sure the temporary is gone
+-			if (tempFile != null)
+-				try
+-				{
+-					Files.deleteIfExists(tempFile);
+-				}
+-				catch (IOException ignored)
+-				{
+-				}
+-		}
+ 	}
+ }
+diff --git a/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibBaseInterface.java b/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibBaseInterface.java
+index 07e75b12ea3a2d72e6b23c0ad8ae34d1f5257da6..8fd5d66c1d27293e5ff0b4bebdcd41e3c42a4e55 100644
+--- a/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibBaseInterface.java
++++ b/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibBaseInterface.java
+@@ -42,4 +42,33 @@ public abstract class DylibBaseInterface
+ 		this._selfApi = __selfApi;
+ 		this.dyLib = __dyLib;
+ 	}
++	
++	/**
++	 * Returns the current API.
++	 *
++	 * @return The current API.
++	 * @throws IllegalStateException If it is no longer available.
++	 * @since 2026/04/20
++	 */
++	protected final DylibScritchInterface selfApi()
++		throws IllegalStateException
++	{
++		DylibScritchInterface rv = this._selfApi.get();
++		if (rv == null)
++			throw new IllegalStateException("GONE");
++		return rv;
++	}
++	
++	/**
++	 * Returns the MCP helper.
++	 *
++	 * @return The MCP helper.
++	 * @throws IllegalStateException If the API is no longer available.
++	 * @since 2026/04/20
++	 */
++	protected final DylibMcpServer mcp()
++		throws IllegalStateException
++	{
++		return this.selfApi().mcp;
++	}
+ }
+diff --git a/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibChoiceInterface.java b/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibChoiceInterface.java
+index 8423f5a21dd20b7dc04a7ba5e8016a4cff6e89df..d612acb723971bdb0c3bf75fbab5d5a4a1d79fee 100644
+--- a/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibChoiceInterface.java
++++ b/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibChoiceInterface.java
+@@ -55,6 +55,7 @@ public class DylibChoiceInterface
+ 		
+ 		NativeScritchDylib.__choiceRemove(this.dyLib._stateP,
+ 			((DylibChoiceObject)__choice).objectPointer(), __atIndex);
++		this.mcp().choiceDelete((DylibBaseObject)__choice, __atIndex);
+ 	}
+ 	
+ 	/**
+@@ -70,6 +71,7 @@ public class DylibChoiceInterface
+ 		
+ 		NativeScritchDylib.__choiceRemoveAll(this.dyLib._stateP,
+ 			((DylibChoiceObject)__choice).objectPointer());
++		this.mcp().choiceDeleteAll((DylibBaseObject)__choice);
+ 	}
+ 	
+ 	/**
+@@ -99,8 +101,10 @@ public class DylibChoiceInterface
+ 		if (__choice == null)
+ 			throw new MLECallError("Null arguments.");
+ 		
+-		return NativeScritchDylib.__choiceInsert(this.dyLib._stateP,
++		int rv = NativeScritchDylib.__choiceInsert(this.dyLib._stateP,
+ 			((DylibChoiceObject)__choice).objectPointer(), __atIndex);
++		this.mcp().choiceInsert((DylibBaseObject)__choice, rv);
++		return rv;
+ 	}
+ 	
+ 	/**
+@@ -134,6 +138,8 @@ public class DylibChoiceInterface
+ 		NativeScritchDylib.__choiceSetEnabled(this.dyLib._stateP,
+ 			((DylibChoiceObject)__choice).objectPointer(), __atIndex,
+ 			__enabled);
++		this.mcp().choiceSetEnabled((DylibBaseObject)__choice, __atIndex,
++			__enabled);
+ 	}
+ 	
+ 	/**
+@@ -174,6 +180,8 @@ public class DylibChoiceInterface
+ 		NativeScritchDylib.__choiceSetSelected(this.dyLib._stateP,
+ 			((DylibChoiceObject)__choice).objectPointer(), __atIndex,
+ 			__selected);
++		this.mcp().choiceSetSelected((DylibBaseObject)__choice, __atIndex,
++			__selected);
+ 	}
+ 	
+ 	/**
+@@ -192,5 +200,7 @@ public class DylibChoiceInterface
+ 		NativeScritchDylib.__choiceSetString(this.dyLib._stateP,
+ 			((DylibChoiceObject)__choice).objectPointer(), __atIndex,
+ 			__string);
++		this.mcp().choiceSetString((DylibBaseObject)__choice, __atIndex,
++			__string);
+ 	}
+ }
+diff --git a/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibComponentInterface.java b/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibComponentInterface.java
+index a39454f97ac1f3f03e07fc393bacc6fbf76111b7..9987589b5866a925ea28b9493035ebe661fd0921 100644
+--- a/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibComponentInterface.java
++++ b/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibComponentInterface.java
+@@ -58,8 +58,12 @@ public class DylibComponentInterface
+ 			throw new MLECallError("Null arguments.");
+ 	
+ 		// Forward
+-		return NativeScritchDylib.__componentGetParent(this.dyLib._stateP,
++		ScritchComponentBracket rv = NativeScritchDylib.__componentGetParent(
++			this.dyLib._stateP,
+ 			((DylibComponentObject)__component).objectPointer());
++		if (rv instanceof DylibBaseObject)
++			this.mcp().register((DylibBaseObject)rv);
++		return rv;
+ 	}
+ 	
+ 	/**
+@@ -109,7 +113,7 @@ public class DylibComponentInterface
+ 		NativeScritchDylib.__componentSetActivateListener(
+ 			this.dyLib._stateP,
+ 			((DylibComponentObject)__component).objectPointer(),
+-			__listener);
++			this.mcp().wrapActivate((DylibBaseObject)__component, __listener));
+ 	}
+ 	
+ 	/**
+@@ -154,7 +158,7 @@ public class DylibComponentInterface
+ 		// Forward
+ 		NativeScritchDylib.__componentSetVisibleListener(this.dyLib._stateP,
+ 			((DylibBaseObject)__component).objectPointer(),
+-			__listener);
++			this.mcp().wrapVisible((DylibBaseObject)__component, __listener));
+ 	}
+ 	
+ 	/**
+@@ -173,4 +177,23 @@ public class DylibComponentInterface
+ 		return NativeScritchDylib.__componentWidth(this.dyLib._stateP,
+ 			((DylibComponentObject)__component).objectPointer());
+ 	}
++
++	/**
++	 * Captures the rendered pixels for the given component.
++	 *
++	 * @param __component The component to capture.
++	 * @param __sizeOut Output array for {@code [width, height]}.
++	 * @return The captured ARGB pixels.
++	 * @throws MLECallError On capture errors.
++	 * @since 2026/04/20
++	 */
++	int[] componentScreenshot(DylibComponentObject __component, int[] __sizeOut)
++		throws MLECallError
++	{
++		if (__component == null || __sizeOut == null || __sizeOut.length < 2)
++			throw new MLECallError("NARG");
++		
++		return NativeScritchDylib.__componentScreenshot(this.dyLib._stateP,
++			__component.objectPointer(), __sizeOut);
++	}
+ }
+diff --git a/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibContainerInterface.java b/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibContainerInterface.java
+index 36480fcb43f9d840cc01a1399cb30d2f75302cd6..396d10ce1a1d4f033afd7f909a044dc6c4b7a464 100644
+--- a/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibContainerInterface.java
++++ b/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibContainerInterface.java
+@@ -56,6 +56,8 @@ public class DylibContainerInterface
+ 		NativeScritchDylib.__containerAdd(this.dyLib._stateP,
+ 			((DylibContainerObject)__container).objectPointer(),
+ 			((DylibComponentObject)__component).objectPointer());
++		this.mcp().containerAdd((DylibBaseObject)__container,
++			(DylibBaseObject)__component);
+ 	}
+ 	
+ 	/**
+@@ -89,6 +91,7 @@ public class DylibContainerInterface
+ 		
+ 		NativeScritchDylib.__containerRemoveAll(this.dyLib._stateP,
+ 			((DylibContainerObject)__container).objectPointer());
++		this.mcp().containerRemoveAll((DylibBaseObject)__container);
+ 	}
+ 	
+ 	/**
+@@ -109,5 +112,7 @@ public class DylibContainerInterface
+ 			((DylibContainerObject)__container).objectPointer(),
+ 			((DylibComponentObject)__component).objectPointer(),
+ 			__x, __y, __w, __h);
++		this.mcp().containerSetBounds((DylibBaseObject)__container,
++			(DylibBaseObject)__component, __x, __y, __w, __h);
+ 	}
+ }
+diff --git a/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibEnvironmentInterface.java b/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibEnvironmentInterface.java
+index 7004820dff79bdfe6e2aafdc5e1d23f2a0ecdb39..9cbdcaf97519d5432221401a637a5abf12116d24 100644
+--- a/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibEnvironmentInterface.java
++++ b/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibEnvironmentInterface.java
+@@ -125,7 +125,10 @@ public class DylibEnvironmentInterface
+ 			ScritchScreenBracket[] result =
+ 				new ScritchScreenBracket[numScreens];
+ 			for (int i = 0; i < numScreens; i++)
++			{
+ 				result[i] = new DylibScreenObject(screenPs[i]);
++				this.mcp().register((DylibBaseObject)result[i]);
++			}
+ 			
+ 			return result;
+ 		}
+diff --git a/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibLabelInterface.java b/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibLabelInterface.java
+index b816558aa217563707e6e921a6d2f8924d54e74c..ffc6729024591aab21e32b2c2fce4f1e416aa56b 100644
+--- a/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibLabelInterface.java
++++ b/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibLabelInterface.java
+@@ -53,5 +53,6 @@ public class DylibLabelInterface
+ 		
+ 		NativeScritchDylib.__labelSetString(this.dyLib._stateP,
+ 			((DylibLabelObject)__label).objectPointer(), __string);
++		this.mcp().labelSet((DylibBaseObject)__label, __string);
+ 	}
+ }
+diff --git a/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibListInterface.java b/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibListInterface.java
+index 8396899fade6f95a71257d3de9ae13f557225e5d..a7ef50106f1d244135cff83b57587cfb1fd8af09 100644
+--- a/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibListInterface.java
++++ b/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibListInterface.java
+@@ -49,6 +49,8 @@ public class DylibListInterface
+ 		if (listP == 0)
+ 			throw new MLECallError("Could not create list.");
+ 		
+-		return new DylibListObject(listP);
++		DylibListObject rv = new DylibListObject(listP);
++		this.mcp().register(rv);
++		return rv;
+ 	}
+ }
+diff --git a/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibMcpServer.java b/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibMcpServer.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..5324c96c43de9d9a1ee5a04b6527c19970a99262
+--- /dev/null
++++ b/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibMcpServer.java
+@@ -0,0 +1,3164 @@
++// -*- Mode: Java; indent-tabs-mode: t; tab-width: 4 -*-
++// ---------------------------------------------------------------------------
++// Multi-Phasic Applications: SquirrelJME
++//     Copyright (C) Stephanie Gawroriski <xer@multiphasicapps.net>
++// ---------------------------------------------------------------------------
++// SquirrelJME is under the Mozilla Public License Version 2.0.
++// See license.mkd for licensing and copyright information.
++// ---------------------------------------------------------------------------
++
++package cc.squirreljme.emulator.scritchui.dylib;
++
++import cc.squirreljme.jvm.mle.exceptions.MLECallError;
++import cc.squirreljme.jvm.mle.scritchui.brackets.ScritchChoiceBracket;
++import cc.squirreljme.jvm.mle.scritchui.brackets.ScritchComponentBracket;
++import cc.squirreljme.jvm.mle.scritchui.brackets.ScritchContainerBracket;
++import cc.squirreljme.jvm.mle.scritchui.brackets.ScritchMenuKindBracket;
++import cc.squirreljme.jvm.mle.scritchui.brackets.ScritchScreenBracket;
++import cc.squirreljme.jvm.mle.scritchui.brackets.ScritchWindowBracket;
++import cc.squirreljme.jvm.mle.scritchui.callbacks.ScritchActivateListener;
++import cc.squirreljme.jvm.mle.scritchui.callbacks.ScritchCloseListener;
++import cc.squirreljme.jvm.mle.scritchui.callbacks.ScritchInputListener;
++import cc.squirreljme.jvm.mle.scritchui.callbacks.ScritchMenuItemActivateListener;
++import cc.squirreljme.jvm.mle.scritchui.callbacks.ScritchVisibleListener;
++import com.oracle.json.Json;
++import com.oracle.json.JsonArrayBuilder;
++import com.oracle.json.JsonObject;
++import com.oracle.json.JsonObjectBuilder;
++import com.oracle.json.JsonValue;
++import com.oracle.json.spi.JsonProvider;
++import com.sun.net.httpserver.Headers;
++import com.sun.net.httpserver.HttpExchange;
++import com.sun.net.httpserver.HttpHandler;
++import com.sun.net.httpserver.HttpServer;
++import java.awt.Point;
++import java.awt.Rectangle;
++import java.awt.image.BufferedImage;
++import java.io.ByteArrayOutputStream;
++import java.io.IOException;
++import java.io.InputStream;
++import java.io.StringWriter;
++import java.net.InetAddress;
++import java.net.InetSocketAddress;
++import java.net.URI;
++import java.util.ArrayList;
++import java.util.Base64;
++import java.util.LinkedHashMap;
++import java.util.LinkedHashSet;
++import java.util.List;
++import java.util.Map;
++import java.util.UUID;
++import java.util.concurrent.Executors;
++import javax.imageio.ImageIO;
++
++/**
++ * Minimal MCP server for driving ScritchUI controls.
++ *
++ * @since 2026/04/20
++ */
++final class DylibMcpServer
++{
++	/** The endpoint path property. */
++	static final String ENDPOINT_PATH_PROPERTY =
++		"cc.squirreljme.mcp.path";
++	
++	/** The port property. */
++	static final String PORT_PROPERTY =
++		"cc.squirreljme.mcp.port";
++	
++	/** The protocol version. */
++	static final String PROTOCOL_VERSION =
++		"2025-11-25";
++	
++	/** The server instance. */
++	private static volatile DylibMcpServer _INSTANCE;
++	
++	/** The ScritchUI interface. */
++	private final DylibScritchInterface _api;
++	
++	/** The endpoint path. */
++	private final String _endpointPath;
++	
++	/** Session identifier. */
++	private final String _sessionId =
++		UUID.randomUUID().toString();
++	
++	/** JSON provider. */
++	private final JsonProvider _json =
++		JsonProvider.provider();
++	
++	/** Known objects. */
++	private final Map<Long, Node> _nodes =
++		new LinkedHashMap<>();
++	
++	/** The HTTP server. */
++	private volatile HttpServer _server;
++	
++	/**
++	 * Initializes the MCP server.
++	 *
++	 * @param __api The ScritchUI API.
++	 * @throws NullPointerException On null arguments.
++	 * @since 2026/04/20
++	 */
++	private DylibMcpServer(DylibScritchInterface __api)
++		throws NullPointerException
++	{
++		if (__api == null)
++			throw new NullPointerException("NARG");
++		
++		this._api = __api;
++		this._endpointPath = DylibMcpServer.__normalizeEndpointPath(
++			System.getProperty(DylibMcpServer.ENDPOINT_PATH_PROPERTY, "/mcp"));
++		
++		this.__startIfRequested();
++	}
++	
++	/**
++	 * Returns the singleton instance.
++	 *
++	 * @param __api The current ScritchUI interface.
++	 * @return The singleton instance.
++	 * @throws NullPointerException On null arguments.
++	 * @since 2026/04/20
++	 */
++	static DylibMcpServer instance(DylibScritchInterface __api)
++		throws NullPointerException
++	{
++		synchronized (DylibMcpServer.class)
++		{
++			DylibMcpServer rv = DylibMcpServer._INSTANCE;
++			if (rv == null)
++				DylibMcpServer._INSTANCE = (rv = new DylibMcpServer(__api));
++			return rv;
++		}
++	}
++	
++	/**
++	 * Registers the given object.
++	 *
++	 * @param __object The object to register.
++	 * @since 2026/04/20
++	 */
++	void register(DylibBaseObject __object)
++	{
++		if (__object == null)
++			return;
++		
++		synchronized (this)
++		{
++			long objectP = __object.objectPointer();
++			Node node = this.__node(objectP);
++			node.kind = this.__kind(__object);
++			node.object = __object;
++		}
++	}
++	
++	/**
++	 * Forgets the given object.
++	 *
++	 * @param __object The object to forget.
++	 * @since 2026/04/20
++	 */
++	void forget(DylibBaseObject __object)
++	{
++		if (__object == null)
++			return;
++		
++		this.forget(__object.objectPointer());
++	}
++	
++	/**
++	 * Forgets the given pointer.
++	 *
++	 * @param __objectP The object pointer to forget.
++	 * @since 2026/04/20
++	 */
++	void forget(long __objectP)
++	{
++		synchronized (this)
++		{
++			Node remove = this._nodes.remove(__objectP);
++			if (remove == null)
++				return;
++			
++			this.__detachFromParent(remove);
++			for (Long childP : new ArrayList<>(remove.children))
++			{
++				Node child = this._nodes.get(childP);
++				if (child != null)
++					child.parentPointer = null;
++			}
++		}
++	}
++	
++	/**
++	 * Stores the label for the given object.
++	 *
++	 * @param __object The object to modify.
++	 * @param __label The label to set.
++	 * @since 2026/04/20
++	 */
++	void labelSet(DylibBaseObject __object, String __label)
++	{
++		if (__object == null)
++			return;
++		
++		synchronized (this)
++		{
++			Node node = this.__node(__object.objectPointer());
++			node.kind = this.__kind(__object);
++			node.object = __object;
++			node.label = __label;
++		}
++	}
++	
++	/**
++	 * Adds a component to a container.
++	 *
++	 * @param __container The container parent.
++	 * @param __component The component child.
++	 * @since 2026/04/20
++	 */
++	void containerAdd(DylibBaseObject __container, DylibBaseObject __component)
++	{
++		if (__container == null || __component == null)
++			return;
++		
++		synchronized (this)
++		{
++			this.register(__container);
++			this.register(__component);
++			this.__setParent(__component.objectPointer(),
++				__container.objectPointer(), -1);
++		}
++	}
++	
++	/**
++	 * Clears all children from the container.
++	 *
++	 * @param __container The container to clear.
++	 * @since 2026/04/20
++	 */
++	void containerRemoveAll(DylibBaseObject __container)
++	{
++		if (__container == null)
++			return;
++		
++		synchronized (this)
++		{
++			this.register(__container);
++			this.__clearChildren(__container.objectPointer());
++		}
++	}
++	
++	/**
++	 * Sets component bounds within a container.
++	 *
++	 * @param __container The parent container.
++	 * @param __component The child component.
++	 * @param __x The X position.
++	 * @param __y The Y position.
++	 * @param __w The width.
++	 * @param __h The height.
++	 * @since 2026/04/20
++	 */
++	void containerSetBounds(DylibBaseObject __container,
++		DylibBaseObject __component, int __x, int __y, int __w, int __h)
++	{
++		if (__container == null || __component == null)
++			return;
++		
++		synchronized (this)
++		{
++			this.register(__container);
++			this.register(__component);
++			
++			Node node = this.__node(__component.objectPointer());
++			node.relativeBounds = new int[] {__x, __y, __w, __h};
++			this.__setParent(__component.objectPointer(),
++				__container.objectPointer(), -1);
++		}
++	}
++	
++	/**
++	 * Stores the content minimum size for the window.
++	 *
++	 * @param __window The window to modify.
++	 * @param __w The width.
++	 * @param __h The height.
++	 * @since 2026/04/20
++	 */
++	void windowContentMinimumSize(DylibBaseObject __window, int __w, int __h)
++	{
++		if (__window == null)
++			return;
++		
++		synchronized (this)
++		{
++			Node node = this.__node(__window.objectPointer());
++			node.kind = this.__kind(__window);
++			node.object = __window;
++			node.minimumContentSize = new int[] {__w, __h};
++		}
++	}
++	
++	/**
++	 * Stores window visibility.
++	 *
++	 * @param __window The window to modify.
++	 * @param __visible The visible state.
++	 * @since 2026/04/20
++	 */
++	void windowVisible(DylibBaseObject __window, boolean __visible)
++	{
++		if (__window == null)
++			return;
++		
++		synchronized (this)
++		{
++			Node node = this.__node(__window.objectPointer());
++			node.kind = this.__kind(__window);
++			node.object = __window;
++			node.visible = Boolean.valueOf(__visible);
++		}
++	}
++	
++	/**
++	 * Sets the menu bar for the given window.
++	 *
++	 * @param __window The owning window.
++	 * @param __menuBar The menu bar, may be {@code null}.
++	 * @since 2026/04/20
++	 */
++	void windowSetMenuBar(DylibBaseObject __window, DylibBaseObject __menuBar)
++	{
++		if (__window == null)
++			return;
++		
++		synchronized (this)
++		{
++			this.register(__window);
++			Node windowNode = this.__node(__window.objectPointer());
++			
++			if (windowNode.menuBarPointer != null)
++				this.__removeChild(windowNode.pointer,
++					windowNode.menuBarPointer.longValue());
++			windowNode.menuBarPointer = null;
++			
++			if (__menuBar != null)
++			{
++				this.register(__menuBar);
++				windowNode.menuBarPointer = Long.valueOf(__menuBar.objectPointer());
++				this.__setParent(__menuBar.objectPointer(),
++					__window.objectPointer(), -1);
++			}
++		}
++	}
++	
++	/**
++	 * Inserts the menu item into the menu tree.
++	 *
++	 * @param __parent The parent menu node.
++	 * @param __at The insertion index.
++	 * @param __child The child to insert.
++	 * @since 2026/04/20
++	 */
++	void menuInsert(DylibBaseObject __parent, int __at, DylibBaseObject __child)
++	{
++		if (__parent == null || __child == null)
++			return;
++		
++		synchronized (this)
++		{
++			this.register(__parent);
++			this.register(__child);
++			this.__setParent(__child.objectPointer(),
++				__parent.objectPointer(), __at);
++		}
++	}
++	
++	/**
++	 * Clears all menu items from the given parent.
++	 *
++	 * @param __parent The parent to clear.
++	 * @since 2026/04/20
++	 */
++	void menuRemoveAll(DylibBaseObject __parent)
++	{
++		if (__parent == null)
++			return;
++		
++		synchronized (this)
++		{
++			this.register(__parent);
++			this.__clearChildren(__parent.objectPointer());
++		}
++	}
++	
++	/**
++	 * Updates the focus state for the given panel.
++	 *
++	 * @param __panel The panel to modify.
++	 * @param __enabled If focus is enabled.
++	 * @param __default If this is the default item.
++	 * @since 2026/04/20
++	 */
++	void panelEnableFocus(DylibBaseObject __panel, boolean __enabled,
++		boolean __default)
++	{
++		if (__panel == null)
++			return;
++		
++		synchronized (this)
++		{
++			Node node = this.__node(__panel.objectPointer());
++			node.kind = this.__kind(__panel);
++			node.object = __panel;
++			node.focusEnabled = Boolean.valueOf(__enabled);
++			node.defaultFocus = Boolean.valueOf(__default);
++		}
++	}
++	
++	/**
++	 * Updates the viewport area for the given view.
++	 *
++	 * @param __view The view to modify.
++	 * @param __width The width.
++	 * @param __height The height.
++	 * @since 2026/04/20
++	 */
++	void viewSetArea(DylibBaseObject __view, int __width, int __height)
++	{
++		if (__view == null)
++			return;
++		
++		synchronized (this)
++		{
++			Node node = this.__node(__view.objectPointer());
++			node.kind = this.__kind(__view);
++			node.object = __view;
++			node.viewArea = new int[] {__width, __height};
++		}
++	}
++	
++	/**
++	 * Adds a new choice entry.
++	 *
++	 * @param __choice The choice to modify.
++	 * @param __at The inserted index.
++	 * @since 2026/04/20
++	 */
++	void choiceInsert(DylibBaseObject __choice, int __at)
++	{
++		if (__choice == null)
++			return;
++		
++		synchronized (this)
++		{
++			Node node = this.__node(__choice.objectPointer());
++			node.kind = this.__kind(__choice);
++			node.object = __choice;
++			
++			int at = Math.max(0, Math.min(__at, node.choiceEntries.size()));
++			node.choiceEntries.add(at, new ChoiceEntry());
++		}
++	}
++	
++	/**
++	 * Deletes the given choice entry.
++	 *
++	 * @param __choice The choice to modify.
++	 * @param __at The index to delete.
++	 * @since 2026/04/20
++	 */
++	void choiceDelete(DylibBaseObject __choice, int __at)
++	{
++		if (__choice == null)
++			return;
++		
++		synchronized (this)
++		{
++			Node node = this.__node(__choice.objectPointer());
++			node.kind = this.__kind(__choice);
++			node.object = __choice;
++			
++			if (__at >= 0 && __at < node.choiceEntries.size())
++				node.choiceEntries.remove(__at);
++		}
++	}
++	
++	/**
++	 * Clears all choice entries.
++	 *
++	 * @param __choice The choice to clear.
++	 * @since 2026/04/20
++	 */
++	void choiceDeleteAll(DylibBaseObject __choice)
++	{
++		if (__choice == null)
++			return;
++		
++		synchronized (this)
++		{
++			Node node = this.__node(__choice.objectPointer());
++			node.kind = this.__kind(__choice);
++			node.object = __choice;
++			node.choiceEntries.clear();
++		}
++	}
++	
++	/**
++	 * Sets the choice label.
++	 *
++	 * @param __choice The choice to modify.
++	 * @param __at The index to modify.
++	 * @param __label The label to set.
++	 * @since 2026/04/20
++	 */
++	void choiceSetString(DylibBaseObject __choice, int __at, String __label)
++	{
++		if (__choice == null)
++			return;
++		
++		synchronized (this)
++		{
++			Node node = this.__node(__choice.objectPointer());
++			node.kind = this.__kind(__choice);
++			node.object = __choice;
++			ChoiceEntry entry = this.__choiceEntry(node, __at);
++			if (entry != null)
++				entry.label = __label;
++		}
++	}
++	
++	/**
++	 * Sets choice enabled state.
++	 *
++	 * @param __choice The choice to modify.
++	 * @param __at The index to modify.
++	 * @param __enabled The enabled state.
++	 * @since 2026/04/20
++	 */
++	void choiceSetEnabled(DylibBaseObject __choice, int __at,
++		boolean __enabled)
++	{
++		if (__choice == null)
++			return;
++		
++		synchronized (this)
++		{
++			Node node = this.__node(__choice.objectPointer());
++			node.kind = this.__kind(__choice);
++			node.object = __choice;
++			ChoiceEntry entry = this.__choiceEntry(node, __at);
++			if (entry != null)
++				entry.enabled = Boolean.valueOf(__enabled);
++		}
++	}
++	
++	/**
++	 * Sets choice selected state.
++	 *
++	 * @param __choice The choice to modify.
++	 * @param __at The index to modify.
++	 * @param __selected The selected state.
++	 * @since 2026/04/20
++	 */
++	void choiceSetSelected(DylibBaseObject __choice, int __at,
++		boolean __selected)
++	{
++		if (__choice == null)
++			return;
++		
++		synchronized (this)
++		{
++			Node node = this.__node(__choice.objectPointer());
++			node.kind = this.__kind(__choice);
++			node.object = __choice;
++			ChoiceEntry entry = this.__choiceEntry(node, __at);
++			if (entry != null)
++				entry.selected = Boolean.valueOf(__selected);
++		}
++	}
++	
++	/**
++	 * Wraps the activate listener.
++	 *
++	 * @param __component The owning component.
++	 * @param __listener The listener to wrap.
++	 * @return The wrapped listener.
++	 * @since 2026/04/20
++	 */
++	ScritchActivateListener wrapActivate(DylibBaseObject __component,
++		ScritchActivateListener __listener)
++	{
++		if (__component == null)
++			return __listener;
++		
++		synchronized (this)
++		{
++			this.register(__component);
++			Node node = this.__node(__component.objectPointer());
++			if (__listener == null)
++			{
++				node.activateListener = null;
++				return null;
++			}
++			
++			WrappedActivateListener wrapped =
++				new WrappedActivateListener(__component.objectPointer(), __listener);
++			node.activateListener = wrapped;
++			return wrapped;
++		}
++	}
++	
++	/**
++	 * Wraps the input listener.
++	 *
++	 * @param __component The owning component.
++	 * @param __listener The listener to wrap.
++	 * @return The wrapped listener.
++	 * @since 2026/04/20
++	 */
++	ScritchInputListener wrapInput(DylibBaseObject __component,
++		ScritchInputListener __listener)
++	{
++		if (__component == null)
++			return __listener;
++		
++		synchronized (this)
++		{
++			this.register(__component);
++			Node node = this.__node(__component.objectPointer());
++			if (__listener == null)
++			{
++				node.inputListener = null;
++				return null;
++			}
++			
++			WrappedInputListener wrapped =
++				new WrappedInputListener(__component.objectPointer(), __listener);
++			node.inputListener = wrapped;
++			return wrapped;
++		}
++	}
++	
++	/**
++	 * Wraps the visible listener.
++	 *
++	 * @param __component The owning component.
++	 * @param __listener The listener to wrap.
++	 * @return The wrapped listener.
++	 * @since 2026/04/20
++	 */
++	ScritchVisibleListener wrapVisible(DylibBaseObject __component,
++		ScritchVisibleListener __listener)
++	{
++		if (__component == null)
++			return __listener;
++		
++		synchronized (this)
++		{
++			this.register(__component);
++			Node node = this.__node(__component.objectPointer());
++			if (__listener == null)
++			{
++				node.visibleListener = null;
++				return null;
++			}
++			
++			WrappedVisibleListener wrapped =
++				new WrappedVisibleListener(__component.objectPointer(), __listener);
++			node.visibleListener = wrapped;
++			return wrapped;
++		}
++	}
++	
++	/**
++	 * Wraps the close listener.
++	 *
++	 * @param __window The owning window.
++	 * @param __listener The listener to wrap.
++	 * @return The wrapped listener.
++	 * @since 2026/04/20
++	 */
++	ScritchCloseListener wrapClose(DylibBaseObject __window,
++		ScritchCloseListener __listener)
++	{
++		if (__window == null)
++			return __listener;
++		
++		synchronized (this)
++		{
++			this.register(__window);
++			Node node = this.__node(__window.objectPointer());
++			if (__listener == null)
++			{
++				node.closeListener = null;
++				return null;
++			}
++			
++			WrappedCloseListener wrapped =
++				new WrappedCloseListener(__window.objectPointer(), __listener);
++			node.closeListener = wrapped;
++			return wrapped;
++		}
++	}
++	
++	/**
++	 * Wraps the menu item activation listener.
++	 *
++	 * @param __window The owning window.
++	 * @param __listener The listener to wrap.
++	 * @return The wrapped listener.
++	 * @since 2026/04/20
++	 */
++	ScritchMenuItemActivateListener wrapMenuItemActivate(
++		DylibBaseObject __window, ScritchMenuItemActivateListener __listener)
++	{
++		if (__window == null)
++			return __listener;
++		
++		synchronized (this)
++		{
++			this.register(__window);
++			Node node = this.__node(__window.objectPointer());
++			if (__listener == null)
++			{
++				node.menuItemActivateListener = null;
++				return null;
++			}
++			
++			WrappedMenuItemActivateListener wrapped =
++				new WrappedMenuItemActivateListener(__window.objectPointer(),
++					__listener);
++			node.menuItemActivateListener = wrapped;
++			return wrapped;
++		}
++	}
++	
++	/**
++	 * Starts the HTTP server, if configured.
++	 *
++	 * @since 2026/04/20
++	 */
++	private void __startIfRequested()
++	{
++		synchronized (this)
++		{
++			if (this._server != null)
++				return;
++			
++			String rawPort = System.getProperty(DylibMcpServer.PORT_PROPERTY);
++			if (rawPort == null || rawPort.trim().isEmpty())
++				return;
++			
++			final int port;
++			try
++			{
++				port = Integer.parseInt(rawPort.trim());
++			}
++			catch (NumberFormatException __e)
++			{
++				throw new IllegalArgumentException(String.format(
++					"Invalid MCP port: %s", rawPort), __e);
++			}
++			
++			if (port <= 0)
++				return;
++			
++			try
++			{
++				HttpServer server = HttpServer.create(
++					new InetSocketAddress(InetAddress.getByName("127.0.0.1"),
++						port), 0);
++				server.createContext(this._endpointPath, new DylibMcpHttpHandler());
++				server.setExecutor(Executors.newCachedThreadPool());
++				server.start();
++				this._server = server;
++				
++				System.err.println(String.format(
++					"SquirrelJME MCP listening on http://127.0.0.1:%d%s",
++					port, this._endpointPath));
++			}
++			catch (IOException __e)
++			{
++				throw new RuntimeException("Could not start MCP server.", __e);
++			}
++		}
++	}
++	
++	/**
++	 * Normalizes the endpoint path.
++	 *
++	 * @param __path The path to normalize.
++	 * @return The normalized path.
++	 * @throws NullPointerException On null arguments.
++	 * @since 2026/04/20
++	 */
++	private static String __normalizeEndpointPath(String __path)
++		throws NullPointerException
++	{
++		if (__path == null)
++			throw new NullPointerException("NARG");
++		
++		String path = __path.trim();
++		if (path.isEmpty())
++			return "/mcp";
++		if (!path.startsWith("/"))
++			path = "/" + path;
++		return path;
++	}
++	
++	/**
++	 * Determines the kind of the given object.
++	 *
++	 * @param __object The object to inspect.
++	 * @return The detected kind.
++	 * @since 2026/04/20
++	 */
++	private String __kind(DylibBaseObject __object)
++	{
++		if (__object instanceof DylibScreenObject)
++			return "screen";
++		if (__object instanceof DylibWindowObject)
++			return "window";
++		if (__object instanceof DylibScrollPanelObject)
++			return "scroll-panel";
++		if (__object instanceof DylibPanelObject)
++			return "panel";
++		if (__object instanceof DylibListObject)
++			return "list";
++		if (__object instanceof DylibMenuBarObject)
++			return "menu-bar";
++		if (__object instanceof DylibMenuItemObject)
++			return "menu-item";
++		if (__object instanceof DylibMenuObject)
++			return "menu";
++		
++		if (__object instanceof DylibChoiceObject)
++			return "choice";
++		if (__object instanceof DylibContainerObject)
++			return "container";
++		if (__object instanceof DylibComponentObject)
++			return "component";
++		return "object";
++	}
++	
++	/**
++	 * Returns the node for the given pointer.
++	 *
++	 * @param __pointer The pointer to look up.
++	 * @return The resultant node.
++	 * @since 2026/04/20
++	 */
++	private Node __node(long __pointer)
++	{
++		Node rv = this._nodes.get(__pointer);
++		if (rv == null)
++		{
++			rv = new Node(__pointer);
++			this._nodes.put(__pointer, rv);
++		}
++		return rv;
++	}
++	
++	/**
++	 * Clears all children of the given parent.
++	 *
++	 * @param __parentP The parent to clear.
++	 * @since 2026/04/20
++	 */
++	private void __clearChildren(long __parentP)
++	{
++		Node parent = this._nodes.get(__parentP);
++		if (parent == null)
++			return;
++		
++		for (Long childP : new ArrayList<>(parent.children))
++		{
++			Node child = this._nodes.get(childP);
++			if (child != null)
++				child.parentPointer = null;
++		}
++		parent.children.clear();
++	}
++	
++	/**
++	 * Detaches the given node from its parent.
++	 *
++	 * @param __node The node to detach.
++	 * @since 2026/04/20
++	 */
++	private void __detachFromParent(Node __node)
++	{
++		if (__node == null || __node.parentPointer == null)
++			return;
++		
++		Node parent = this._nodes.get(__node.parentPointer);
++		if (parent != null)
++			parent.children.remove(Long.valueOf(__node.pointer));
++		__node.parentPointer = null;
++	}
++	
++	/**
++	 * Removes the given child from the parent.
++	 *
++	 * @param __parentP The parent pointer.
++	 * @param __childP The child pointer.
++	 * @since 2026/04/20
++	 */
++	private void __removeChild(long __parentP, long __childP)
++	{
++		Node parent = this._nodes.get(__parentP);
++		if (parent != null)
++			parent.children.remove(Long.valueOf(__childP));
++		
++		Node child = this._nodes.get(__childP);
++		if (child != null)
++			child.parentPointer = null;
++	}
++	
++	/**
++	 * Sets the parent-child relationship.
++	 *
++	 * @param __childP The child pointer.
++	 * @param __parentP The parent pointer.
++	 * @param __at The insertion index, negative to append.
++	 * @since 2026/04/20
++	 */
++	private void __setParent(long __childP, long __parentP, int __at)
++	{
++		Node child = this.__node(__childP);
++		Node parent = this.__node(__parentP);
++		
++		if (child.parentPointer != null)
++		{
++			Node oldParent = this._nodes.get(child.parentPointer);
++			if (oldParent != null)
++				oldParent.children.remove(Long.valueOf(__childP));
++		}
++		
++		child.parentPointer = Long.valueOf(__parentP);
++		parent.children.remove(Long.valueOf(__childP));
++		
++		if (__at < 0 || __at >= parent.children.size())
++			parent.children.add(Long.valueOf(__childP));
++		else
++			parent.children.add(__at, Long.valueOf(__childP));
++	}
++	
++	/**
++	 * Returns the choice entry at the given index.
++	 *
++	 * @param __node The choice node.
++	 * @param __at The index to access.
++	 * @return The choice entry or {@code null}.
++	 * @since 2026/04/20
++	 */
++	private ChoiceEntry __choiceEntry(Node __node, int __at)
++	{
++		if (__node == null || __at < 0)
++			return null;
++		
++		while (__node.choiceEntries.size() <= __at)
++			__node.choiceEntries.add(new ChoiceEntry());
++		
++		return __node.choiceEntries.get(__at);
++	}
++	
++	/**
++	 * Returns the node for the given control ID.
++	 *
++	 * @param __controlId The control ID.
++	 * @return The resultant node.
++	 * @throws ToolException If the control does not exist.
++	 * @since 2026/04/20
++	 */
++	private Node __requireNodeById(String __controlId)
++		throws ToolException
++	{
++		if (__controlId == null || __controlId.trim().isEmpty())
++			throw new ToolException("A control id is required.");
++		
++		synchronized (this)
++		{
++			for (Node node : this._nodes.values())
++				if (__controlId.equals(node.id))
++					return node;
++		}
++		
++		throw new ToolException(String.format(
++			"Unknown control: %s", __controlId));
++	}
++	
++	/**
++	 * Records an event against the given object.
++	 *
++	 * @param __objectP The object pointer.
++	 * @param __event The event name.
++	 * @param __detail Extra detail.
++	 * @since 2026/04/20
++	 */
++	private void __recordEvent(long __objectP, String __event, String __detail)
++	{
++		synchronized (this)
++		{
++			Node node = this.__node(__objectP);
++			node.lastEvent = __event;
++			node.lastEventDetail = __detail;
++			node.lastEventMillis = Long.valueOf(System.currentTimeMillis());
++		}
++	}
++	
++	/**
++	 * Sends a JSON response.
++	 *
++	 * @param __exchange The HTTP exchange.
++	 * @param __status The HTTP status code.
++	 * @param __payload The payload to send.
++	 * @throws IOException If it could not be sent.
++	 * @since 2026/04/20
++	 */
++	private void __sendJson(HttpExchange __exchange, int __status,
++		JsonObject __payload)
++		throws IOException
++	{
++		byte[] bytes = this.__jsonString(__payload).getBytes("utf-8");
++		
++		Headers headers = __exchange.getResponseHeaders();
++		headers.set("Content-Type", "application/json");
++		headers.set("MCP-Session-Id", this._sessionId);
++		headers.set("MCP-Protocol-Version", DylibMcpServer.PROTOCOL_VERSION);
++		
++		__exchange.sendResponseHeaders(__status, bytes.length);
++		__exchange.getResponseBody().write(bytes);
++	}
++	
++	/**
++	 * Sends an empty response.
++	 *
++	 * @param __exchange The HTTP exchange.
++	 * @param __status The HTTP status.
++	 * @throws IOException If it could not be sent.
++	 * @since 2026/04/20
++	 */
++	private void __sendEmpty(HttpExchange __exchange, int __status)
++		throws IOException
++	{
++		Headers headers = __exchange.getResponseHeaders();
++		headers.set("MCP-Session-Id", this._sessionId);
++		headers.set("MCP-Protocol-Version", DylibMcpServer.PROTOCOL_VERSION);
++		__exchange.sendResponseHeaders(__status, -1);
++	}
++	
++	/**
++	 * Returns whether the origin is accepted.
++	 *
++	 * @param __origin The origin header.
++	 * @return If the origin is accepted.
++	 * @since 2026/04/20
++	 */
++	private boolean __isAllowedOrigin(String __origin)
++	{
++		if (__origin == null || __origin.trim().isEmpty())
++			return true;
++		
++		try
++		{
++			URI uri = URI.create(__origin.trim());
++			String host = uri.getHost();
++			if (host == null)
++				return false;
++			
++			return "localhost".equalsIgnoreCase(host) ||
++				"127.0.0.1".equals(host) ||
++				"::1".equals(host) ||
++				"[::1]".equals(host);
++		}
++		catch (IllegalArgumentException __e)
++		{
++			return false;
++		}
++	}
++	
++	/**
++	 * Returns the JSON-RPC error payload.
++	 *
++	 * @param __id The request ID, may be {@code null}.
++	 * @param __code The error code.
++	 * @param __message The error message.
++	 * @return The error payload.
++	 * @since 2026/04/20
++	 */
++	private JsonObject __jsonRpcError(JsonValue __id, int __code,
++		String __message)
++	{
++		JsonObjectBuilder error = this._json.createObjectBuilder()
++			.add("code", __code)
++			.add("message", (__message == null ? "Unknown error." : __message));
++		
++		JsonObjectBuilder payload = this._json.createObjectBuilder()
++			.add("jsonrpc", "2.0")
++			.add("error", error.build());
++		if (__id != null)
++			payload.add("id", __id);
++		return payload.build();
++	}
++	
++	/**
++	 * Returns the JSON-RPC success payload.
++	 *
++	 * @param __id The request ID.
++	 * @param __result The result payload.
++	 * @return The success payload.
++	 * @since 2026/04/20
++	 */
++	private JsonObject __jsonRpcResult(JsonValue __id, JsonObject __result)
++	{
++		JsonObjectBuilder payload = this._json.createObjectBuilder()
++			.add("jsonrpc", "2.0")
++			.add("id", __id)
++			.add("result", __result);
++		return payload.build();
++	}
++	
++	/**
++	 * Returns the text form of the given JSON structure.
++	 *
++	 * @param __value The value to stringify.
++	 * @return The resultant JSON string.
++	 * @since 2026/04/20
++	 */
++	private String __jsonString(JsonObject __value)
++	{
++		StringWriter out = new StringWriter();
++		this._json.createWriter(out).write(__value);
++		return out.toString();
++	}
++	
++	/**
++	 * Returns a string value from the given object.
++	 *
++	 * @param __object The source object.
++	 * @param __key The key to read.
++	 * @return The string value or {@code null}.
++	 * @since 2026/04/20
++	 */
++	private static String __string(JsonObject __object, String __key)
++	{
++		if (__object == null || __key == null || !__object.containsKey(__key))
++			return null;
++		if (JsonValue.NULL.equals(__object.get(__key)))
++			return null;
++		return __object.getString(__key, null);
++	}
++	
++	/**
++	 * Returns a boolean value from the given object.
++	 *
++	 * @param __object The source object.
++	 * @param __key The key to read.
++	 * @param __defaultValue The default value.
++	 * @return The boolean value.
++	 * @since 2026/04/20
++	 */
++	private static boolean __boolean(JsonObject __object, String __key,
++		boolean __defaultValue)
++	{
++		if (__object == null || __key == null || !__object.containsKey(__key))
++			return __defaultValue;
++		return __object.getBoolean(__key, __defaultValue);
++	}
++	
++	/**
++	 * Returns an integer value from the given object.
++	 *
++	 * @param __object The source object.
++	 * @param __key The key to read.
++	 * @return The integer value.
++	 * @throws ToolException If the value is not present.
++	 * @since 2026/04/20
++	 */
++	private static int __requiredInt(JsonObject __object, String __key)
++		throws ToolException
++	{
++		if (__object == null || __key == null || !__object.containsKey(__key))
++			throw new ToolException(String.format(
++				"Missing required integer: %s", __key));
++		try
++		{
++			return __object.getInt(__key);
++		}
++		catch (RuntimeException __e)
++		{
++			throw new ToolException(String.format(
++				"Invalid integer value for %s.", __key), __e);
++		}
++	}
++	
++	/**
++	 * Returns a JSON object value from the given object.
++	 *
++	 * @param __object The object to inspect.
++	 * @param __key The key to read.
++	 * @return The object value or an empty object.
++	 * @since 2026/04/20
++	 */
++	private static JsonObject __object(JsonObject __object, String __key)
++	{
++		if (__object == null || __key == null || !__object.containsKey(__key))
++			return Json.createObjectBuilder().build();
++		
++		JsonValue value = __object.get(__key);
++		if (value instanceof JsonObject)
++			return (JsonObject)value;
++		return Json.createObjectBuilder().build();
++	}
++	
++	/**
++	 * Calls a tool.
++	 *
++	 * @param __name The tool name.
++	 * @param __arguments The tool arguments.
++	 * @return The call result object.
++	 * @throws Exception On failures.
++	 * @since 2026/04/20
++	 */
++	private JsonObject __callTool(String __name, JsonObject __arguments)
++		throws Exception
++	{
++		if ("scritch.snapshot".equals(__name))
++			return this.__toolSnapshot(__arguments);
++		if ("scritch.activate".equals(__name))
++			return this.__toolActivate(__arguments);
++		if ("scritch.close_window".equals(__name))
++			return this.__toolCloseWindow(__arguments);
++		if ("scritch.set_window_visible".equals(__name))
++			return this.__toolSetWindowVisible(__arguments);
++		if ("scritch.set_bounds".equals(__name))
++			return this.__toolSetBounds(__arguments);
++		if ("scritch.select_choice".equals(__name))
++			return this.__toolSelectChoice(__arguments);
++		if ("scritch.send_input".equals(__name))
++			return this.__toolSendInput(__arguments);
++		if ("scritch.screenshot".equals(__name))
++			return this.__toolScreenshot(__arguments);
++		
++		throw new ToolException(String.format(
++			"Unknown tool: %s", __name));
++	}
++	
++	/**
++	 * Builds the tool list payload.
++	 *
++	 * @return The tool list payload.
++	 * @since 2026/04/20
++	 */
++	private JsonObject __toolListPayload()
++	{
++		JsonArrayBuilder tools = this._json.createArrayBuilder();
++		
++		tools.add(this.__toolDefinition("scritch.snapshot",
++			"Inspect the live ScritchUI control tree and current state.",
++			this.__schemaObject(
++				this.__schemaProperty("rootId",
++					this.__schemaType("string")),
++				this.__schemaProperty("includeAll",
++					this.__schemaType("boolean")))));
++		
++		tools.add(this.__toolDefinition("scritch.activate",
++			"Invoke an activate-capable control or menu item.",
++			this.__schemaObject(true, "id",
++				this.__schemaProperty("id",
++					this.__schemaType("string")))));
++		
++		tools.add(this.__toolDefinition("scritch.close_window",
++			"Invoke a window close listener directly.",
++			this.__schemaObject(true, "id",
++				this.__schemaProperty("id",
++					this.__schemaType("string")))));
++		
++		tools.add(this.__toolDefinition("scritch.set_window_visible",
++			"Show or hide a ScritchUI window.",
++			this.__schemaObject(true, "id", "visible",
++				this.__schemaProperty("id",
++					this.__schemaType("string")),
++				this.__schemaProperty("visible",
++					this.__schemaType("boolean")))));
++		
++		tools.add(this.__toolDefinition("scritch.set_bounds",
++			"Change a component's bounds within its parent container.",
++			this.__schemaObject(true, "id", "x", "y", "width", "height",
++				this.__schemaProperty("id",
++					this.__schemaType("string")),
++				this.__schemaProperty("x",
++					this.__schemaType("integer")),
++				this.__schemaProperty("y",
++					this.__schemaType("integer")),
++				this.__schemaProperty("width",
++					this.__schemaType("integer")),
++				this.__schemaProperty("height",
++					this.__schemaType("integer")))));
++		
++		tools.add(this.__toolDefinition("scritch.select_choice",
++			"Select a choice or list entry by index.",
++			this.__schemaObject(true, "id", "index",
++				this.__schemaProperty("id",
++					this.__schemaType("string")),
++				this.__schemaProperty("index",
++					this.__schemaType("integer")))));
++		
++		tools.add(this.__toolDefinition("scritch.send_input",
++			"Send a raw input event to a control with an input listener.",
++			this.__schemaObject(true, "id", "type",
++				this.__schemaProperty("id",
++					this.__schemaType("string")),
++				this.__schemaProperty("type",
++					this.__schemaType("integer")),
++				this.__schemaProperty("time",
++					this.__schemaType("integer")),
++				this.__schemaProperty("a",
++					this.__schemaType("integer")),
++				this.__schemaProperty("b",
++					this.__schemaType("integer")),
++				this.__schemaProperty("c",
++					this.__schemaType("integer")),
++				this.__schemaProperty("d",
++					this.__schemaType("integer")),
++				this.__schemaProperty("e",
++					this.__schemaType("integer")),
++				this.__schemaProperty("f",
++					this.__schemaType("integer")),
++				this.__schemaProperty("g",
++					this.__schemaType("integer")),
++				this.__schemaProperty("h",
++					this.__schemaType("integer")),
++				this.__schemaProperty("i",
++					this.__schemaType("integer")),
++				this.__schemaProperty("j",
++					this.__schemaType("integer")),
++				this.__schemaProperty("k",
++					this.__schemaType("integer")),
++				this.__schemaProperty("l",
++					this.__schemaType("integer")))));
++		
++		tools.add(this.__toolDefinition("scritch.screenshot",
++			"Capture a screenshot of a control, window, or screen.",
++			this.__schemaObject(
++				this.__schemaProperty("id",
++					this.__schemaType("string")))));
++		
++		return this._json.createObjectBuilder()
++			.add("tools", tools.build())
++			.build();
++	}
++	
++	/**
++	 * Builds a tool definition.
++	 *
++	 * @param __name The tool name.
++	 * @param __description The description.
++	 * @param __schema The input schema.
++	 * @return The tool definition.
++	 * @since 2026/04/20
++	 */
++	private JsonObject __toolDefinition(String __name, String __description,
++		JsonObject __schema)
++	{
++		return this._json.createObjectBuilder()
++			.add("name", __name)
++			.add("description", __description)
++			.add("inputSchema", __schema)
++			.build();
++	}
++	
++	/**
++	 * Builds an object schema.
++	 *
++	 * @param __properties The schema properties.
++	 * @return The schema object.
++	 * @since 2026/04/20
++	 */
++	private JsonObject __schemaObject(JsonObject... __properties)
++	{
++		return this.__schemaObject(false, new String[0], __properties);
++	}
++	
++	/**
++	 * Builds an object schema.
++	 *
++	 * @param __hasRequired Are required properties present?
++	 * @param __required Required keys.
++	 * @param __properties The schema properties.
++	 * @return The schema object.
++	 * @since 2026/04/20
++	 */
++	private JsonObject __schemaObject(boolean __hasRequired, String[] __required,
++		JsonObject... __properties)
++	{
++		JsonObjectBuilder props = this._json.createObjectBuilder();
++		for (JsonObject property : __properties)
++			for (String key : property.keySet())
++				props.add(key, property.get(key));
++		
++		JsonObjectBuilder rv = this._json.createObjectBuilder()
++			.add("type", "object")
++			.add("additionalProperties", false)
++			.add("properties", props.build());
++		
++		if (__hasRequired && __required.length > 0)
++		{
++			JsonArrayBuilder required = this._json.createArrayBuilder();
++			for (String key : __required)
++				required.add(key);
++			rv.add("required", required.build());
++		}
++		
++		return rv.build();
++	}
++	
++	/**
++	 * Builds an object schema with required keys.
++	 *
++	 * @param __hasRequired Always true when required keys are passed.
++	 * @param __required Required keys.
++	 * @param __properties Schema properties.
++	 * @return The schema object.
++	 * @since 2026/04/20
++	 */
++	private JsonObject __schemaObject(boolean __hasRequired, String __required,
++		JsonObject... __properties)
++	{
++		return this.__schemaObject(__hasRequired, new String[] {__required},
++			__properties);
++	}
++	
++	/**
++	 * Builds an object schema with required keys.
++	 *
++	 * @param __hasRequired Always true when required keys are passed.
++	 * @param __requiredA The first required key.
++	 * @param __requiredB The second required key.
++	 * @param __properties Schema properties.
++	 * @return The schema object.
++	 * @since 2026/04/20
++	 */
++	private JsonObject __schemaObject(boolean __hasRequired, String __requiredA,
++		String __requiredB, JsonObject... __properties)
++	{
++		return this.__schemaObject(__hasRequired,
++			new String[] {__requiredA, __requiredB}, __properties);
++	}
++	
++	/**
++	 * Builds an object schema with required keys.
++	 *
++	 * @param __hasRequired Always true when required keys are passed.
++	 * @param __requiredA The first required key.
++	 * @param __requiredB The second required key.
++	 * @param __requiredC The third required key.
++	 * @param __properties Schema properties.
++	 * @return The schema object.
++	 * @since 2026/04/20
++	 */
++	private JsonObject __schemaObject(boolean __hasRequired, String __requiredA,
++		String __requiredB, String __requiredC, JsonObject... __properties)
++	{
++		return this.__schemaObject(__hasRequired,
++			new String[] {__requiredA, __requiredB, __requiredC}, __properties);
++	}
++	
++	/**
++	 * Builds an object schema with required keys.
++	 *
++	 * @param __hasRequired Always true when required keys are passed.
++	 * @param __requiredA The first required key.
++	 * @param __requiredB The second required key.
++	 * @param __requiredC The third required key.
++	 * @param __requiredD The fourth required key.
++	 * @param __requiredE The fifth required key.
++	 * @param __properties Schema properties.
++	 * @return The schema object.
++	 * @since 2026/04/20
++	 */
++	private JsonObject __schemaObject(boolean __hasRequired, String __requiredA,
++		String __requiredB, String __requiredC, String __requiredD,
++		String __requiredE, JsonObject... __properties)
++	{
++		return this.__schemaObject(__hasRequired,
++			new String[] {__requiredA, __requiredB, __requiredC, __requiredD,
++				__requiredE}, __properties);
++	}
++	
++	/**
++	 * Builds a schema property.
++	 *
++	 * @param __name The property name.
++	 * @param __schema The property schema.
++	 * @return The property object.
++	 * @since 2026/04/20
++	 */
++	private JsonObject __schemaProperty(String __name, JsonObject __schema)
++	{
++		return this._json.createObjectBuilder()
++			.add(__name, __schema)
++			.build();
++	}
++	
++	/**
++	 * Builds a basic type schema.
++	 *
++	 * @param __type The type string.
++	 * @return The schema object.
++	 * @since 2026/04/20
++	 */
++	private JsonObject __schemaType(String __type)
++	{
++		return this._json.createObjectBuilder()
++			.add("type", __type)
++			.build();
++	}
++	
++	/**
++	 * Builds a successful tool result.
++	 *
++	 * @param __payload The structured payload.
++	 * @return The result object.
++	 * @since 2026/04/20
++	 */
++	private JsonObject __toolSuccess(JsonObject __payload)
++	{
++		JsonObject text = this._json.createObjectBuilder()
++			.add("type", "text")
++			.add("text", this.__jsonString(__payload))
++			.build();
++		
++		JsonArrayBuilder content = this._json.createArrayBuilder();
++		content.add(text);
++		
++		return this._json.createObjectBuilder()
++			.add("content", content.build())
++			.add("structuredContent", __payload)
++			.add("isError", false)
++			.build();
++	}
++	
++	/**
++	 * Builds a successful tool result with an image.
++	 *
++	 * @param __payload Structured payload.
++	 * @param __data Image data.
++	 * @param __mimeType The image MIME type.
++	 * @return The result object.
++	 * @since 2026/04/20
++	 */
++	private JsonObject __toolSuccessWithImage(JsonObject __payload,
++		String __data, String __mimeType)
++	{
++		JsonArrayBuilder content = this._json.createArrayBuilder();
++		content.add(this._json.createObjectBuilder()
++			.add("type", "text")
++			.add("text", this.__jsonString(__payload))
++			.build());
++		content.add(this._json.createObjectBuilder()
++			.add("type", "image")
++			.add("data", __data)
++			.add("mimeType", __mimeType)
++			.build());
++		
++		return this._json.createObjectBuilder()
++			.add("content", content.build())
++			.add("structuredContent", __payload)
++			.add("isError", false)
++			.build();
++	}
++	
++	/**
++	 * Builds a tool error result.
++	 *
++	 * @param __message The error message.
++	 * @return The error result.
++	 * @since 2026/04/20
++	 */
++	private JsonObject __toolError(String __message)
++	{
++		JsonObject payload = this._json.createObjectBuilder()
++			.add("error", (__message == null ? "Unknown error." : __message))
++			.build();
++		
++		JsonArrayBuilder content = this._json.createArrayBuilder();
++		content.add(this._json.createObjectBuilder()
++			.add("type", "text")
++			.add("text", payload.getString("error"))
++			.build());
++		
++		return this._json.createObjectBuilder()
++			.add("content", content.build())
++			.add("structuredContent", payload)
++			.add("isError", true)
++			.build();
++	}
++	
++	/**
++	 * Executes work on the ScritchUI event loop.
++	 *
++	 * @param __work The work to execute.
++	 * @return The resultant value.
++	 * @throws Exception On failures.
++	 * @since 2026/04/20
++	 */
++	private <T> T __onEventLoop(Work<T> __work)
++		throws Exception
++	{
++		if (__work == null)
++			throw new NullPointerException("NARG");
++		
++		final Holder<T> result = new Holder<>();
++		final Exception[] failure = new Exception[1];
++		
++		this._api.eventLoop().loopExecuteWait(new Runnable()
++		{
++			@Override
++			public void run()
++			{
++				try
++				{
++					result.value = __work.run();
++				}
++				catch (Exception __e)
++				{
++					failure[0] = __e;
++				}
++			}
++		});
++		
++		if (failure[0] != null)
++			throw failure[0];
++		return result.value;
++	}
++	
++	/**
++	 * Returns the snapshot tool result.
++	 *
++	 * @param __arguments Tool arguments.
++	 * @return The result object.
++	 * @throws Exception On failures.
++	 * @since 2026/04/20
++	 */
++	private JsonObject __toolSnapshot(JsonObject __arguments)
++		throws Exception
++	{
++		final String rootId = DylibMcpServer.__string(__arguments, "rootId");
++		
++		JsonObject payload = this.__onEventLoop(new Work<JsonObject>()
++		{
++			@Override
++			public JsonObject run()
++				throws Exception
++			{
++				return DylibMcpServer.this.__snapshot(rootId);
++			}
++		});
++		
++		return this.__toolSuccess(payload);
++	}
++	
++	/**
++	 * Returns the activate tool result.
++	 *
++	 * @param __arguments Tool arguments.
++	 * @return The result object.
++	 * @throws Exception On failures.
++	 * @since 2026/04/20
++	 */
++	private JsonObject __toolActivate(JsonObject __arguments)
++		throws Exception
++	{
++		final String controlId = DylibMcpServer.__string(__arguments, "id");
++		JsonObject payload = this.__onEventLoop(new Work<JsonObject>()
++		{
++			@Override
++			public JsonObject run()
++				throws Exception
++			{
++				Node node = DylibMcpServer.this.__requireNodeById(controlId);
++				
++				if (node.activateListener != null &&
++					node.object instanceof ScritchComponentBracket)
++				{
++					node.activateListener.activate(
++						(ScritchComponentBracket)node.object);
++					
++					return DylibMcpServer.this._json.createObjectBuilder()
++						.add("id", node.id)
++						.add("kind", node.kind)
++						.add("action", "activate")
++						.add("mode", "component")
++						.build();
++				}
++				
++				if (node.object instanceof DylibMenuKindObject)
++				{
++					Node window = DylibMcpServer.this.__windowForMenuNode(node);
++					if (window != null && window.menuItemActivateListener != null)
++					{
++						window.menuItemActivateListener.menuItemActivate(
++							(ScritchWindowBracket)window.object,
++							(ScritchMenuKindBracket)node.object);
++						
++						return DylibMcpServer.this._json.createObjectBuilder()
++							.add("id", node.id)
++							.add("kind", node.kind)
++							.add("action", "activate")
++							.add("mode", "menu")
++							.add("windowId", window.id)
++							.build();
++					}
++				}
++				
++				throw new ToolException(String.format(
++					"Control %s does not support activation.", node.id));
++			}
++		});
++		
++		return this.__toolSuccess(payload);
++	}
++	
++	/**
++	 * Returns the close window tool result.
++	 *
++	 * @param __arguments Tool arguments.
++	 * @return The result object.
++	 * @throws Exception On failures.
++	 * @since 2026/04/20
++	 */
++	private JsonObject __toolCloseWindow(JsonObject __arguments)
++		throws Exception
++	{
++		final String controlId = DylibMcpServer.__string(__arguments, "id");
++		JsonObject payload = this.__onEventLoop(new Work<JsonObject>()
++		{
++			@Override
++			public JsonObject run()
++				throws Exception
++			{
++				Node node = DylibMcpServer.this.__requireNodeById(controlId);
++				if (!(node.object instanceof ScritchWindowBracket) ||
++					node.closeListener == null)
++					throw new ToolException(String.format(
++						"Window %s does not have a close listener.", node.id));
++				
++				boolean cancelled = node.closeListener.closed(
++					(ScritchWindowBracket)node.object);
++				
++				return DylibMcpServer.this._json.createObjectBuilder()
++					.add("id", node.id)
++					.add("kind", node.kind)
++					.add("action", "close_window")
++					.add("cancelled", cancelled)
++					.build();
++			}
++		});
++		
++		return this.__toolSuccess(payload);
++	}
++	
++	/**
++	 * Returns the set window visibility tool result.
++	 *
++	 * @param __arguments Tool arguments.
++	 * @return The result object.
++	 * @throws Exception On failures.
++	 * @since 2026/04/20
++	 */
++	private JsonObject __toolSetWindowVisible(JsonObject __arguments)
++		throws Exception
++	{
++		final String controlId = DylibMcpServer.__string(__arguments, "id");
++		final boolean visible = DylibMcpServer.__boolean(__arguments,
++			"visible", true);
++		
++		JsonObject payload = this.__onEventLoop(new Work<JsonObject>()
++		{
++			@Override
++			public JsonObject run()
++				throws Exception
++			{
++				Node node = DylibMcpServer.this.__requireNodeById(controlId);
++				if (!(node.object instanceof DylibWindowObject))
++					throw new ToolException(String.format(
++						"Control %s is not a window.", node.id));
++				
++				DylibMcpServer.this._api.window().windowSetVisible(
++					(DylibWindowObject)node.object, visible);
++				
++				return DylibMcpServer.this._json.createObjectBuilder()
++					.add("id", node.id)
++					.add("kind", node.kind)
++					.add("action", "set_window_visible")
++					.add("visible", visible)
++					.build();
++			}
++		});
++		
++		return this.__toolSuccess(payload);
++	}
++	
++	/**
++	 * Returns the set bounds tool result.
++	 *
++	 * @param __arguments Tool arguments.
++	 * @return The result object.
++	 * @throws Exception On failures.
++	 * @since 2026/04/20
++	 */
++	private JsonObject __toolSetBounds(JsonObject __arguments)
++		throws Exception
++	{
++		final String controlId = DylibMcpServer.__string(__arguments, "id");
++		final int x = DylibMcpServer.__requiredInt(__arguments, "x");
++		final int y = DylibMcpServer.__requiredInt(__arguments, "y");
++		final int w = DylibMcpServer.__requiredInt(__arguments, "width");
++		final int h = DylibMcpServer.__requiredInt(__arguments, "height");
++		
++		JsonObject payload = this.__onEventLoop(new Work<JsonObject>()
++		{
++			@Override
++			public JsonObject run()
++				throws Exception
++			{
++				Node node = DylibMcpServer.this.__requireNodeById(controlId);
++				if (!(node.object instanceof DylibComponentObject))
++					throw new ToolException(String.format(
++						"Control %s is not a component.", node.id));
++				if (node.parentPointer == null)
++					throw new ToolException(String.format(
++						"Control %s does not have a parent container.", node.id));
++				
++				Node parent = DylibMcpServer.this._nodes.get(node.parentPointer);
++				if (parent == null || !(parent.object instanceof DylibContainerObject))
++					throw new ToolException(String.format(
++						"Parent of %s is not a container.", node.id));
++				
++				DylibMcpServer.this._api.container().containerSetBounds(
++					(ScritchContainerBracket)parent.object,
++					(DylibComponentObject)node.object, x, y, w, h);
++				
++				return DylibMcpServer.this._json.createObjectBuilder()
++					.add("id", node.id)
++					.add("kind", node.kind)
++					.add("action", "set_bounds")
++					.add("bounds", DylibMcpServer.this.__boundsObject(x, y, w, h))
++					.build();
++			}
++		});
++		
++		return this.__toolSuccess(payload);
++	}
++	
++	/**
++	 * Returns the select choice tool result.
++	 *
++	 * @param __arguments Tool arguments.
++	 * @return The result object.
++	 * @throws Exception On failures.
++	 * @since 2026/04/20
++	 */
++	private JsonObject __toolSelectChoice(JsonObject __arguments)
++		throws Exception
++	{
++		final String controlId = DylibMcpServer.__string(__arguments, "id");
++		final int index = DylibMcpServer.__requiredInt(__arguments, "index");
++		
++		JsonObject payload = this.__onEventLoop(new Work<JsonObject>()
++		{
++			@Override
++			public JsonObject run()
++				throws Exception
++			{
++				Node node = DylibMcpServer.this.__requireNodeById(controlId);
++				if (!(node.object instanceof DylibChoiceObject))
++					throw new ToolException(String.format(
++						"Control %s is not a choice/list.", node.id));
++				
++				DylibMcpServer.this._api.choice().choiceSetSelected(
++					(ScritchChoiceBracket)node.object, index, true);
++				
++				return DylibMcpServer.this._json.createObjectBuilder()
++					.add("id", node.id)
++					.add("kind", node.kind)
++					.add("action", "select_choice")
++					.add("index", index)
++					.build();
++			}
++		});
++		
++		return this.__toolSuccess(payload);
++	}
++	
++	/**
++	 * Returns the send input tool result.
++	 *
++	 * @param __arguments Tool arguments.
++	 * @return The result object.
++	 * @throws Exception On failures.
++	 * @since 2026/04/20
++	 */
++	private JsonObject __toolSendInput(JsonObject __arguments)
++		throws Exception
++	{
++		final String controlId = DylibMcpServer.__string(__arguments, "id");
++		final int type = DylibMcpServer.__requiredInt(__arguments, "type");
++		final long time = (__arguments.containsKey("time") ?
++			(long)__arguments.getInt("time") : System.currentTimeMillis());
++		final int a = (__arguments.containsKey("a") ? __arguments.getInt("a") : 0);
++		final int b = (__arguments.containsKey("b") ? __arguments.getInt("b") : 0);
++		final int c = (__arguments.containsKey("c") ? __arguments.getInt("c") : 0);
++		final int d = (__arguments.containsKey("d") ? __arguments.getInt("d") : 0);
++		final int e = (__arguments.containsKey("e") ? __arguments.getInt("e") : 0);
++		final int f = (__arguments.containsKey("f") ? __arguments.getInt("f") : 0);
++		final int g = (__arguments.containsKey("g") ? __arguments.getInt("g") : 0);
++		final int h = (__arguments.containsKey("h") ? __arguments.getInt("h") : 0);
++		final int i = (__arguments.containsKey("i") ? __arguments.getInt("i") : 0);
++		final int j = (__arguments.containsKey("j") ? __arguments.getInt("j") : 0);
++		final int k = (__arguments.containsKey("k") ? __arguments.getInt("k") : 0);
++		final int l = (__arguments.containsKey("l") ? __arguments.getInt("l") : 0);
++		
++		JsonObject payload = this.__onEventLoop(new Work<JsonObject>()
++		{
++			@Override
++			public JsonObject run()
++				throws Exception
++			{
++				Node node = DylibMcpServer.this.__requireNodeById(controlId);
++				if (!(node.object instanceof ScritchComponentBracket) ||
++					node.inputListener == null)
++					throw new ToolException(String.format(
++						"Control %s does not have an input listener.", node.id));
++				
++				node.inputListener.inputEvent(
++					(ScritchComponentBracket)node.object,
++					type, time, a, b, c, d, e, f, g, h, i, j, k, l);
++				
++				return DylibMcpServer.this._json.createObjectBuilder()
++					.add("id", node.id)
++					.add("kind", node.kind)
++					.add("action", "send_input")
++					.add("type", type)
++					.add("time", time)
++					.build();
++			}
++		});
++		
++		return this.__toolSuccess(payload);
++	}
++	
++	/**
++	 * Returns the screenshot tool result.
++	 *
++	 * @param __arguments Tool arguments.
++	 * @return The result object.
++	 * @throws Exception On failures.
++	 * @since 2026/04/20
++	 */
++	private JsonObject __toolScreenshot(JsonObject __arguments)
++		throws Exception
++	{
++		final String controlId = DylibMcpServer.__string(__arguments, "id");
++		ScreenshotCapture capture = this.__onEventLoop(
++			new Work<ScreenshotCapture>()
++		{
++			@Override
++			public ScreenshotCapture run()
++				throws Exception
++			{
++				ScreenshotRequest request =
++					DylibMcpServer.this.__screenshotRequest(controlId);
++				return DylibMcpServer.this.__captureScreenshot(request);
++			}
++		});
++		
++		if (capture == null || capture.bounds == null || capture.argb == null)
++			throw new ToolException("Could not capture control pixels.");
++		
++		BufferedImage image = new BufferedImage(capture.bounds.width,
++			capture.bounds.height, BufferedImage.TYPE_INT_ARGB);
++		image.setRGB(0, 0, capture.bounds.width, capture.bounds.height,
++			capture.argb, 0, capture.bounds.width);
++		ByteArrayOutputStream png = new ByteArrayOutputStream();
++		ImageIO.write(image, "png", png);
++		
++		JsonObjectBuilder payload = this._json.createObjectBuilder()
++			.add("resolvedId", capture.resolvedId)
++			.add("kind", capture.kind)
++			.add("bounds", this.__boundsObject(capture.bounds.x,
++				capture.bounds.y, capture.bounds.width, capture.bounds.height));
++		if (capture.controlId != null)
++			payload.add("id", capture.controlId);
++		
++		return this.__toolSuccessWithImage(payload.build(),
++			Base64.getEncoder().encodeToString(png.toByteArray()), "image/png");
++	}
++
++	/**
++	 * Captures the rendered pixels for the given request.
++	 *
++	 * @param __request The screenshot request.
++	 * @return The captured pixels.
++	 * @throws ToolException If the request cannot be fulfilled.
++	 * @since 2026/04/20
++	 */
++	private ScreenshotCapture __captureScreenshot(ScreenshotRequest __request)
++		throws ToolException
++	{
++		if (__request == null || __request.component == null)
++			throw new ToolException("No component is available for capture.");
++		
++		int[] size = new int[2];
++		int[] argb;
++		try
++		{
++			argb = this._api.component.componentScreenshot(__request.component,
++				size);
++		}
++		catch (MLECallError __e)
++		{
++			throw new ToolException("Component capture failed.", __e);
++		}
++		
++		if (argb == null || size[0] <= 0 || size[1] <= 0)
++			throw new ToolException("Component capture returned no pixels.");
++		if (argb.length < (size[0] * size[1]))
++			throw new ToolException("Component capture returned truncated pixels.");
++		
++		Rectangle bounds = __request.bounds;
++		if (bounds == null)
++			bounds = new Rectangle(0, 0, size[0], size[1]);
++		else
++			bounds = new Rectangle(bounds.x, bounds.y, size[0], size[1]);
++		
++		return new ScreenshotCapture(__request.controlId, __request.kind,
++			__request.resolvedId, bounds, argb);
++	}
++	
++	/**
++	 * Builds a snapshot of the current UI state.
++	 *
++	 * @param __rootId The optional root ID.
++	 * @return The snapshot payload.
++	 * @throws ToolException If the root ID is invalid.
++	 * @since 2026/04/20
++	 */
++	private JsonObject __snapshot(String __rootId)
++		throws ToolException
++	{
++		Long rootPointer = null;
++		if (__rootId != null && !__rootId.trim().isEmpty())
++			rootPointer = Long.valueOf(this.__requireNodeById(__rootId).pointer);
++		
++		JsonArrayBuilder controls = this._json.createArrayBuilder();
++		JsonArrayBuilder roots = this._json.createArrayBuilder();
++		
++		synchronized (this)
++		{
++			for (Node node : this._nodes.values())
++				if (node.parentPointer == null)
++					roots.add(node.id);
++			
++			for (Node node : this._nodes.values())
++				if (rootPointer == null || this.__isUnderRoot(node, rootPointer))
++					controls.add(this.__snapshotNode(node));
++		}
++		
++		JsonObjectBuilder result = this._json.createObjectBuilder()
++			.add("controls", controls.build())
++			.add("roots", roots.build());
++		
++		if (rootPointer != null)
++			result.add("rootId", this.__node(rootPointer.longValue()).id);
++		
++		return result.build();
++	}
++	
++	/**
++	 * Returns whether the given node is under the given root.
++	 *
++	 * @param __node The node to inspect.
++	 * @param __rootPointer The root pointer.
++	 * @return If the node is under the root.
++	 * @since 2026/04/20
++	 */
++	private boolean __isUnderRoot(Node __node, Long __rootPointer)
++	{
++		if (__node == null || __rootPointer == null)
++			return false;
++		
++		Node at = __node;
++		while (at != null)
++		{
++			if (at.pointer == __rootPointer.longValue())
++				return true;
++			if (at.parentPointer == null)
++				break;
++			at = this._nodes.get(at.parentPointer);
++		}
++		return false;
++	}
++	
++	/**
++	 * Builds a snapshot node payload.
++	 *
++	 * @param __node The node to build.
++	 * @return The node payload.
++	 * @since 2026/04/20
++	 */
++	private JsonObject __snapshotNode(Node __node)
++	{
++		JsonObjectBuilder out = this._json.createObjectBuilder()
++			.add("id", __node.id)
++			.add("pointer", String.format("0x%x", __node.pointer))
++			.add("kind", __node.kind);
++		
++		if (__node.parentPointer != null)
++			out.add("parentId", this.__node(__node.parentPointer).id);
++		
++		JsonArrayBuilder children = this._json.createArrayBuilder();
++		for (Long childP : __node.children)
++			children.add(this.__node(childP.longValue()).id);
++		out.add("children", children.build());
++		
++		if (__node.label != null)
++			out.add("label", __node.label);
++		if (__node.relativeBounds != null)
++			out.add("relativeBounds",
++				this.__boundsObject(__node.relativeBounds[0],
++					__node.relativeBounds[1], __node.relativeBounds[2],
++					__node.relativeBounds[3]));
++		if (__node.viewArea != null)
++			out.add("viewArea", this.__sizeObject(
++				__node.viewArea[0], __node.viewArea[1]));
++		if (__node.minimumContentSize != null)
++			out.add("minimumContentSize", this.__sizeObject(
++				__node.minimumContentSize[0], __node.minimumContentSize[1]));
++		if (__node.focusEnabled != null)
++			out.add("focusEnabled", __node.focusEnabled.booleanValue());
++		if (__node.defaultFocus != null)
++			out.add("defaultFocus", __node.defaultFocus.booleanValue());
++		if (__node.visible != null)
++			out.add("visible", __node.visible.booleanValue());
++		if (__node.lastEvent != null)
++		{
++			JsonObjectBuilder lastEvent = this._json.createObjectBuilder()
++				.add("name", __node.lastEvent);
++			if (__node.lastEventDetail != null)
++				lastEvent.add("detail", __node.lastEventDetail);
++			if (__node.lastEventMillis != null)
++				lastEvent.add("time", __node.lastEventMillis.longValue());
++			out.add("lastEvent", lastEvent.build());
++		}
++		
++		if (__node.object instanceof DylibScreenObject)
++		{
++			int[] pixels = new int[4];
++			int[] mm = new int[4];
++			this._api.screen().screenGetBounds((DylibScreenObject)__node.object,
++				null, pixels, mm);
++			out.add("screenId", this._api.screen().screenId(
++				(DylibScreenObject)__node.object));
++			out.add("bounds", this.__boundsObject(pixels[0], pixels[1],
++				pixels[2], pixels[3]));
++		}
++		
++		if (__node.object instanceof DylibContainerObject)
++		{
++			int[] contentSize = new int[2];
++			int[] frameBound = new int[4];
++			int[] contentBound = new int[4];
++			this._api.container().containerGetFrame(
++				(ScritchContainerBracket)__node.object,
++				contentSize, frameBound, contentBound);
++			out.add("frameBounds", this.__boundsObject(frameBound[0],
++				frameBound[1], frameBound[2], frameBound[3]));
++			out.add("contentBounds", this.__boundsObject(contentBound[0],
++				contentBound[1], contentBound[2], contentBound[3]));
++			out.add("contentSize", this.__sizeObject(
++				contentSize[0], contentSize[1]));
++		}
++		
++		if (__node.object instanceof DylibComponentObject)
++		{
++			out.add("size", this.__sizeObject(
++				this._api.component().componentWidth(
++					(DylibComponentObject)__node.object),
++				this._api.component().componentGetHeight(
++					(DylibComponentObject)__node.object)));
++		}
++		
++		if (__node.object instanceof DylibWindowObject)
++			out.add("visible", this._api.window().windowIsVisible(
++				(DylibWindowObject)__node.object));
++		
++		if (__node.object instanceof DylibChoiceObject)
++		{
++			int selectedIndex = this._api.choice().choiceGetSelectedIndex(
++				(ScritchChoiceBracket)__node.object);
++			out.add("selectedIndex", selectedIndex);
++			
++			JsonArrayBuilder entries = this._json.createArrayBuilder();
++			for (int i = 0; i < __node.choiceEntries.size(); i++)
++			{
++				ChoiceEntry entry = __node.choiceEntries.get(i);
++				JsonObjectBuilder item = this._json.createObjectBuilder()
++					.add("index", i);
++				if (entry.label != null)
++					item.add("label", entry.label);
++				if (entry.enabled != null)
++					item.add("enabled", entry.enabled.booleanValue());
++				if (entry.selected != null)
++					item.add("selected", entry.selected.booleanValue());
++				entries.add(item.build());
++			}
++			out.add("choices", entries.build());
++		}
++		
++		JsonArrayBuilder actions = this._json.createArrayBuilder();
++		for (String action : this.__actions(__node))
++			actions.add(action);
++		out.add("actions", actions.build());
++		
++		return out.build();
++	}
++	
++	/**
++	 * Returns available actions for the given node.
++	 *
++	 * @param __node The node to inspect.
++	 * @return The available actions.
++	 * @since 2026/04/20
++	 */
++	private List<String> __actions(Node __node)
++	{
++		LinkedHashSet<String> result = new LinkedHashSet<>();
++		
++		if (__node.activateListener != null)
++			result.add("activate");
++		
++		if (__node.object instanceof DylibMenuKindObject &&
++			this.__windowForMenuNode(__node) != null)
++			result.add("activate");
++		
++		if (__node.inputListener != null)
++			result.add("send_input");
++		
++		if (__node.object instanceof DylibChoiceObject)
++			result.add("select_choice");
++		
++		if (__node.object instanceof DylibWindowObject)
++		{
++			result.add("set_window_visible");
++			if (__node.closeListener != null)
++				result.add("close_window");
++		}
++		
++		if (__node.object instanceof DylibComponentObject &&
++			__node.parentPointer != null)
++			result.add("set_bounds");
++		
++		if (this.__resolvedScreenshotTarget(__node) != null)
++			result.add("screenshot");
++		
++		return new ArrayList<>(result);
++	}
++	
++	/**
++	 * Returns the bounds object.
++	 *
++	 * @param __x The X position.
++	 * @param __y The Y position.
++	 * @param __w The width.
++	 * @param __h The height.
++	 * @return The bounds object.
++	 * @since 2026/04/20
++	 */
++	private JsonObject __boundsObject(int __x, int __y, int __w, int __h)
++	{
++		return this._json.createObjectBuilder()
++			.add("x", __x)
++			.add("y", __y)
++			.add("width", __w)
++			.add("height", __h)
++			.build();
++	}
++	
++	/**
++	 * Returns the size object.
++	 *
++	 * @param __w The width.
++	 * @param __h The height.
++	 * @return The size object.
++	 * @since 2026/04/20
++	 */
++	private JsonObject __sizeObject(int __w, int __h)
++	{
++		return this._json.createObjectBuilder()
++			.add("width", __w)
++			.add("height", __h)
++			.build();
++	}
++	
++	/**
++	 * Returns the window for a given menu node.
++	 *
++	 * @param __node The node to inspect.
++	 * @return The owning window or {@code null}.
++	 * @since 2026/04/20
++	 */
++	private Node __windowForMenuNode(Node __node)
++	{
++		Node at = __node;
++		while (at != null)
++		{
++			if (at.object instanceof DylibWindowObject &&
++				at.menuItemActivateListener != null)
++				return at;
++			if (at.parentPointer == null)
++				break;
++			at = this._nodes.get(at.parentPointer);
++		}
++		return null;
++	}
++	
++	/**
++	 * Returns the screenshot request for the given control.
++	 *
++	 * @param __controlId The control ID.
++	 * @return The screenshot request.
++	 * @throws ToolException If the control does not exist.
++	 * @since 2026/04/20
++	 */
++	private ScreenshotRequest __screenshotRequest(String __controlId)
++		throws ToolException
++	{
++		Node target = null;
++		if (__controlId != null && !__controlId.trim().isEmpty())
++			target = this.__requireNodeById(__controlId);
++		
++		if (target == null)
++			target = this.__defaultScreenshotTarget();
++		else if (target.object instanceof DylibScreenObject)
++			target = this.__descendantScreenshotTarget(target);
++		
++		if (target == null)
++			throw new ToolException("There is no visible application window to capture.");
++		
++		Node resolved = this.__resolvedScreenshotTarget(target);
++		if (resolved == null)
++			throw new ToolException(String.format(
++				"Control %s cannot be captured.", target.id));
++		
++		Rectangle bounds = this.__captureBounds(resolved);
++		if (bounds == null)
++			throw new ToolException(String.format(
++				"Control %s does not expose capture bounds.", resolved.id));
++		
++		return new ScreenshotRequest(__controlId,
++			(DylibComponentObject)resolved.object, resolved.kind,
++			resolved.id, bounds);
++	}
++	
++	/**
++	 * Returns the resolved screenshot target.
++	 *
++	 * @param __node The source node.
++	 * @return The resolved screenshot node, if any.
++	 * @since 2026/04/20
++	 */
++	private Node __resolvedScreenshotTarget(Node __node)
++	{
++		Node at = __node;
++		while (at != null)
++		{
++			if (at.object instanceof DylibComponentObject)
++				return at;
++			if (at.parentPointer == null)
++				break;
++			at = this._nodes.get(at.parentPointer);
++		}
++		return null;
++	}
++
++	/**
++	 * Returns the default screenshot target.
++	 *
++	 * @return The default target, if any.
++	 * @since 2026/04/20
++	 */
++	private Node __defaultScreenshotTarget()
++	{
++		Node fallback = null;
++		
++		synchronized (this)
++		{
++			for (Node node : this._nodes.values())
++				if (node.object instanceof DylibWindowObject &&
++					this.__nodeVisible(node))
++					return node;
++			
++			for (Node node : this._nodes.values())
++				if (fallback == null &&
++					node.object instanceof DylibComponentObject)
++					fallback = node;
++		}
++		
++		return fallback;
++	}
++
++	/**
++	 * Returns the first descendant screenshot target under the given node.
++	 *
++	 * @param __root The root node.
++	 * @return The descendant target, if any.
++	 * @since 2026/04/20
++	 */
++	private Node __descendantScreenshotTarget(Node __root)
++	{
++		if (__root == null)
++			return null;
++		
++		Node fallback = null;
++		for (Long childP : __root.children)
++		{
++			Node child = this._nodes.get(childP);
++			if (child == null)
++				continue;
++			
++			if (child.object instanceof DylibWindowObject &&
++				this.__nodeVisible(child))
++				return child;
++			
++			if (fallback == null && child.object instanceof DylibComponentObject)
++				fallback = child;
++			
++			Node nested = this.__descendantScreenshotTarget(child);
++			if (nested != null)
++				return nested;
++		}
++		return fallback;
++	}
++
++	/**
++	 * Returns whether the node is visible.
++	 *
++	 * @param __node The node to inspect.
++	 * @return If the node is visible.
++	 * @since 2026/04/20
++	 */
++	private boolean __nodeVisible(Node __node)
++	{
++		if (__node == null)
++			return false;
++		if (__node.object instanceof DylibWindowObject)
++			return this._api.window().windowIsVisible(
++				(DylibWindowObject)__node.object);
++		return (__node.visible == null || __node.visible.booleanValue());
++	}
++	
++	/**
++	 * Returns the capture bounds for the given node.
++	 *
++	 * @param __node The node to inspect.
++	 * @return The capture bounds, if available.
++	 * @since 2026/04/20
++	 */
++	private Rectangle __captureBounds(Node __node)
++	{
++		if (__node.object instanceof DylibComponentObject)
++			return this.__componentBounds(__node);
++		
++		return null;
++	}
++	
++	/**
++	 * Returns the component bounds.
++	 *
++	 * @param __node The node to inspect.
++	 * @return The component bounds.
++	 * @since 2026/04/20
++	 */
++	private Rectangle __componentBounds(Node __node)
++	{
++		if (__node == null || !(__node.object instanceof DylibComponentObject))
++			return null;
++		
++		int width = this._api.component().componentWidth(
++			(DylibComponentObject)__node.object);
++		int height = this._api.component().componentGetHeight(
++			(DylibComponentObject)__node.object);
++		
++		if (__node.parentPointer == null)
++			return new Rectangle(0, 0, width, height);
++		
++		Node parent = this._nodes.get(__node.parentPointer.longValue());
++		if (parent != null && parent.object instanceof DylibScreenObject)
++			return new Rectangle(0, 0, width, height);
++		
++		Point origin = this.__contentOrigin(__node.parentPointer.longValue());
++		if (origin == null)
++			return null;
++		
++		int x = origin.x;
++		int y = origin.y;
++		if (__node.relativeBounds != null)
++		{
++			x += __node.relativeBounds[0];
++			y += __node.relativeBounds[1];
++			width = __node.relativeBounds[2];
++			height = __node.relativeBounds[3];
++		}
++		
++		return new Rectangle(x, y, width, height);
++	}
++	
++	/**
++	 * Returns the content origin for the given container.
++	 *
++	 * @param __containerP The container pointer.
++	 * @return The content origin.
++	 * @since 2026/04/20
++	 */
++	private Point __contentOrigin(long __containerP)
++	{
++		Node parent = this._nodes.get(__containerP);
++		if (parent == null || !(parent.object instanceof DylibContainerObject))
++			return null;
++		
++		int[] content = new int[4];
++		this._api.container().containerGetFrame(
++			(ScritchContainerBracket)parent.object, null, null, content);
++		return new Point(content[0], content[1]);
++	}
++	
++	/**
++	 * HTTP handler for the MCP endpoint.
++	 *
++	 * @since 2026/04/20
++	 */
++	private final class DylibMcpHttpHandler
++		implements HttpHandler
++	{
++		/**
++		 * {@inheritDoc}
++		 * @since 2026/04/20
++		 */
++		@Override
++		public void handle(HttpExchange __exchange)
++			throws IOException
++		{
++			try
++			{
++				String origin = __exchange.getRequestHeaders().getFirst("Origin");
++				if (!DylibMcpServer.this.__isAllowedOrigin(origin))
++				{
++					DylibMcpServer.this.__sendJson(__exchange, 403,
++						DylibMcpServer.this.__jsonRpcError(null, -32000,
++							"Forbidden Origin."));
++					return;
++				}
++				
++				String method = __exchange.getRequestMethod();
++				if ("GET".equalsIgnoreCase(method))
++				{
++					__exchange.getResponseHeaders().set("Allow", "POST");
++					DylibMcpServer.this.__sendEmpty(__exchange, 405);
++					return;
++				}
++				
++				if (!"POST".equalsIgnoreCase(method))
++				{
++					__exchange.getResponseHeaders().set("Allow", "GET, POST");
++					DylibMcpServer.this.__sendEmpty(__exchange, 405);
++					return;
++				}
++				
++				JsonObject request;
++				try (InputStream in = __exchange.getRequestBody())
++				{
++					request = DylibMcpServer.this._json.createReader(in).readObject();
++				}
++				
++				JsonValue id = request.get("id");
++				String rpcMethod = DylibMcpServer.__string(request, "method");
++				
++				if (rpcMethod == null)
++				{
++					DylibMcpServer.this.__sendEmpty(__exchange, 202);
++					return;
++				}
++				
++				if ("initialize".equals(rpcMethod))
++				{
++					JsonObjectBuilder serverInfo =
++						DylibMcpServer.this._json.createObjectBuilder()
++							.add("name", "SquirrelJME ScritchUI MCP")
++							.add("version", "0.3.0");
++					
++					JsonObjectBuilder capabilities =
++						DylibMcpServer.this._json.createObjectBuilder()
++							.add("tools",
++								DylibMcpServer.this._json.createObjectBuilder()
++									.add("listChanged", false)
++									.build());
++					
++					JsonObject result = DylibMcpServer.this._json.createObjectBuilder()
++						.add("protocolVersion", DylibMcpServer.PROTOCOL_VERSION)
++						.add("capabilities", capabilities.build())
++						.add("serverInfo", serverInfo.build())
++						.add("instructions",
++							"Use the scritch.* tools to inspect controls, " +
++							"drive activation and input listeners, change " +
++							"window/component state, and capture screenshots.")
++						.build();
++					
++					DylibMcpServer.this.__sendJson(__exchange, 200,
++						DylibMcpServer.this.__jsonRpcResult(id, result));
++					return;
++				}
++				
++				if (rpcMethod.startsWith("notifications/"))
++				{
++					DylibMcpServer.this.__sendEmpty(__exchange, 202);
++					return;
++				}
++				
++				if ("ping".equals(rpcMethod))
++				{
++					DylibMcpServer.this.__sendJson(__exchange, 200,
++						DylibMcpServer.this.__jsonRpcResult(id,
++							DylibMcpServer.this._json.createObjectBuilder()
++								.build()));
++					return;
++				}
++				
++				if ("tools/list".equals(rpcMethod))
++				{
++					DylibMcpServer.this.__sendJson(__exchange, 200,
++						DylibMcpServer.this.__jsonRpcResult(id,
++							DylibMcpServer.this.__toolListPayload()));
++					return;
++				}
++				
++				if ("tools/call".equals(rpcMethod))
++				{
++					JsonObject params = DylibMcpServer.__object(request, "params");
++					String name = DylibMcpServer.__string(params, "name");
++					JsonObject arguments = DylibMcpServer.__object(params,
++						"arguments");
++					
++					JsonObject result;
++					try
++					{
++						result = DylibMcpServer.this.__callTool(name, arguments);
++					}
++					catch (ToolException __e)
++					{
++						result = DylibMcpServer.this.__toolError(__e.getMessage());
++					}
++					catch (Exception __e)
++					{
++						result = DylibMcpServer.this.__toolError(
++							(__e.getMessage() == null ? __e.toString() :
++								__e.getMessage()));
++					}
++					
++					DylibMcpServer.this.__sendJson(__exchange, 200,
++						DylibMcpServer.this.__jsonRpcResult(id, result));
++					return;
++				}
++				
++				DylibMcpServer.this.__sendJson(__exchange, 200,
++					DylibMcpServer.this.__jsonRpcError(id, -32601,
++						"Method not found."));
++			}
++			finally
++			{
++				__exchange.close();
++			}
++		}
++	}
++	
++	/**
++	 * Basic control node.
++	 *
++	 * @since 2026/04/20
++	 */
++	private static final class Node
++	{
++		/** Child controls. */
++		final List<Long> children =
++			new ArrayList<>();
++		
++		/** Choice entries. */
++		final List<ChoiceEntry> choiceEntries =
++			new ArrayList<>();
++		
++		/** Control ID. */
++		final String id;
++		
++		/** Pointer. */
++		final long pointer;
++		
++		/** Default focus state. */
++		Boolean defaultFocus;
++		
++		/** Focus enabled state. */
++		Boolean focusEnabled;
++		
++		/** Kind of node. */
++		String kind =
++			"object";
++		
++		/** The label text. */
++		String label;
++		
++		/** The last event name. */
++		String lastEvent;
++		
++		/** The last event detail. */
++		String lastEventDetail;
++		
++		/** The last event time. */
++		Long lastEventMillis;
++		
++		/** The menu bar pointer. */
++		Long menuBarPointer;
++		
++		/** Minimum content size. */
++		int[] minimumContentSize;
++		
++		/** Backing object. */
++		DylibBaseObject object;
++		
++		/** Parent pointer. */
++		Long parentPointer;
++		
++		/** Relative bounds. */
++		int[] relativeBounds;
++		
++		/** View area. */
++		int[] viewArea;
++		
++		/** Visible state. */
++		Boolean visible;
++		
++		/** Activate listener. */
++		WrappedActivateListener activateListener;
++		
++		/** Close listener. */
++		WrappedCloseListener closeListener;
++		
++		/** Input listener. */
++		WrappedInputListener inputListener;
++		
++		/** Menu activation listener. */
++		WrappedMenuItemActivateListener menuItemActivateListener;
++		
++		/** Visible listener. */
++		WrappedVisibleListener visibleListener;
++		
++		/**
++		 * Initializes the node.
++		 *
++		 * @param __pointer The control pointer.
++		 * @since 2026/04/20
++		 */
++		Node(long __pointer)
++		{
++			this.pointer = __pointer;
++			this.id = String.format("object:%x", __pointer);
++		}
++	}
++	
++	/**
++	 * A single choice entry.
++	 *
++	 * @since 2026/04/20
++	 */
++	private static final class ChoiceEntry
++	{
++		/** Enabled state. */
++		Boolean enabled;
++		
++		/** Entry label. */
++		String label;
++		
++		/** Selected state. */
++		Boolean selected;
++	}
++	
++	/**
++	 * Holder for loop results.
++	 *
++	 * @param <T> The held type.
++	 * @since 2026/04/20
++	 */
++	private static final class Holder<T>
++	{
++		/** The held value. */
++		T value;
++	}
++	
++	/**
++	 * Screenshot request state.
++	 *
++	 * @since 2026/04/20
++	 */
++	private static final class ScreenshotRequest
++	{
++		/** Requested control ID. */
++		final String controlId;
++		
++		/** Captured component. */
++		final DylibComponentObject component;
++		
++		/** Capture bounds. */
++		final Rectangle bounds;
++		
++		/** Resolved control kind. */
++		final String kind;
++		
++		/** Resolved control ID. */
++		final String resolvedId;
++		
++		/**
++		 * Initializes the request.
++		 *
++		 * @param __controlId The original control ID.
++		 * @param __component The component to capture.
++		 * @param __kind The resolved kind.
++		 * @param __resolvedId The resolved control ID.
++		 * @param __bounds The capture bounds.
++		 * @since 2026/04/20
++		 */
++		ScreenshotRequest(String __controlId,
++			DylibComponentObject __component, String __kind,
++			String __resolvedId, Rectangle __bounds)
++		{
++			this.controlId = __controlId;
++			this.component = __component;
++			this.kind = __kind;
++			this.resolvedId = __resolvedId;
++			this.bounds = __bounds;
++		}
++	}
++
++	/**
++	 * Screenshot capture state.
++	 *
++	 * @since 2026/04/20
++	 */
++	private static final class ScreenshotCapture
++	{
++		/** Requested control ID. */
++		final String controlId;
++		
++		/** Captured ARGB pixels. */
++		final int[] argb;
++		
++		/** Capture bounds. */
++		final Rectangle bounds;
++		
++		/** Resolved control kind. */
++		final String kind;
++		
++		/** Resolved control ID. */
++		final String resolvedId;
++		
++		/**
++		 * Initializes the capture.
++		 *
++		 * @param __controlId The original control ID.
++		 * @param __kind The resolved kind.
++		 * @param __resolvedId The resolved control ID.
++		 * @param __bounds The capture bounds.
++		 * @param __argb The captured pixels.
++		 * @since 2026/04/20
++		 */
++		ScreenshotCapture(String __controlId, String __kind,
++			String __resolvedId, Rectangle __bounds, int[] __argb)
++		{
++			this.controlId = __controlId;
++			this.kind = __kind;
++			this.resolvedId = __resolvedId;
++			this.bounds = __bounds;
++			this.argb = __argb;
++		}
++	}
++	
++	/**
++	 * Work item that may throw.
++	 *
++	 * @param <T> The result type.
++	 * @since 2026/04/20
++	 */
++	private interface Work<T>
++	{
++		/**
++		 * Executes the work item.
++		 *
++		 * @return The result.
++		 * @throws Exception On failures.
++		 * @since 2026/04/20
++		 */
++		T run()
++			throws Exception;
++	}
++	
++	/**
++	 * Tool execution exception.
++	 *
++	 * @since 2026/04/20
++	 */
++	private static class ToolException
++		extends Exception
++	{
++		/**
++		 * Initializes the exception.
++		 *
++		 * @param __message The failure message.
++		 * @since 2026/04/20
++		 */
++		ToolException(String __message)
++		{
++			super(__message);
++		}
++		
++		/**
++		 * Initializes the exception.
++		 *
++		 * @param __message The failure message.
++		 * @param __cause The failure cause.
++		 * @since 2026/04/20
++		 */
++		ToolException(String __message, Throwable __cause)
++		{
++			super(__message, __cause);
++		}
++	}
++	
++	/**
++	 * Activate listener wrapper.
++	 *
++	 * @since 2026/04/20
++	 */
++	private final class WrappedActivateListener
++		implements ScritchActivateListener
++	{
++		/** The delegate listener. */
++		private final ScritchActivateListener _delegate;
++		
++		/** Owning object pointer. */
++		private final long _objectP;
++		
++		/**
++		 * Initializes the wrapper.
++		 *
++		 * @param __objectP The object pointer.
++		 * @param __delegate The delegate listener.
++		 * @since 2026/04/20
++		 */
++		WrappedActivateListener(long __objectP,
++			ScritchActivateListener __delegate)
++		{
++			this._objectP = __objectP;
++			this._delegate = __delegate;
++		}
++		
++		/**
++		 * {@inheritDoc}
++		 * @since 2026/04/20
++		 */
++		@Override
++		public void activate(ScritchComponentBracket __component)
++		{
++			DylibMcpServer.this.__recordEvent(this._objectP, "activate", null);
++			this._delegate.activate(__component);
++		}
++	}
++	
++	/**
++	 * Input listener wrapper.
++	 *
++	 * @since 2026/04/20
++	 */
++	private final class WrappedInputListener
++		implements ScritchInputListener
++	{
++		/** The delegate listener. */
++		private final ScritchInputListener _delegate;
++		
++		/** The owning pointer. */
++		private final long _objectP;
++		
++		/**
++		 * Initializes the wrapper.
++		 *
++		 * @param __objectP The object pointer.
++		 * @param __delegate The delegate listener.
++		 * @since 2026/04/20
++		 */
++		WrappedInputListener(long __objectP, ScritchInputListener __delegate)
++		{
++			this._objectP = __objectP;
++			this._delegate = __delegate;
++		}
++		
++		/**
++		 * {@inheritDoc}
++		 * @since 2026/04/20
++		 */
++		@Override
++		public void inputEvent(ScritchComponentBracket __component, int __type,
++			long __time, int __a, int __b, int __c, int __d, int __e, int __f,
++			int __g, int __h, int __i, int __j, int __k, int __l)
++		{
++			DylibMcpServer.this.__recordEvent(this._objectP, "input",
++				String.format("type=%d a=%d b=%d c=%d d=%d",
++					__type, __a, __b, __c, __d));
++			this._delegate.inputEvent(__component, __type, __time, __a, __b,
++				__c, __d, __e, __f, __g, __h, __i, __j, __k, __l);
++		}
++	}
++	
++	/**
++	 * Visible listener wrapper.
++	 *
++	 * @since 2026/04/20
++	 */
++	private final class WrappedVisibleListener
++		implements ScritchVisibleListener
++	{
++		/** Delegate listener. */
++		private final ScritchVisibleListener _delegate;
++		
++		/** Owning pointer. */
++		private final long _objectP;
++		
++		/**
++		 * Initializes the wrapper.
++		 *
++		 * @param __objectP The object pointer.
++		 * @param __delegate The delegate listener.
++		 * @since 2026/04/20
++		 */
++		WrappedVisibleListener(long __objectP,
++			ScritchVisibleListener __delegate)
++		{
++			this._objectP = __objectP;
++			this._delegate = __delegate;
++		}
++		
++		/**
++		 * {@inheritDoc}
++		 * @since 2026/04/20
++		 */
++		@Override
++		public void visibilityChanged(ScritchComponentBracket __component,
++			boolean __from, boolean __to)
++		{
++			DylibMcpServer.this.__recordEvent(this._objectP, "visible",
++				String.format("%s->%s", __from, __to));
++			this._delegate.visibilityChanged(__component, __from, __to);
++		}
++	}
++	
++	/**
++	 * Close listener wrapper.
++	 *
++	 * @since 2026/04/20
++	 */
++	private final class WrappedCloseListener
++		implements ScritchCloseListener
++	{
++		/** Delegate listener. */
++		private final ScritchCloseListener _delegate;
++		
++		/** Owning pointer. */
++		private final long _objectP;
++		
++		/**
++		 * Initializes the wrapper.
++		 *
++		 * @param __objectP The object pointer.
++		 * @param __delegate The delegate listener.
++		 * @since 2026/04/20
++		 */
++		WrappedCloseListener(long __objectP, ScritchCloseListener __delegate)
++		{
++			this._objectP = __objectP;
++			this._delegate = __delegate;
++		}
++		
++		/**
++		 * {@inheritDoc}
++		 * @since 2026/04/20
++		 */
++		@Override
++		public boolean closed(ScritchWindowBracket __window)
++			throws MLECallError
++		{
++			DylibMcpServer.this.__recordEvent(this._objectP, "close", null);
++			return this._delegate.closed(__window);
++		}
++	}
++	
++	/**
++	 * Menu item activation listener wrapper.
++	 *
++	 * @since 2026/04/20
++	 */
++	private final class WrappedMenuItemActivateListener
++		implements ScritchMenuItemActivateListener
++	{
++		/** Delegate listener. */
++		private final ScritchMenuItemActivateListener _delegate;
++		
++		/** Owning pointer. */
++		private final long _objectP;
++		
++		/**
++		 * Initializes the wrapper.
++		 *
++		 * @param __objectP The object pointer.
++		 * @param __delegate The delegate listener.
++		 * @since 2026/04/20
++		 */
++		WrappedMenuItemActivateListener(long __objectP,
++			ScritchMenuItemActivateListener __delegate)
++		{
++			this._objectP = __objectP;
++			this._delegate = __delegate;
++		}
++		
++		/**
++		 * {@inheritDoc}
++		 * @since 2026/04/20
++		 */
++		@Override
++		public void menuItemActivate(ScritchWindowBracket __window,
++			ScritchMenuKindBracket __menuItem)
++		{
++			DylibMcpServer.this.__recordEvent(this._objectP, "menu-activate",
++				(__menuItem instanceof DylibBaseObject ?
++					String.format("object:%x",
++						((DylibBaseObject)__menuItem).objectPointer()) :
++					null));
++			if (__menuItem instanceof DylibBaseObject)
++				DylibMcpServer.this.__recordEvent(
++					((DylibBaseObject)__menuItem).objectPointer(),
++					"activate", "menu");
++			this._delegate.menuItemActivate(__window, __menuItem);
++		}
++	}
++}
+diff --git a/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibMenuInterface.java b/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibMenuInterface.java
+index 22304e6e2a9a2e28ea56da450192f5152eefc841..f94a822251e7eb0ceb6b1b6f3cf1c027451b3370 100644
+--- a/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibMenuInterface.java
++++ b/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibMenuInterface.java
+@@ -56,7 +56,9 @@ public class DylibMenuInterface
+ 		if (menuBarP == 0)
+ 			throw new MLECallError("Menu bar not created?");
+ 		
+-		return new DylibMenuBarObject(menuBarP);
++		DylibMenuBarObject rv = new DylibMenuBarObject(menuBarP);
++		this.mcp().register(rv);
++		return rv;
+ 	}
+ 	
+ 	/**
+@@ -76,6 +78,8 @@ public class DylibMenuInterface
+ 			((DylibMenuKindObject)__into).objectPointer(),
+ 			__at,
+ 			((DylibMenuKindObject)__item).objectPointer());
++		this.mcp().menuInsert((DylibBaseObject)__into, __at,
++			(DylibBaseObject)__item);
+ 	}
+ 	
+ 	/**
+@@ -90,7 +94,9 @@ public class DylibMenuInterface
+ 		if (menuItemP == 0)
+ 			throw new MLECallError("Menu item not created?");
+ 		
+-		return new DylibMenuItemObject(menuItemP);
++		DylibMenuItemObject rv = new DylibMenuItemObject(menuItemP);
++		this.mcp().register(rv);
++		return rv;
+ 	}
+ 	
+ 	/**
+@@ -117,7 +123,9 @@ public class DylibMenuInterface
+ 		if (menuP == 0)
+ 			throw new MLECallError("Menu not created?");
+ 		
+-		return new DylibMenuObject(menuP);
++		DylibMenuObject rv = new DylibMenuObject(menuP);
++		this.mcp().register(rv);
++		return rv;
+ 	}
+ 	
+ 	/**
+@@ -133,5 +141,6 @@ public class DylibMenuInterface
+ 		
+ 		NativeScritchDylib.__menuRemoveAll(this.dyLib._stateP,
+ 			((DylibMenuKindObject)__menuKind).objectPointer());
++		this.mcp().menuRemoveAll((DylibBaseObject)__menuKind);
+ 	}
+ }
+diff --git a/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibPanelInterface.java b/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibPanelInterface.java
+index 4c2c440066fba75d4f471ab2f94813986a341f62..c6728c31de41b9b10af0cba846f42462ad9eaa62 100644
+--- a/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibPanelInterface.java
++++ b/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibPanelInterface.java
+@@ -58,6 +58,8 @@ public class DylibPanelInterface
+ 		
+ 		NativeScritchDylib.__panelEnableFocus(this.dyLib._stateP,
+ 			((DylibPanelObject)__panel).objectPointer(), __enabled, __default);
++		this.mcp().panelEnableFocus((DylibBaseObject)__panel, __enabled,
++			__default);
+ 	}
+ 	
+ 	/**
+@@ -71,7 +73,9 @@ public class DylibPanelInterface
+ 		if (panelP == 0)
+ 			throw new MLECallError("Could not create panel.");
+ 		
+-		return new DylibPanelObject(panelP);
++		DylibPanelObject rv = new DylibPanelObject(panelP);
++		this.mcp().register(rv);
++		return rv;
+ 	}
+ 	
+ 	/**
+@@ -90,6 +94,7 @@ public class DylibPanelInterface
+ 			throw new MLECallError("Null arguments.");
+ 		
+ 		NativeScritchDylib.__componentSetInputListener(this.dyLib._stateP,
+-			((DylibComponentObject)__component).objectPointer(), __listener);
++			((DylibComponentObject)__component).objectPointer(),
++			this.mcp().wrapInput((DylibBaseObject)__component, __listener));
+ 	}
+ }
+diff --git a/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibScreenInterface.java b/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibScreenInterface.java
+index de4cf8f4fdb07182e6bd0ec187b5c9f60b0b4d32..9e754ae876ecbb3a38937af7b799ca0d1bf84cdb 100644
+--- a/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibScreenInterface.java
++++ b/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibScreenInterface.java
+@@ -74,7 +74,8 @@ public class DylibScreenInterface
+ 		NativeScritchDylib.__screenGetBounds(
+ 			this.dyLib._stateP,
+ 			((DylibScreenObject)__screen).objectPointer(),
+-			(__for == null ? null : ((DylibComponentObject)__for).objectPointer()),
++			(__for == null ? 0L :
++				((DylibComponentObject)__for).objectPointer()),
+ 			__pixels, __mm);
+ 	}
+ 	
+diff --git a/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibScritchInterface.java b/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibScritchInterface.java
+index fcbd3bcc565d3cffb084726296be01c1f0705cea..8ca0eddd824946dc4cc10ec56c6aeae0ea94a67e 100644
+--- a/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibScritchInterface.java
++++ b/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibScritchInterface.java
+@@ -60,7 +60,7 @@ public class DylibScritchInterface
+ 	
+ 	/** The internal default order of interfaces. */
+ 	private static final List<String> _ORDER =
+-		UnmodifiableList.of(Arrays.asList("cocoa", "win32", "gtk2"));
++		UnmodifiableList.of(Arrays.asList("cocoa", "win32", "gtk2", "x11"));
+ 	
+ 	/** The default instance of this. */
+ 	private static volatile DylibScritchInterface _INSTANCE;
+@@ -68,6 +68,9 @@ public class DylibScritchInterface
+ 	/** The native dynamic library to use. */
+ 	protected final NativeScritchDylib dyLib;
+ 	
++	/** The MCP helper. */
++	protected final DylibMcpServer mcp;
++	
+ 	/** The choice implementation. */
+ 	protected final DylibChoiceInterface choice;
+ 	
+@@ -125,6 +128,7 @@ public class DylibScritchInterface
+ 		
+ 		// Store for later
+ 		this.dyLib = __dyLib;
++		this.mcp = DylibMcpServer.instance(this);
+ 		
+ 		// Initialize all sub-interfaces
+ 		Reference<DylibScritchInterface> self =
+@@ -186,6 +190,7 @@ public class DylibScritchInterface
+ 		if (__object == null)
+ 			throw new MLECallError("Null arguments");
+ 		
++		this.mcp.forget((DylibBaseObject)__object);
+ 		NativeScritchDylib.__objectDelete(this.dyLib._stateP,
+ 			((DylibBaseObject)__object).objectPointer());
+ 	}
+@@ -347,10 +352,14 @@ public class DylibScritchInterface
+ 				throw new MLECallError(
+ 					"No native ScritchUI libraries.");
+ 			
+-			// Which interfaces are available?
++			// Which interfaces are available? The native build emits this as
++			// whitespace-separated tokens, so support both one-per-line and
++			// single-line forms.
+ 			for (String str : StreamUtils.readAllLines(in, "utf-8"))
+ 				if (str != null && !str.isEmpty())
+-					potentials.add(str.toLowerCase());
++					for (String token : str.trim().split("\\s+"))
++						if (!token.isEmpty())
++							potentials.add(token.toLowerCase());
+ 		}
+ 		catch (IOException __e)
+ 		{
+diff --git a/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibScrollPanelInterface.java b/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibScrollPanelInterface.java
+index 775498fe789162751353f453130fc69d98025249..0fd53f6d78ee602d8ff88a40e0b9b985a8ba0f24 100644
+--- a/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibScrollPanelInterface.java
++++ b/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibScrollPanelInterface.java
+@@ -52,6 +52,8 @@ public class DylibScrollPanelInterface
+ 		if (panelP == 0)
+ 			throw new MLECallError("Could not create scroll panel.");
+ 		
+-		return new DylibScrollPanelObject(panelP);
++		DylibScrollPanelObject rv = new DylibScrollPanelObject(panelP);
++		this.mcp().register(rv);
++		return rv;
+ 	}
+ }
+diff --git a/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibViewInterface.java b/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibViewInterface.java
+index 7a01be30bd92da910e70f5cacf463de423188e0f..8a7409b4eec66bcebc0f823d42e6cf95233cf43f 100644
+--- a/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibViewInterface.java
++++ b/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibViewInterface.java
+@@ -67,6 +67,7 @@ public class DylibViewInterface
+ 		NativeScritchDylib.__viewSetArea(this.dyLib._stateP,
+ 			((DylibComponentObject)__view).objectPointer(),
+ 			__width, __height);
++		this.mcp().viewSetArea((DylibBaseObject)__view, __width, __height);
+ 	}
+ 	
+ 	@Override
+diff --git a/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibWindowInterface.java b/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibWindowInterface.java
+index b38ec71aeb379489cab19dbbd5cf9f311a36b37f..ac754c8a2272c4db59540c0637de309b3ac204cd 100644
+--- a/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibWindowInterface.java
++++ b/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibWindowInterface.java
+@@ -71,6 +71,8 @@ public class DylibWindowInterface
+ 		
+ 		NativeScritchDylib.__windowContentMinimumSize(this.dyLib._stateP,
+ 			((DylibWindowObject)__window).objectPointer(), __w, __h);
++		this.mcp().windowContentMinimumSize((DylibBaseObject)__window, __w,
++			__h);
+ 	}
+ 	
+ 	/**
+@@ -121,7 +123,9 @@ public class DylibWindowInterface
+ 		if (windowP == 0)
+ 			throw new MLECallError("Could not create window.");
+ 		
+-		return new DylibWindowObject(windowP);
++		DylibWindowObject rv = new DylibWindowObject(windowP);
++		this.mcp().register(rv);
++		return rv;
+ 	}
+ 	
+ 	/**
+@@ -137,7 +141,8 @@ public class DylibWindowInterface
+ 			throw new MLECallError("Null arguments.");
+ 		
+ 		NativeScritchDylib.__windowSetCloseListener(this.dyLib._stateP,
+-			((DylibWindowObject)__window).objectPointer(), __listener);
++			((DylibWindowObject)__window).objectPointer(),
++			this.mcp().wrapClose((DylibBaseObject)__window, __listener));
+ 	}
+ 	
+ 	/**
+@@ -157,6 +162,8 @@ public class DylibWindowInterface
+ 			((DylibWindowObject)__window).objectPointer(),
+ 			(__menuBar == null ? 0 :
+ 				((DylibMenuBarObject)__menuBar).objectPointer()));
++		this.mcp().windowSetMenuBar((DylibBaseObject)__window,
++			(DylibBaseObject)__menuBar);
+ 	}
+ 	
+ 	/**
+@@ -174,7 +181,9 @@ public class DylibWindowInterface
+ 		
+ 		NativeScritchDylib.__windowSetMenuItemActivateListener(
+ 			this.dyLib._stateP,
+-			((DylibWindowObject)__window).objectPointer(), __listener);
++			((DylibWindowObject)__window).objectPointer(),
++			this.mcp().wrapMenuItemActivate((DylibBaseObject)__window,
++				__listener));
+ 	}
+ 	
+ 	/**
+@@ -192,5 +201,6 @@ public class DylibWindowInterface
+ 		NativeScritchDylib.__windowSetVisible(
+ 			this.dyLib._stateP, ((DylibWindowObject)__window).objectPointer(),
+ 			__visible);
++		this.mcp().windowVisible((DylibBaseObject)__window, __visible);
+ 	}
+ }
+diff --git a/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/NativeScritchDylib.java b/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/NativeScritchDylib.java
+index 4424f94575bc93819fc305b28c5a90ce682748b9..47b1e7659dc57983e941ab2e578d0b8eddb2c373 100644
+--- a/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/NativeScritchDylib.java
++++ b/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/NativeScritchDylib.java
+@@ -227,6 +227,20 @@ public final class NativeScritchDylib
+ 	static native int __componentHeight(long __stateP,
+ 		long __componentP)
+ 		throws MLECallError;
++
++	/**
++	 * Captures the rendered pixels for the given component.
++	 *
++	 * @param __stateP The state pointer.
++	 * @param __componentP The component pointer.
++	 * @param __sizeOut Output array for {@code [width, height]}.
++	 * @return The captured ARGB pixels.
++	 * @throws MLECallError If the component cannot be captured.
++	 * @since 2026/04/20
++	 */
++	static native int[] __componentScreenshot(long __stateP,
++		long __componentP, int[] __sizeOut)
++		throws MLECallError;
+ 	
+ 	/**
+ 	 * Repaints the given component.
+diff --git a/emulators/standalone/src/main/java/cc/squirreljme/vm/standalone/hosted/HostedVirtualMachine.java b/emulators/standalone/src/main/java/cc/squirreljme/vm/standalone/hosted/HostedVirtualMachine.java
+index c188feec1393ec788194ff5f7ad63793294ed1e2..796880c9c4910847c4bc59fcbef9c300c26dd711 100644
+--- a/emulators/standalone/src/main/java/cc/squirreljme/vm/standalone/hosted/HostedVirtualMachine.java
++++ b/emulators/standalone/src/main/java/cc/squirreljme/vm/standalone/hosted/HostedVirtualMachine.java
+@@ -281,6 +281,15 @@ public class HostedVirtualMachine
+ 				args.add(String.format("-D%s=%s",
+ 					prop.getKey(), prop.getValue()));
+ 			
++			// Forward host-side ScritchUI and MCP properties into the hosted
++			// JVM, since these are specified on the outer standalone process.
++			HostedVirtualMachine.__forwardHostProperty(args,
++				"cc.squirreljme.scritchui");
++			HostedVirtualMachine.__forwardHostProperty(args,
++				"cc.squirreljme.mcp.path");
++			HostedVirtualMachine.__forwardHostProperty(args,
++				"cc.squirreljme.mcp.port");
++			
+ 			// Classpath accordingly
+ 			args.add("-classpath");
+ 			args.add(supportPath + File.pathSeparator + classPathString);
+@@ -384,4 +393,26 @@ public class HostedVirtualMachine
+ 		// Not found
+ 		return null;
+ 	}
++	
++	/**
++	 * Forwards the given host property into the hosted JVM arguments.
++	 *
++	 * @param __args The argument list to append to.
++	 * @param __name The property name to copy.
++	 * @throws NullPointerException On null arguments.
++	 * @since 2026/04/21
++	 */
++	private static void __forwardHostProperty(List<String> __args,
++		String __name)
++		throws NullPointerException
++	{
++		if (__args == null || __name == null)
++			throw new NullPointerException("NARG");
++		
++		String value = System.getProperty(__name);
++		if (value == null || value.isEmpty())
++			return;
++		
++		__args.add(String.format("-D%s=%s", __name, value));
++	}
+ }
+diff --git a/modules/cldc-compact/src/main/java/java/lang/Integer.java b/modules/cldc-compact/src/main/java/java/lang/Integer.java
+index b86e2c9d27ef3ec5a434868ac7aa157fab634c23..16ddce82b6df563d2a0a042cc2b57d708f24c5c3 100644
+--- a/modules/cldc-compact/src/main/java/java/lang/Integer.java
++++ b/modules/cldc-compact/src/main/java/java/lang/Integer.java
+@@ -620,19 +620,19 @@ public final class Integer
+ 	@Api
+ 	public static String toBinaryString(int __a)
+ 	{
+-		throw Debugging.todo();
++		return Long.__unsignedString(__a & 0xFFFFFFFFL, 2);
+ 	}
+ 	
+ 	@Api
+ 	public static String toHexString(int __a)
+ 	{
+-		throw Debugging.todo();
++		return Long.__unsignedString(__a & 0xFFFFFFFFL, 16);
+ 	}
+ 	
+ 	@Api
+ 	public static String toOctalString(int __a)
+ 	{
+-		throw Debugging.todo();
++		return Long.__unsignedString(__a & 0xFFFFFFFFL, 8);
+ 	}
+ 	
+ 	/**
+@@ -712,4 +712,3 @@ public final class Integer
+ 		return new Integer(__v);
+ 	}
+ }
+-
+diff --git a/modules/cldc-compact/src/main/java/java/lang/Long.java b/modules/cldc-compact/src/main/java/java/lang/Long.java
+index 84b407be67d1f6b4bee35d062c745c101bf3ee45..885d123caef94a1e4ac18dd43ae06a9e33629426 100644
+--- a/modules/cldc-compact/src/main/java/java/lang/Long.java
++++ b/modules/cldc-compact/src/main/java/java/lang/Long.java
+@@ -561,10 +561,47 @@ public final class Long
+ 	 * @return The resulting string.
+ 	 * @since 2019/12/25
+ 	 */
+-	private static String __unsignedString(long __v, int __b)
++	static String __unsignedString(long __v, int __b)
+ 	{
+-		throw Debugging.todo();
++		final char[] digits = "0123456789abcdef".toCharArray();
++		final int shift;
++		final int mask;
++		
++		switch (__b)
++		{
++			case 2:
++				shift = 1;
++				mask = 0x1;
++				break;
++			
++			case 8:
++				shift = 3;
++				mask = 0x7;
++				break;
++			
++			case 16:
++				shift = 4;
++				mask = 0xF;
++				break;
++			
++			default:
++				throw new IllegalArgumentException("EB6r");
++		}
++		
++		if (__v == 0L)
++			return "0";
++		
++		char[] result = new char[64];
++		int at = result.length;
++		long value = __v;
++		do
++		{
++			result[--at] = digits[(int)(value & mask)];
++			value >>>= shift;
++		}
++		while (value != 0L);
++		
++		return new String(result, at, result.length - at);
+ 	}
+ }
+ 
+-
+diff --git a/modules/gcf/src/main/java/cc/squirreljme/runtime/gcf/TCPClientConnection.java b/modules/gcf/src/main/java/cc/squirreljme/runtime/gcf/TCPClientConnection.java
+index 6bc04c52955738535fb1f44417e3372a8945460b..7c428a3a7276f9b976e67942c2cb19dff4f84394 100644
+--- a/modules/gcf/src/main/java/cc/squirreljme/runtime/gcf/TCPClientConnection.java
++++ b/modules/gcf/src/main/java/cc/squirreljme/runtime/gcf/TCPClientConnection.java
+@@ -9,7 +9,6 @@
+ 
+ package cc.squirreljme.runtime.gcf;
+ 
+-import cc.squirreljme.runtime.cldc.debug.Debugging;
+ import java.io.DataInputStream;
+ import java.io.DataOutputStream;
+ import java.io.IOException;
+@@ -62,6 +61,38 @@ public abstract class TCPClientConnection
+ 	protected abstract void doClose()
+ 		throws IOException;
+ 	
++	/**
++	 * Returns the local address of this connection.
++	 *
++	 * @return The local address.
++	 * @throws IOException If it could not be determined.
++	 * @since 2026/04/21
++	 */
++	protected abstract String doGetLocalAddress()
++		throws IOException;
++	
++	/**
++	 * Returns the local port of this connection.
++	 *
++	 * @return The local port.
++	 * @throws IOException If it could not be determined.
++	 * @since 2026/04/21
++	 */
++	protected abstract int doGetLocalPort()
++		throws IOException;
++	
++	/**
++	 * Returns the value of the given socket option.
++	 *
++	 * @param __o The option to query.
++	 * @return The option value.
++	 * @throws IllegalArgumentException If the option is invalid.
++	 * @throws IOException If it could not be queried.
++	 * @since 2026/04/21
++	 */
++	protected abstract int doGetSocketOption(byte __o)
++		throws IllegalArgumentException, IOException;
++	
+ 	/**
+ 	 * Performs the actual input stream open.
+ 	 *
+@@ -172,7 +203,7 @@ public abstract class TCPClientConnection
+ 	public final AccessPoint getAccessPoint()
+ 		throws IOException
+ 	{
+-		throw Debugging.todo();
++		return null;
+ 	}
+ 	
+ 	/**
+@@ -183,7 +214,7 @@ public abstract class TCPClientConnection
+ 	public final String getAddress()
+ 		throws IOException
+ 	{
+-		throw Debugging.todo();
++		return TCPClientConnection.__hostString(this.ipaddr.hostname);
+ 	}
+ 	
+ 	/**
+@@ -194,7 +225,7 @@ public abstract class TCPClientConnection
+ 	public final String getLocalAddress()
+ 		throws IOException
+ 	{
+-		throw Debugging.todo();
++		return this.doGetLocalAddress();
+ 	}
+ 	
+ 	/**
+@@ -205,7 +236,7 @@ public abstract class TCPClientConnection
+ 	public final int getLocalPort()
+ 		throws IOException
+ 	{
+-		throw Debugging.todo();
++		return this.doGetLocalPort();
+ 	}
+ 	
+ 	/**
+@@ -216,7 +247,7 @@ public abstract class TCPClientConnection
+ 	public final int getPort()
+ 		throws IOException
+ 	{
+-		throw Debugging.todo();
++		return this.ipaddr.port;
+ 	}
+ 	
+ 	/**
+@@ -227,7 +258,16 @@ public abstract class TCPClientConnection
+ 	public final int getSocketOption(byte __o)
+ 		throws IllegalArgumentException, IOException
+ 	{
+-		throw Debugging.todo();
++		/* {@squirreljme.error EC0n Invalid socket option. (The option)} */
++		if (__o != SocketConnection.KEEPALIVE &&
++			__o != SocketConnection.LINGER &&
++			__o != SocketConnection.SNDBUF &&
++			__o != SocketConnection.RCVBUF &&
++			__o != SocketConnection.DELAY &&
++			__o != SocketConnection.TIMEOUT)
++			throw new IllegalArgumentException("EC0n " + __o);
++		
++		return this.doGetSocketOption(__o);
+ 	}
+ 	
+ 	/**
+@@ -269,8 +309,12 @@ public abstract class TCPClientConnection
+ 		throws IllegalArgumentException, IOException
+ 	{
+ 		/* {@squirreljme.error EC0n Invalid socket option. (The option)} */
+-		if (__o != SocketConnection.KEEPALIVE || __o != SocketConnection.LINGER || __o != SocketConnection.SNDBUF ||
+-			__o != SocketConnection.RCVBUF || __o != SocketConnection.DELAY || __o != SocketConnection.TIMEOUT)
++		if (__o != SocketConnection.KEEPALIVE &&
++			__o != SocketConnection.LINGER &&
++			__o != SocketConnection.SNDBUF &&
++			__o != SocketConnection.RCVBUF &&
++			__o != SocketConnection.DELAY &&
++			__o != SocketConnection.TIMEOUT)
+ 			throw new IllegalArgumentException("EC0n " + __o);
+ 		
+ 		// Check options
+@@ -302,5 +346,21 @@ public abstract class TCPClientConnection
+ 		// Forward
+ 		this.doSetSocketOption(__o, __v);
+ 	}
++	
++	/**
++	 * Normalizes the given host name for accessors.
++	 *
++	 * @param __host The host to normalize.
++	 * @return The normalized host name.
++	 * @since 2026/04/21
++	 */
++	private static String __hostString(String __host)
++	{
++		if (__host == null)
++			return null;
++		
++		if (__host.startsWith("[") && __host.endsWith("]"))
++			return __host.substring(1, __host.length() - 1);
++		return __host;
++	}
+ }
+-
+diff --git a/modules/meep-midlet/src/main/java/javax/microedition/midlet/MIDlet.java b/modules/meep-midlet/src/main/java/javax/microedition/midlet/MIDlet.java
+index 0d8a34c3128fe5aaae55c97a7d9b705bb0eee0ab..639c88e2be12631e76d147344356b4c8c833a9dc 100644
+--- a/modules/meep-midlet/src/main/java/javax/microedition/midlet/MIDlet.java
++++ b/modules/meep-midlet/src/main/java/javax/microedition/midlet/MIDlet.java
+@@ -184,9 +184,6 @@ public abstract class MIDlet
+ 				}
+ 				catch (IOException e)
+ 				{
+-					// It failed, so maybe give a reason why?
+-					e.printStackTrace();
+-					
+ 					source.isMissing = true;
+ 				}
+ 			
+@@ -328,4 +325,3 @@ public abstract class MIDlet
+ 		throw Debugging.todo();
+ 	}
+ }
+-
+diff --git a/modules/meep-rms/src/main/java/javax/microedition/rms/RecordStoreInfo.java b/modules/meep-rms/src/main/java/javax/microedition/rms/RecordStoreInfo.java
+index a502a5bff19cbea2405aab15bcfdd70d2dd1e333..4113d9e3f33a63f473cc98b119c24468f4f8dde8 100644
+--- a/modules/meep-rms/src/main/java/javax/microedition/rms/RecordStoreInfo.java
++++ b/modules/meep-rms/src/main/java/javax/microedition/rms/RecordStoreInfo.java
+@@ -119,10 +119,16 @@ public final class RecordStoreInfo
+ 			if (otherBaseName != null)
+ 				this._baseName = otherBaseName;
+ 			else
++			{
++				String safeName = Base64Encoder.encode(__name.getBytes("utf-8"))
++					.toLowerCase()
++					.replace('=', '_')
++					.replace('/', '_')
++					.replace('+', '-');
+ 				this._baseName = String.format("%08x%02d%s",
+ 					__owner.hashCode(), __name.length(),
+-					Base64Encoder.encode(__name.getBytes("utf-8"))
+-						.toLowerCase().replace('=', '_'));
++					safeName);
++			}
+ 			this._metaName = this._baseName + ".rms";
+ 		}
+ 		catch (IOException __e)
+@@ -300,4 +306,3 @@ public final class RecordStoreInfo
+ 		}
+ 	}
+ }
+-
+diff --git a/modules/midp-lcdui/src/main/java/cc/squirreljme/runtime/lcdui/common/EditableText.java b/modules/midp-lcdui/src/main/java/cc/squirreljme/runtime/lcdui/common/EditableText.java
+index 02bcfa798563170732a856d78abe04441c0ec4e7..b3de36a6bc97b5ea16409e5240d2175f3de7497a 100644
+--- a/modules/midp-lcdui/src/main/java/cc/squirreljme/runtime/lcdui/common/EditableText.java
++++ b/modules/midp-lcdui/src/main/java/cc/squirreljme/runtime/lcdui/common/EditableText.java
+@@ -50,6 +50,56 @@ public final class EditableText
+ 	
+ 	/** The current constraints. */
+ 	private volatile int _constraints;
++
++	/**
++	 * Returns the current constraints.
++	 *
++	 * @return The current constraints.
++	 * @since 2026/04/21
++	 */
++	public int getConstraints()
++	{
++		return this._constraints;
++	}
++
++	/**
++	 * Returns the maximum length of the field.
++	 *
++	 * @return The maximum text size.
++	 * @since 2026/04/21
++	 */
++	public int getMaxSize()
++	{
++		return this._maxlength;
++	}
++
++	/**
++	 * Returns the current string value.
++	 *
++	 * @return The current text.
++	 * @since 2026/04/21
++	 */
++	public String getString()
++	{
++		synchronized (this.lock)
++		{
++			return this._value.toString();
++		}
++	}
++
++	/**
++	 * Returns the current text size.
++	 *
++	 * @return The current character count.
++	 * @since 2026/04/21
++	 */
++	public int size()
++	{
++		synchronized (this.lock)
++		{
++			return this._value.length();
++		}
++	}
+ 	
+ 	/**
+ 	 * Initializes the text field by setting every parameter at once.
+@@ -84,7 +134,71 @@ public final class EditableText
+ 			// However if the constraints are smaller for the implementation
+ 			// then no exception is thrown (just give the truncated string)
+ 			if (__t != null)
+-				this.setString((n < __c ? __t.substring(0, n) : __t));
++				this.setString((__t.length() > n ? __t.substring(0, n) : __t));
++		}
++	}
++
++	/**
++	 * Deletes a range from the current text.
++	 *
++	 * @param __at The offset to delete from.
++	 * @param __length The number of characters to delete.
++	 * @throws IndexOutOfBoundsException If the range is not valid.
++	 * @since 2026/04/21
++	 */
++	public void delete(int __at, int __length)
++		throws IndexOutOfBoundsException
++	{
++		if (__length < 0)
++			throw new IndexOutOfBoundsException("IOOB");
++		
++		synchronized (this.lock)
++		{
++			StringBuilder value = this._value;
++			int n = value.length();
++			if (__at < 0 || __at > n || (__at + __length) > n)
++				throw new IndexOutOfBoundsException("IOOB");
++			
++			value.delete(__at, __at + __length);
++		}
++	}
++
++	/**
++	 * Inserts text into the current value.
++	 *
++	 * @param __text The text to insert.
++	 * @param __at The index to insert at.
++	 * @throws IllegalArgumentException If the text would violate the field
++	 * constraints.
++	 * @throws IndexOutOfBoundsException If the insert index is not valid.
++	 * @throws NullPointerException On null arguments.
++	 * @since 2026/04/21
++	 */
++	public void insert(String __text, int __at)
++		throws IllegalArgumentException, IndexOutOfBoundsException,
++			NullPointerException
++	{
++		if (__text == null)
++			throw new NullPointerException("NARG");
++		
++		synchronized (this.lock)
++		{
++			StringBuilder value = this._value;
++			int n = value.length();
++			if (__at < 0 || __at > n)
++				throw new IndexOutOfBoundsException("IOOB");
++			
++			StringBuilder next = new StringBuilder(n + __text.length());
++			next.append(value, 0, __at);
++			next.append(__text);
++			next.append(value, __at, n);
++			
++			/* {@squirreljme.error EB06 Cannot insert the specified string
++			because it is not valid within the constraints.} */
++			if (!EditableText.__check(next, this._maxlength, this._constraints))
++				throw new IllegalArgumentException("EB06");
++			
++			value.insert(__at, __text);
+ 		}
+ 	}
+ 	
+@@ -213,6 +327,10 @@ public final class EditableText
+ 		// Check
+ 		if (__cs == null)
+ 			throw new NullPointerException("NARG");
++
++		// Must fit within the maximum size
++		if (__cs.length() > __ms)
++			return false;
+ 		
+ 		// No constraints used or the input string is empty
+ 		// Empty strings are always valid because otherwise constructing
+@@ -252,7 +370,22 @@ public final class EditableText
+ 				
+ 				// E-mail addresses and URLs allow everything
+ 			case TextField.EMAILADDR:
++			case TextField.PHONENUMBER:
+ 			case TextField.URL:
++				if (type == TextField.PHONENUMBER)
++				{
++					for (int i = 0; i < n; i++)
++					{
++						char c = __cs.charAt(i);
++						if (c >= '0' && c <= '9')
++							continue;
++						if (c == ' ' || c == '-' || c == '(' || c == ')')
++							continue;
++						if (c == '+' && i == 0)
++							continue;
++						return false;
++					}
++				}
+ 				return true;
+ 			
+ 				// Unknown
+@@ -261,4 +394,3 @@ public final class EditableText
+ 		}
+ 	}
+ }
+-
+diff --git a/modules/midp-lcdui/src/main/java/javax/microedition/lcdui/Form.java b/modules/midp-lcdui/src/main/java/javax/microedition/lcdui/Form.java
+index 9abe67d3c10b3ad63d6d6a16c527d6ade31d2ccb..7beb4b3f641cf7b7b4931b8bab0e8513324a9d3a 100644
+--- a/modules/midp-lcdui/src/main/java/javax/microedition/lcdui/Form.java
++++ b/modules/midp-lcdui/src/main/java/javax/microedition/lcdui/Form.java
+@@ -9,7 +9,11 @@
+ 
+ package javax.microedition.lcdui;
+ 
++import cc.squirreljme.jvm.mle.scritchui.ScritchInterface;
++import cc.squirreljme.jvm.mle.scritchui.ScritchPanelInterface;
+ import cc.squirreljme.jvm.mle.scritchui.brackets.ScritchComponentBracket;
++import cc.squirreljme.jvm.mle.scritchui.brackets.ScritchPanelBracket;
++import cc.squirreljme.runtime.lcdui.scritchui.DisplayableState;
+ import cc.squirreljme.runtime.cldc.annotation.Api;
+ import cc.squirreljme.runtime.cldc.debug.Debugging;
+ 
+@@ -17,12 +21,30 @@ import cc.squirreljme.runtime.cldc.debug.Debugging;
+ public class Form
+ 	extends Screen
+ {
++	/** Padding around form items. */
++	static final int _PADDING =
++		4;
++
+ 	/** The layout policy for this form. */
+ 	volatile FormLayoutPolicy _layout =
+ 		new __DefaultFormLayoutPolicy__(this);
+ 	
+ 	/** Is the layout considered stale? */
+ 	volatile boolean _staleLayout;
++
++	/** The form items. */
++	private volatile Item[] _items =
++		new Item[0];
++
++	/** The item state listener. */
++	private volatile ItemStateListener _itemStateListener;
++
++	/** The item traversal listener. */
++	private volatile ItemTraversalListener _itemTraversalListener;
++
++	/** The currently focused item index. */
++	private volatile int _focusIndex =
++		-1;
+ 	
+ 	/**
+ 	 * Initializes an empty form with an optionally specified title.
+@@ -52,6 +74,16 @@ public class Form
+ 	public Form(String __t, Item[] __i)
+ 		throws IllegalStateException, NullPointerException
+ 	{
++		DisplayableState state = this.__state();
++		ScritchInterface scritchApi = state.scritchApi();
++		ScritchPanelInterface panelApi = scritchApi.panel();
++		ScritchPanelBracket scritchPanel = state.scritchPanel();
++		scritchApi.paintable().componentSetPaintListener(scritchPanel,
++			new __ExecFormPaint__(this));
++		panelApi.panelSetInputListener(scritchPanel,
++			new __ExecFormInput__(this));
++		panelApi.panelEnableFocus(scritchPanel, true, true);
++
+ 		// Forms just use the titles the same as Displayables
+ 		try
+ 		{
+@@ -129,24 +161,29 @@ public class Form
+ 	{
+ 		if (__i == null)
+ 			throw new NullPointerException("NARG");
+-		
+-		throw Debugging.todo();
+-		/*
+-		/* {@squirreljme.error EB23 Cannot append an item which has already
+-		been associated with a form.} * /
+-		if (__i._displayable != null)
+-			throw new IllegalStateException("EB23");
+-		__i._displayable = this;
+-		
+-		// Append item
+-		__VolatileList__<Item> items = this._items;
+-		int rv = items.append(__i);
+-		
+-		// Update display
+-		this.__update();
+-		
+-		return rv;
+-		*/
++
++		int index;
++		synchronized (this)
++		{
++			/* {@squirreljme.error EB23 Cannot append an item which has already
++			been associated with a form.} */
++			if (__i._displayable != null)
++				throw new IllegalStateException("EB23");
++
++			Item[] items = this._items;
++			index = items.length;
++			Item[] copy = new Item[index + 1];
++			System.arraycopy(items, 0, copy, 0, index);
++			copy[index] = __i;
++
++			__i._displayable = this;
++			this._items = copy;
++			this._focusIndex = this.__normalizeFocusIndex(index);
++			this._staleLayout = true;
++		}
++
++		this.__refresh();
++		return index;
+ 	}
+ 	
+ 	/**
+@@ -160,21 +197,40 @@ public class Form
+ 	public void delete(int __i)
+ 		throws IndexOutOfBoundsException
+ 	{
+-		throw Debugging.todo();
+-		/*
+-		// Delete item
+-		this._items.remove(__i);
+-		
+-		// Update display
+-		this.__update();
+-		
+-		 */
++		synchronized (this)
++		{
++			Item[] items = this._items;
++			int n = items.length;
++			if (__i < 0 || __i >= n)
++				throw new IndexOutOfBoundsException("IOOB");
++
++			items[__i]._displayable = null;
++
++			Item[] copy = new Item[n - 1];
++			System.arraycopy(items, 0, copy, 0, __i);
++			System.arraycopy(items, __i + 1, copy, __i, n - __i - 1);
++			this._items = copy;
++			this._focusIndex = this.__normalizeFocusIndex(
++				(this._focusIndex > __i ? this._focusIndex - 1 : this._focusIndex));
++			this._staleLayout = true;
++		}
++
++		this.__refresh();
+ 	}
+ 	
+ 	@Api
+ 	public void deleteAll()
+ 	{
+-		throw Debugging.todo();
++		synchronized (this)
++		{
++			for (Item item : this._items)
++				item._displayable = null;
++			this._items = new Item[0];
++			this._focusIndex = -1;
++			this._staleLayout = true;
++		}
++
++		this.__refresh();
+ 	}
+ 	
+ 	/**
+@@ -189,11 +245,7 @@ public class Form
+ 	public Item get(int __i)
+ 		throws IndexOutOfBoundsException
+ 	{
+-		throw Debugging.todo();
+-		/*
+-		return this._items.get(__i);
+-		
+-		 */
++		return this._items[__i];
+ 	}
+ 	
+ 	/**
+@@ -206,7 +258,15 @@ public class Form
+ 	@Api
+ 	public Item getCurrent()
+ 	{
+-		throw Debugging.todo();
++		Item[] items = this._items;
++		if (items.length == 0)
++			return null;
++		
++		int focusIndex = this._focusIndex;
++		if (focusIndex < 0 || focusIndex >= items.length)
++			focusIndex = this.__normalizeFocusIndex(0);
++		
++		return items[focusIndex];
+ 	}
+ 	
+ 	/**
+@@ -216,7 +276,7 @@ public class Form
+ 	@Override
+ 	public int getHeight()
+ 	{
+-		throw Debugging.todo();
++		return this.__getHeight();
+ 	}
+ 	
+ 	/**
+@@ -243,31 +303,86 @@ public class Form
+ 	@Override
+ 	public int getWidth()
+ 	{
+-		throw Debugging.todo();
++		return this.__getWidth();
+ 	}
+ 	
+ 	@Api
+ 	public void insert(int __a, Item __b)
+ 	{
+-		throw Debugging.todo();
++		if (__b == null)
++			throw new NullPointerException("NARG");
++
++		synchronized (this)
++		{
++			Item[] items = this._items;
++			int n = items.length;
++			if (__a < 0 || __a > n)
++				throw new IndexOutOfBoundsException("IOOB");
++
++			/* {@squirreljme.error EB23 Cannot append an item which has already
++			been associated with a form.} */
++			if (__b._displayable != null)
++				throw new IllegalStateException("EB23");
++
++			Item[] copy = new Item[n + 1];
++			System.arraycopy(items, 0, copy, 0, __a);
++			copy[__a] = __b;
++			System.arraycopy(items, __a, copy, __a + 1, n - __a);
++
++			__b._displayable = this;
++			this._items = copy;
++			this._focusIndex = this.__normalizeFocusIndex(
++				(this._focusIndex >= __a ? this._focusIndex + 1 : this._focusIndex));
++			this._staleLayout = true;
++		}
++
++		this.__refresh();
+ 	}
+ 	
+ 	@Api
+ 	public void set(int __a, Item __b)
+ 	{
+-		throw Debugging.todo();
++		if (__b == null)
++			throw new NullPointerException("NARG");
++
++		synchronized (this)
++		{
++			Item[] items = this._items;
++			if (__a < 0 || __a >= items.length)
++				throw new IndexOutOfBoundsException("IOOB");
++
++			Displayable existingOwner = __b._displayable;
++			if (existingOwner != null && existingOwner != this)
++				throw new IllegalStateException("EB23");
++
++			Item old = items[__a];
++			if (old == __b)
++				return;
++
++			Item[] copy = new Item[items.length];
++			System.arraycopy(items, 0, copy, 0, items.length);
++			copy[__a] = __b;
++
++			old._displayable = null;
++			__b._displayable = this;
++			this._items = copy;
++			this._focusIndex = this.__normalizeFocusIndex(__a);
++			this._staleLayout = true;
++		}
++
++		this.__refresh();
+ 	}
+ 	
+ 	@Api
+ 	public void setItemStateListener(ItemStateListener __a)
+ 	{
+-		throw Debugging.todo();
++		this._itemStateListener = __a;
+ 	}
+ 	
+ 	@Api
+ 	public void setItemTraversalListener(ItemTraversalListener __itl)
+ 	{
+-		throw Debugging.todo();
++		this._itemTraversalListener = __itl;
+ 	}
+ 	
+ 	/**
+@@ -295,17 +410,241 @@ public class Form
+ 	@Api
+ 	public int size()
+ 	{
+-		throw Debugging.todo();
+-		/*
+-		return this._items.size();
+-		
+-		 */
++		return this._items.length;
+ 	}
+ 	
+ 	@Override
+ 	ScritchComponentBracket __scritchComponent()
+ 	{
+-		throw Debugging.todo();
++		return this.__state().scritchPanel();
++	}
++
++	/**
++	 * Returns a snapshot of the current items.
++	 *
++	 * @return The current items.
++	 * @since 2026/04/20
++	 */
++	final Item[] __items()
++	{
++		return this._items;
++	}
++
++	/**
++	 * Advances the current focus to another field.
++	 *
++	 * @param __delta The directional delta.
++	 * @return If focus changed.
++	 * @since 2026/04/21
++	 */
++	final boolean __advanceFocus(int __delta)
++	{
++		if (__delta == 0)
++			return false;
++		
++		ItemTraversalListener listener;
++		Item oldItem;
++		Item newItem;
++		synchronized (this)
++		{
++			int next = this.__nextFocusableIndex(this._focusIndex, __delta);
++			if (next < 0 || next == this._focusIndex)
++				return false;
++			
++			oldItem = this.__itemAt(this._focusIndex);
++			this._focusIndex = next;
++			newItem = this._items[next];
++			listener = this._itemTraversalListener;
++		}
++		
++		if (listener != null)
++		{
++			if (oldItem != null && oldItem != newItem)
++				listener.itemTraversedOut(oldItem);
++			if (newItem != null && newItem != oldItem)
++				listener.itemTraversedIn(newItem);
++		}
++		
++		this.__refresh();
++		return true;
++	}
++
++	/**
++	 * Returns the currently focused text field, if any.
++	 *
++	 * @return The current text field or {@code null}.
++	 * @since 2026/04/21
++	 */
++	final TextField __focusedTextField()
++	{
++		synchronized (this)
++		{
++			Item item = this.__itemAt(this._focusIndex);
++			if (item instanceof TextField)
++				return (TextField)item;
++			
++			int focusIndex = this.__normalizeFocusIndex(this._focusIndex);
++			Item normalized = this.__itemAt(focusIndex);
++			if (normalized instanceof TextField)
++			{
++				this._focusIndex = focusIndex;
++				return (TextField)normalized;
++			}
++		}
++		
++		return null;
++	}
++
++	/**
++	 * Returns the currently focused item index.
++	 *
++	 * @return The focused item index or {@code -1}.
++	 * @since 2026/04/21
++	 */
++	final int __focusIndex()
++	{
++		return this._focusIndex;
++	}
++
++	/**
++	 * Handles a typed character for the currently focused item.
++	 *
++	 * @param __c The character to handle.
++	 * @return If the character was accepted.
++	 * @since 2026/04/21
++	 */
++	final boolean __handleCharacter(char __c)
++	{
++		if (__c == '\t')
++			return this.__advanceFocus(1);
++		
++		TextField textField = this.__focusedTextField();
++		if (textField == null)
++			return false;
++		
++		try
++		{
++			return textField.__accept(__c);
++		}
++		catch (IllegalArgumentException e)
++		{
++			return false;
++		}
++	}
++
++	/**
++	 * Notifies the form that an item changed.
++	 *
++	 * @param __item The item that changed.
++	 * @since 2026/04/21
++	 */
++	final void __itemChanged(Item __item)
++	{
++		ItemStateListener listener = this._itemStateListener;
++		if (listener != null && __item != null)
++			listener.itemStateChanged(__item);
++		this.__refresh();
++	}
++
++	/**
++	 * Repaints the form.
++	 *
++	 * @since 2026/04/20
++	 */
++	final void __refresh()
++	{
++		this.__state().scritchApi().paintable()
++			.componentRepaint(this.__state().scritchPanel());
++	}
++
++	/**
++	 * Returns the item at the given index.
++	 *
++	 * @param __index The index to read.
++	 * @return The item or {@code null}.
++	 * @since 2026/04/21
++	 */
++	private Item __itemAt(int __index)
++	{
++		Item[] items = this._items;
++		if (__index < 0 || __index >= items.length)
++			return null;
++		return items[__index];
++	}
++
++	/**
++	 * Returns the next focusable item index.
++	 *
++	 * @param __from The starting focus index.
++	 * @param __delta The direction to move.
++	 * @return The next focusable index or {@code -1}.
++	 * @since 2026/04/21
++	 */
++	private int __nextFocusableIndex(int __from, int __delta)
++	{
++		Item[] items = this._items;
++		int n = items.length;
++		if (n <= 0)
++			return -1;
++		
++		int start = __from;
++		if (start < 0 || start >= n)
++			start = 0;
++		
++		int index = start;
++		for (int i = 0; i < n; i++)
++		{
++			index += (__delta < 0 ? -1 : 1);
++			if (index < 0)
++				index = n - 1;
++			else if (index >= n)
++				index = 0;
++			
++			if (Form.__isFocusable(items[index]))
++				return index;
++		}
++		
++		return __from;
++	}
++
++	/**
++	 * Normalizes the focus index to a valid form item.
++	 *
++	 * @param __preferred The preferred focus index.
++	 * @return The normalized focus index.
++	 * @since 2026/04/21
++	 */
++	private int __normalizeFocusIndex(int __preferred)
++	{
++		Item[] items = this._items;
++		int n = items.length;
++		if (n <= 0)
++			return -1;
++		
++		if (__preferred >= 0 && __preferred < n &&
++			Form.__isFocusable(items[__preferred]))
++			return __preferred;
++		
++		for (int i = 0; i < n; i++)
++			if (Form.__isFocusable(items[i]))
++				return i;
++		
++		if (__preferred >= 0 && __preferred < n)
++			return __preferred;
++		return 0;
++	}
++
++	/**
++	 * Returns whether the given item can receive form focus.
++	 *
++	 * @param __item The item to test.
++	 * @return If the item is focusable.
++	 * @since 2026/04/21
++	 */
++	private static boolean __isFocusable(Item __item)
++	{
++		return (__item instanceof TextField) &&
++			((TextField)__item).__isEditable();
+ 	}
+ 	
+ 	/**
+@@ -342,5 +681,3 @@ public class Form
+ 		this._staleLayout = true;
+ 	}
+ }
+-
+-
+diff --git a/modules/midp-lcdui/src/main/java/javax/microedition/lcdui/ImageItem.java b/modules/midp-lcdui/src/main/java/javax/microedition/lcdui/ImageItem.java
+index 6d3c8d497eb4713271d53747c190cadb4fc1cb2a..7eb2290659b1dc5edc0cd7eacfcef1f5755b7cfc 100644
+--- a/modules/midp-lcdui/src/main/java/javax/microedition/lcdui/ImageItem.java
++++ b/modules/midp-lcdui/src/main/java/javax/microedition/lcdui/ImageItem.java
+@@ -99,19 +99,19 @@ public class ImageItem
+ 	@Api
+ 	public String getAltText()
+ 	{
+-		throw Debugging.todo();
++		return this._alt;
+ 	}
+ 	
+ 	@Api
+ 	public int getAppearanceMode()
+ 	{
+-		throw Debugging.todo();
++		return this._amode;
+ 	}
+ 	
+ 	@Api
+ 	public Image getImage()
+ 	{
+-		throw Debugging.todo();
++		return this._image;
+ 	}
+ 	
+ 	@Api
+@@ -157,4 +157,3 @@ public class ImageItem
+ 	}
+ }
+ 
+-
+diff --git a/modules/midp-lcdui/src/main/java/javax/microedition/lcdui/Item.java b/modules/midp-lcdui/src/main/java/javax/microedition/lcdui/Item.java
+index 9f16276085ccfa45466b47e85a2cf8a8164dac89..be53dece8eb1affc0a2f9540717cec05518d6e90 100644
+--- a/modules/midp-lcdui/src/main/java/javax/microedition/lcdui/Item.java
++++ b/modules/midp-lcdui/src/main/java/javax/microedition/lcdui/Item.java
+@@ -88,6 +88,9 @@ public abstract class Item
+ 	
+ 	/** The label of this item. */
+ 	final StringTracker _labelTracker;
++
++	/** The owning displayable, if any. */
++	volatile Displayable _displayable;
+ 	
+ 	/** The current layout of the item. */
+ 	volatile int _layout =
+@@ -311,4 +314,3 @@ public abstract class Item
+ 	}
+ }
+ 
+-
+diff --git a/modules/midp-lcdui/src/main/java/javax/microedition/lcdui/StringItem.java b/modules/midp-lcdui/src/main/java/javax/microedition/lcdui/StringItem.java
+index 797d8bee07b687f044b84841901c36cf64cbf096..d5c1508568c498835292544739e28c392fb00c04 100644
+--- a/modules/midp-lcdui/src/main/java/javax/microedition/lcdui/StringItem.java
++++ b/modules/midp-lcdui/src/main/java/javax/microedition/lcdui/StringItem.java
+@@ -65,7 +65,7 @@ public class StringItem
+ 	@Api
+ 	public int getAppearanceMode()
+ 	{
+-		throw Debugging.todo();
++		return this._amode;
+ 	}
+ 	
+ 	/**
+@@ -78,7 +78,7 @@ public class StringItem
+ 	public Font getFont()
+ 	{
+ 		Font rv = this._font;
+-		throw Debugging.todo();
++		return (rv != null ? rv : Font.getDefaultFont());
+ 	}
+ 	
+ 	/**
+@@ -126,14 +126,13 @@ public class StringItem
+ 	@Api
+ 	public void setFont(Font __a)
+ 	{
+-		throw Debugging.todo();
++		this._font = __a;
+ 	}
+ 	
+ 	@Api
+ 	public void setText(String __a)
+ 	{
+-		throw Debugging.todo();
++		this._text = __a;
+ 	}
+ }
+ 
+-
+diff --git a/modules/midp-lcdui/src/main/java/javax/microedition/lcdui/TextField.java b/modules/midp-lcdui/src/main/java/javax/microedition/lcdui/TextField.java
+index 22041304aa66404d09a11c1e6490cf7a7e81ecb8..610b8fc4e7c2bde0b64fd448787e591217b97f65 100644
+--- a/modules/midp-lcdui/src/main/java/javax/microedition/lcdui/TextField.java
++++ b/modules/midp-lcdui/src/main/java/javax/microedition/lcdui/TextField.java
+@@ -202,61 +202,99 @@ public class TextField
+ 	@Api
+ 	public void delete(int __a, int __b)
+ 	{
+-		throw Debugging.todo();
++		this._editabletext.delete(__a, __b);
++		this.__changed();
+ 	}
+ 	
+ 	@Api
+ 	public int getCaretPosition()
+ 	{
+-		throw Debugging.todo();
++		return this.size();
+ 	}
+ 	
+ 	@Api
+ 	public int getChars(char[] __a)
+ 	{
+-		throw Debugging.todo();
++		String value = this.getString();
++		if (__a == null)
++			return value.length();
++		
++		value.getChars(0, value.length(), __a, 0);
++		return value.length();
+ 	}
+ 	
+ 	@Api
+ 	public int getConstraints()
+ 	{
+-		throw Debugging.todo();
++		return this._editabletext.getConstraints();
+ 	}
+ 	
+ 	@Api
+ 	public int getMaxSize()
+ 	{
+-		throw Debugging.todo();
++		return this._editabletext.getMaxSize();
+ 	}
+ 	
+ 	@Api
+ 	public String getString()
+ 	{
+-		throw Debugging.todo();
++		return this._editabletext.getString();
++	}
++
++	/**
++	 * {@inheritDoc}
++	 * @since 2026/04/21
++	 */
++	@Override
++	public int getMinimumHeight()
++	{
++		return Math.max(Font.getDefaultFont().getHeight() + 8, 16);
++	}
++
++	/**
++	 * {@inheritDoc}
++	 * @since 2026/04/21
++	 */
++	@Override
++	public int getMinimumWidth()
++	{
++		Font font = Font.getDefaultFont();
++		return Math.max(80, font.charWidth('M') * 8);
+ 	}
+ 	
+ 	@Api
+ 	public void insert(char[] __a, int __b, int __c, int __d)
+ 	{
+-		throw Debugging.todo();
++		if (__a == null)
++			throw new NullPointerException("NARG");
++		
++		this.insert(new String(__a, __b, __c), __d);
+ 	}
+ 	
+ 	@Api
+ 	public void insert(String __a, int __b)
+ 	{
+-		throw Debugging.todo();
++		this._editabletext.insert(__a, __b);
++		this.__changed();
+ 	}
+ 	
+ 	@Api
+ 	public void setCaret(int __i)
+ 	{
+-		throw Debugging.todo();
++		if (__i < 0 || __i > this.size())
++			throw new IllegalArgumentException("EB07");
+ 	}
+ 	
+ 	@Api
+ 	public void setChars(char[] __a, int __b, int __c)
+ 	{
+-		throw Debugging.todo();
++		if (__a == null)
++		{
++			this.setString(null);
++			return;
++		}
++		
++		this.setString(new String(__a, __b, __c));
+ 	}
+ 	
+ 	/**
+@@ -321,12 +359,83 @@ public class TextField
+ 		throws IllegalArgumentException
+ 	{
+ 		this._editabletext.setString(__s);
++		this.__changed();
+ 	}
+ 	
+ 	@Api
+ 	public int size()
+ 	{
+-		throw Debugging.todo();
++		return this._editabletext.size();
+ 	}
+-}
+ 
++	/**
++	 * Accepts a single typed character for this field.
++	 *
++	 * @param __c The character to accept.
++	 * @return If the input changed the field.
++	 * @since 2026/04/21
++	 */
++	final boolean __accept(char __c)
++	{
++		if (!this.__isEditable())
++			return false;
++		
++		if (__c == '\r' || __c == '\n')
++			return false;
++		
++		if (__c == '\b' || __c == 127)
++		{
++			int n = this.size();
++			if (n <= 0)
++				return false;
++			
++			this.delete(n - 1, 1);
++			return true;
++		}
++		
++		this.insert(String.valueOf(__c), this.size());
++		return true;
++	}
++
++	/**
++	 * Returns if this field is editable.
++	 *
++	 * @return If the field is editable.
++	 * @since 2026/04/21
++	 */
++	final boolean __isEditable()
++	{
++		return (this.getConstraints() & TextField.UNEDITABLE) == 0;
++	}
++
++	/**
++	 * Returns the string to display for this field.
++	 *
++	 * @return The displayable field value.
++	 * @since 2026/04/21
++	 */
++	final String __renderString()
++	{
++		String value = this.getString();
++		if ((this.getConstraints() & TextField.PASSWORD) == 0)
++			return value;
++		
++		int n = value.length();
++		char[] masked = new char[n];
++		for (int i = 0; i < n; i++)
++			masked[i] = '*';
++		return new String(masked);
++	}
++
++	/**
++	 * Notifies the owning form that the field changed.
++	 *
++	 * @since 2026/04/21
++	 */
++	private void __changed()
++	{
++		Displayable displayable = this._displayable;
++		if (displayable instanceof Form)
++			((Form)displayable).__itemChanged(this);
++	}
++}
+diff --git a/modules/midp-lcdui/src/main/java/javax/microedition/lcdui/__ExecFormInput__.java b/modules/midp-lcdui/src/main/java/javax/microedition/lcdui/__ExecFormInput__.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..1e0b85ba68f25fb025ca3450ef22db1dcdbc5efb
+--- /dev/null
++++ b/modules/midp-lcdui/src/main/java/javax/microedition/lcdui/__ExecFormInput__.java
+@@ -0,0 +1,72 @@
++// -*- Mode: Java; indent-tabs-mode: t; tab-width: 4 -*-
++// ---------------------------------------------------------------------------
++// SquirrelJME
++//     Copyright (C) Stephanie Gawroriski <xer@multiphasicapps.net>
++// ---------------------------------------------------------------------------
++// SquirrelJME is under the Mozilla Public License Version 2.0.
++// See license.mkd for licensing and copyright information.
++// ---------------------------------------------------------------------------
++
++package javax.microedition.lcdui;
++
++import cc.squirreljme.jvm.mle.scritchui.brackets.ScritchComponentBracket;
++import cc.squirreljme.jvm.mle.scritchui.callbacks.ScritchInputListener;
++import cc.squirreljme.jvm.mle.scritchui.constants.ScritchInputMethodType;
++import java.lang.ref.Reference;
++import java.lang.ref.WeakReference;
++
++/**
++ * Handles input for forms.
++ *
++ * @since 2026/04/21
++ */
++final class __ExecFormInput__
++	implements ScritchInputListener
++{
++	/** The form being handled. */
++	private final Reference<Form> _form;
++
++	/**
++	 * Initializes the input handler.
++	 *
++	 * @param __form The form to handle.
++	 * @throws NullPointerException On null arguments.
++	 * @since 2026/04/21
++	 */
++	__ExecFormInput__(Form __form)
++		throws NullPointerException
++	{
++		if (__form == null)
++			throw new NullPointerException("NARG");
++		
++		this._form = new WeakReference<>(__form);
++	}
++
++	/**
++	 * {@inheritDoc}
++	 * @since 2026/04/21
++	 */
++	@Override
++	public void inputEvent(ScritchComponentBracket __component,
++		int __type, long __time, int __a, int __b, int __c, int __d, int __e,
++		int __f, int __g, int __h, int __i, int __j, int __k, int __l)
++	{
++		Form form = this._form.get();
++		if (form == null)
++			return;
++		
++		switch (__type)
++		{
++			case ScritchInputMethodType.KEY_CHAR_PRESSED:
++				form.__handleCharacter((char)__a);
++				break;
++				
++			case ScritchInputMethodType.KEY_PRESSED:
++				if (__a == '\t')
++					form.__advanceFocus(1);
++				else if (__a == '\b' || __a == 127)
++					form.__handleCharacter('\b');
++				break;
++		}
++	}
++}
+diff --git a/modules/midp-lcdui/src/main/java/javax/microedition/lcdui/__ExecFormPaint__.java b/modules/midp-lcdui/src/main/java/javax/microedition/lcdui/__ExecFormPaint__.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..fc5bcc5aa7e0e6595a77e6508036bfa4552f3a7b
+--- /dev/null
++++ b/modules/midp-lcdui/src/main/java/javax/microedition/lcdui/__ExecFormPaint__.java
+@@ -0,0 +1,275 @@
++// -*- Mode: Java; indent-tabs-mode: t; tab-width: 4 -*-
++// ---------------------------------------------------------------------------
++// Multi-Phasic Applications: SquirrelJME
++//     Copyright (C) Stephanie Gawroriski <xer@multiphasicapps.net>
++// ---------------------------------------------------------------------------
++// SquirrelJME is under the Mozilla Public License Version 2.0.
++// See license.mkd for licensing and copyright information.
++// ---------------------------------------------------------------------------
++
++package javax.microedition.lcdui;
++
++import cc.squirreljme.jvm.mle.scritchui.brackets.ScritchComponentBracket;
++import cc.squirreljme.jvm.mle.scritchui.brackets.ScritchPencilBracket;
++import cc.squirreljme.jvm.mle.scritchui.callbacks.ScritchPaintListener;
++import cc.squirreljme.runtime.lcdui.mle.PencilGraphics;
++import java.lang.ref.Reference;
++import java.lang.ref.WeakReference;
++
++/**
++ * Paints on a form panel.
++ *
++ * @since 2026/04/20
++ */
++final class __ExecFormPaint__
++	implements ScritchPaintListener
++{
++	/** The form being painted. */
++	private final Reference<Form> _form;
++
++	/**
++	 * Initializes the painter.
++	 *
++	 * @param __form The form to paint.
++	 * @throws NullPointerException On null arguments.
++	 * @since 2026/04/20
++	 */
++	__ExecFormPaint__(Form __form)
++		throws NullPointerException
++	{
++		if (__form == null)
++			throw new NullPointerException("NARG");
++
++		this._form = new WeakReference<>(__form);
++	}
++
++	/**
++	 * {@inheritDoc}
++	 * @since 2026/04/20
++	 */
++	@Override
++	public void paint(ScritchComponentBracket __component,
++		ScritchPencilBracket __g, int __sw, int __sh, int __special)
++	{
++		Form form = this._form.get();
++		if (form == null)
++			return;
++
++		Graphics gfx = PencilGraphics.of(__g, __sw, __sh);
++		Font defaultFont = Font.getDefaultFont();
++		int x = Form._PADDING;
++		int y = Form._PADDING;
++		int width = Math.max(0, __sw - (Form._PADDING * 2));
++
++		gfx.setColor(255, 255, 255);
++		gfx.fillRect(0, 0, __sw, __sh);
++		gfx.setColor(0, 0, 0);
++
++		Item[] items = form.__items();
++		int focusIndex = form.__focusIndex();
++		for (int itemIndex = 0, n = items.length; itemIndex < n; itemIndex++)
++		{
++			Item item = items[itemIndex];
++			y = this.__paintLabel(gfx, defaultFont, item, x, y, width);
++			
++			if (item instanceof StringItem)
++				y = this.__paintString(gfx, defaultFont, (StringItem)item,
++					x, y, width);
++
++			else if (item instanceof ImageItem)
++			{
++				Image image = ((ImageItem)item).getImage();
++				if (image != null)
++				{
++					gfx.drawImage(image, x, y, Graphics.TOP | Graphics.LEFT);
++					y += image.getHeight();
++				}
++			}
++
++			else if (item instanceof TextField)
++				y = this.__paintTextField(gfx, defaultFont, (TextField)item,
++					x, y, width, itemIndex == focusIndex);
++
++			y += Form._PADDING;
++		}
++	}
++
++	/**
++	 * Paints the item label.
++	 *
++	 * @param __gfx The graphics to draw to.
++	 * @param __font The default font.
++	 * @param __item The item being painted.
++	 * @param __x The X coordinate.
++	 * @param __y The Y coordinate.
++	 * @param __width The available width.
++	 * @return The new Y coordinate.
++	 * @since 2026/04/21
++	 */
++	private int __paintLabel(Graphics __gfx, Font __font, Item __item,
++		int __x, int __y, int __width)
++	{
++		String label = __item.getLabel();
++		if (label == null || label.length() == 0)
++			return __y;
++		
++		__gfx.setFont(__font);
++		return this.__paintLines(__gfx, __font, label, __x, __y, __width);
++	}
++
++	/**
++	 * Paints a string item.
++	 *
++	 * @param __gfx The graphics to draw to.
++	 * @param __defaultFont The default font.
++	 * @param __item The item to paint.
++	 * @param __x The X coordinate.
++	 * @param __y The Y coordinate.
++	 * @param __width The available width.
++	 * @return The new Y coordinate.
++	 * @since 2026/04/21
++	 */
++	private int __paintString(Graphics __gfx, Font __defaultFont,
++		StringItem __item, int __x, int __y, int __width)
++	{
++		Font useFont = __item._font;
++		if (useFont == null)
++			useFont = __defaultFont;
++		
++		__gfx.setFont(useFont);
++		String text = __item._text;
++		if (text == null)
++			return __y + Math.max(1, useFont.getHeight());
++		
++		return this.__paintLines(__gfx, useFont, text, __x, __y, __width);
++	}
++
++	/**
++	 * Paints a text field.
++	 *
++	 * @param __gfx The graphics to draw to.
++	 * @param __font The font to draw with.
++	 * @param __field The field to paint.
++	 * @param __x The X coordinate.
++	 * @param __y The Y coordinate.
++	 * @param __width The available width.
++	 * @param __focused Is the field focused?
++	 * @return The new Y coordinate.
++	 * @since 2026/04/21
++	 */
++	private int __paintTextField(Graphics __gfx, Font __font,
++		TextField __field, int __x, int __y, int __width, boolean __focused)
++	{
++		int lineHeight = Math.max(1, __font.getHeight());
++		int boxHeight = lineHeight + 8;
++		int textY = __y + 4;
++		String text = __field.__renderString();
++		
++		__gfx.setFont(__font);
++		if (__focused)
++			__gfx.setColor(224, 238, 255);
++		else
++			__gfx.setColor(245, 245, 245);
++		__gfx.fillRect(__x, __y, __width, boxHeight);
++		
++		__gfx.setColor(0, 0, 0);
++		__gfx.drawRect(__x, __y, Math.max(0, __width - 1),
++			Math.max(0, boxHeight - 1));
++		
++		int innerX = __x + 4;
++		int innerWidth = Math.max(0, __width - 8);
++		String visibleText = this.__fitTail(__font, text, innerWidth);
++		__gfx.drawString(visibleText, innerX, textY,
++			Graphics.TOP | Graphics.LEFT);
++		
++		if (__focused)
++		{
++			int caretX = innerX + __font.stringWidth(visibleText);
++			if (caretX >= (__x + __width - 3))
++				caretX = (__x + __width - 3);
++			__gfx.drawLine(caretX, __y + 2, caretX, __y + boxHeight - 3);
++		}
++		
++		return __y + boxHeight;
++	}
++
++	/**
++	 * Paints potentially multiline text.
++	 *
++	 * @param __gfx The graphics to draw to.
++	 * @param __font The font used to draw.
++	 * @param __text The text to paint.
++	 * @param __x The X coordinate.
++	 * @param __y The Y coordinate.
++	 * @param __width The available width.
++	 * @return The new Y coordinate.
++	 * @since 2026/04/21
++	 */
++	private int __paintLines(Graphics __gfx, Font __font, String __text,
++		int __x, int __y, int __width)
++	{
++		int lineHeight = Math.max(1, __font.getHeight());
++		int lineStart = 0;
++		for (int i = 0, n = __text.length(); i <= n; i++)
++			if (i == n || __text.charAt(i) == '\n')
++			{
++				String line = __text.substring(lineStart, i);
++				String visibleLine = this.__fitHead(__font, line, __width);
++				__gfx.drawString(visibleLine, __x, __y,
++					Graphics.TOP | Graphics.LEFT);
++				__y += lineHeight;
++				lineStart = i + 1;
++			}
++		
++		return __y;
++	}
++
++	/**
++	 * Fits the tail of the given string within the available width.
++	 *
++	 * @param __font The font being used.
++	 * @param __text The text to fit.
++	 * @param __width The maximum width.
++	 * @return The displayable text.
++	 * @since 2026/04/21
++	 */
++	private String __fitTail(Font __font, String __text, int __width)
++	{
++		if (__text == null || __text.length() == 0 || __width <= 0)
++			return "";
++		
++		if (__font.stringWidth(__text) <= __width)
++			return __text;
++		
++		int start = __text.length();
++		while (start > 0 &&
++			__font.stringWidth(__text.substring(start - 1)) <= __width)
++			start--;
++		
++		return __text.substring(start);
++	}
++
++	/**
++	 * Fits the head of the given string within the available width.
++	 *
++	 * @param __font The font being used.
++	 * @param __text The text to fit.
++	 * @param __width The maximum width.
++	 * @return The displayable text.
++	 * @since 2026/04/21
++	 */
++	private String __fitHead(Font __font, String __text, int __width)
++	{
++		if (__text == null || __text.length() == 0 || __width <= 0)
++			return "";
++		
++		if (__font.stringWidth(__text) <= __width)
++			return __text;
++		
++		int end = __text.length();
++		while (end > 0 && __font.stringWidth(__text.substring(0, end)) > __width)
++			end--;
++		
++		return __text.substring(0, end);
++	}
++}
+diff --git a/nanocoat/include/lib/scritchui/core/core.h b/nanocoat/include/lib/scritchui/core/core.h
+index 7751d6549e7cab50f0faa28a8da9011cedfa4774..748ef9033156c9ad330afdee95b43a974dcbfdae 100644
+--- a/nanocoat/include/lib/scritchui/core/core.h
++++ b/nanocoat/include/lib/scritchui/core/core.h
+@@ -117,6 +117,13 @@ sjme_errorCode sjme_scritchui_core_componentPosition(
+ 	sjme_attrOutNullable sjme_jint* outX,
+ 	sjme_attrOutNullable sjme_jint* outY);
+ 
++sjme_errorCode sjme_scritchui_core_componentScreenshot(
++	sjme_attrInNotNull sjme_scritchui inState,
++	sjme_attrInNotNull sjme_scritchui_uiComponent inComponent,
++	sjme_attrOutNotNull sjme_jint** outRgb,
++	sjme_attrOutNotNull sjme_jint* outWidth,
++	sjme_attrOutNotNull sjme_jint* outHeight);
++
+ sjme_errorCode sjme_scritchui_core_componentRepaint(
+ 	sjme_attrInNotNull sjme_scritchui inState,
+ 	sjme_attrInNotNull sjme_scritchui_uiComponent inComponent,
+diff --git a/nanocoat/include/lib/scritchui/framebuffer/fb.h b/nanocoat/include/lib/scritchui/framebuffer/fb.h
+index 56c6d24c8fa49578be03d6a2ef3d1fb2060bae81..66311e0bb9350a36cbfd8c1a2e05d90f594529f0 100644
+--- a/nanocoat/include/lib/scritchui/framebuffer/fb.h
++++ b/nanocoat/include/lib/scritchui/framebuffer/fb.h
+@@ -135,6 +135,13 @@ sjme_errorCode sjme_scritchui_fb_componentPosition(
+ 	sjme_attrOutNullable sjme_jint* outX,
+ 	sjme_attrOutNullable sjme_jint* outY);
+ 
++sjme_errorCode sjme_scritchui_fb_componentScreenshot(
++	sjme_attrInNotNull sjme_scritchui inState,
++	sjme_attrInNotNull sjme_scritchui_uiComponent inComponent,
++	sjme_attrOutNotNull sjme_jint** outRgb,
++	sjme_attrOutNotNull sjme_jint* outWidth,
++	sjme_attrOutNotNull sjme_jint* outHeight);
++
+ sjme_errorCode sjme_scritchui_fb_componentRepaint(
+ 	sjme_attrInNotNull sjme_scritchui inState,
+ 	sjme_attrInNotNull sjme_scritchui_uiComponent inComponent,
+diff --git a/nanocoat/include/lib/scritchui/gtk2/gtk2.h b/nanocoat/include/lib/scritchui/gtk2/gtk2.h
+index 13a856ca4239993455cb1180d8b202fe163f7cc8..09746726742d7ad70b447e62674e270ebae6afc2 100644
+--- a/nanocoat/include/lib/scritchui/gtk2/gtk2.h
++++ b/nanocoat/include/lib/scritchui/gtk2/gtk2.h
+@@ -81,6 +81,13 @@ sjme_errorCode sjme_scritchui_gtk2_componentFocusHas(
+ 	sjme_attrInNotNull sjme_scritchui_uiComponent inComponent,
+ 	sjme_attrOutNotNull sjme_jboolean* outHasFocus);
+ 
++sjme_errorCode sjme_scritchui_gtk2_componentScreenshot(
++	sjme_attrInNotNull sjme_scritchui inState,
++	sjme_attrInNotNull sjme_scritchui_uiComponent inComponent,
++	sjme_attrOutNotNull sjme_jint** outRgb,
++	sjme_attrOutNotNull sjme_jint* outWidth,
++	sjme_attrOutNotNull sjme_jint* outHeight);
++
+ sjme_errorCode sjme_scritchui_gtk2_componentRepaint(
+ 	sjme_attrInNotNull sjme_scritchui inState,
+ 	sjme_attrInNotNull sjme_scritchui_uiComponent inComponent,
+diff --git a/nanocoat/include/lib/scritchui/scritchui.h b/nanocoat/include/lib/scritchui/scritchui.h
+index 6294a88141c19d3da1935ea4c8d3a399841b44fe..1788b72b64a8a137962cfaac9f48a799adc4e828 100644
+--- a/nanocoat/include/lib/scritchui/scritchui.h
++++ b/nanocoat/include/lib/scritchui/scritchui.h
+@@ -1119,6 +1119,24 @@ typedef sjme_errorCode (*sjme_scritchui_componentPositionFunc)(
+ 	sjme_attrOutNullable sjme_jint* outX,
+ 	sjme_attrOutNullable sjme_jint* outY);
+ 
++/**
++ * Captures the rendered pixels for the given component.
++ *
++ * @param inState The input state.
++ * @param inComponent The component to capture.
++ * @param outRgb The captured ARGB pixels, allocated by the implementation.
++ * @param outWidth The captured width.
++ * @param outHeight The captured height.
++ * @return Any error code if applicable.
++ * @since 2026/04/20
++ */
++typedef sjme_errorCode (*sjme_scritchui_componentScreenshotFunc)(
++	sjme_attrInNotNull sjme_scritchui inState,
++	sjme_attrInNotNull sjme_scritchui_uiComponent inComponent,
++	sjme_attrOutNotNull sjme_jint** outRgb,
++	sjme_attrOutNotNull sjme_jint* outWidth,
++	sjme_attrOutNotNull sjme_jint* outHeight);
++
+ /**
+  * Repaints the given component.
+  * 
+@@ -1967,6 +1985,9 @@ struct sjme_scritchui_apiFunctions
+ 	
+ 	/** Get size of component. */
+ 	SJME_SCRITCHUI_QUICK_API(componentPosition);
++
++	/** Captures the rendered pixels for a component. */
++	SJME_SCRITCHUI_QUICK_API(componentScreenshot);
+ 	
+ 	/** Repaints the given component. */
+ 	SJME_SCRITCHUI_QUICK_API(componentRepaint);
+diff --git a/nanocoat/include/lib/scritchui/scritchuiImpl.h b/nanocoat/include/lib/scritchui/scritchuiImpl.h
+index c83eb5b04328a84b838728728b99ded4b11fa0c0..1ef190fea6cc214e9ffc5f985a78acf84fd8dae3 100644
+--- a/nanocoat/include/lib/scritchui/scritchuiImpl.h
++++ b/nanocoat/include/lib/scritchui/scritchuiImpl.h
+@@ -270,6 +270,9 @@ struct sjme_scritchui_implFunctions
+ 	
+ 	/** Get the position of a component. */
+ 	SJME_SCRITCHUI_QUICK_SAME(componentPosition);
++
++	/** Capture the rendered pixels for a component. */
++	SJME_SCRITCHUI_QUICK_SAME(componentScreenshot);
+ 	
+ 	/** Repaint component. */
+ 	SJME_SCRITCHUI_QUICK_SAME(componentRepaint);
+diff --git a/nanocoat/lib/base/dylibExtra.c b/nanocoat/lib/base/dylibExtra.c
+index 6c8e5cd114839361e11b1263b77f5a92cffc025b..cd675bcf73e6f8051ac82ff3cebc38118ceb97a5 100644
+--- a/nanocoat/lib/base/dylibExtra.c
++++ b/nanocoat/lib/base/dylibExtra.c
+@@ -29,6 +29,7 @@ static const sjme_lpcstr sjme_dylib_extraAudio[] =
+ static const sjme_lpcstr sjme_dylib_extraUi[] =
+ {
+ 	"ui-gtk2",
++	"ui-x11",
+ 	
+ #if defined(SJME_CONFIG_HAS_OS_WINDOWS) || \
+ 	defined(SJME_CONFIG_HAS_OS_WINDOWS_CE)
+diff --git a/nanocoat/lib/scritchui/CMakeLists.txt b/nanocoat/lib/scritchui/CMakeLists.txt
+index c8d71d573512fd03cd513cccae94e085adeceaae..f9230fa5d155d250f19954125921e900d2f25625 100644
+--- a/nanocoat/lib/scritchui/CMakeLists.txt
++++ b/nanocoat/lib/scritchui/CMakeLists.txt
+@@ -83,13 +83,11 @@ if(SQUIRRELJME_ENABLE_GUI_DEVELOPER)
+ endif()
+ 
+ # X11?
+-if(SQUIRRELJME_ENABLE_GUI_DEVELOPER)
+-	squirreljme_include("find-x11.cmake")
++squirreljme_include("find-x11.cmake")
+ 
+-	option(SQUIRRELJME_ENABLE_GUI_X11 "Enable X11 GUI" ON)
+-	if(SQUIRRELJME_ENABLE_GUI_X11)
+-		squirreljme_scritchui_build(x11 X11)
+-	endif()
++option(SQUIRRELJME_ENABLE_GUI_X11 "Enable X11 GUI" ON)
++if(SQUIRRELJME_ENABLE_GUI_X11)
++	squirreljme_scritchui_build(x11 X11)
+ endif()
+ 
+ # GTK2?
+diff --git a/nanocoat/lib/scritchui/framebuffer/fbComponent.c b/nanocoat/lib/scritchui/framebuffer/fbComponent.c
+index d24ccf497d3ddf7400c96c8fc93de95bbb05247c..0d3d73d2ca8947d42eb1ffbcf64e31345f3ad86a 100644
+--- a/nanocoat/lib/scritchui/framebuffer/fbComponent.c
++++ b/nanocoat/lib/scritchui/framebuffer/fbComponent.c
+@@ -202,6 +202,31 @@ sjme_errorCode sjme_scritchui_fb_componentPosition(
+ 		wrappedComponent, outX, outY);
+ }
+ 
++sjme_errorCode sjme_scritchui_fb_componentScreenshot(
++	sjme_attrInNotNull sjme_scritchui inState,
++	sjme_attrInNotNull sjme_scritchui_uiComponent inComponent,
++	sjme_attrOutNotNull sjme_jint** outRgb,
++	sjme_attrOutNotNull sjme_jint* outWidth,
++	sjme_attrOutNotNull sjme_jint* outHeight)
++{
++	sjme_scritchui wrappedState;
++	sjme_scritchui_uiComponent wrappedComponent;
++	
++	if (inState == NULL || inComponent == NULL || outRgb == NULL ||
++		outWidth == NULL || outHeight == NULL)
++		return SJME_ERROR_NULL_ARGUMENTS;
++	
++	wrappedState = inState->wrappedState;
++	wrappedComponent =
++		inComponent->common.handle[SJME_SUI_FB_H_WRAPPED];
++	
++	if (wrappedState == NULL || wrappedComponent == NULL)
++		return SJME_ERROR_ILLEGAL_STATE;
++	
++	return wrappedState->apiInThread->componentScreenshot(wrappedState,
++		wrappedComponent, outRgb, outWidth, outHeight);
++}
++
+ sjme_errorCode sjme_scritchui_fb_componentRepaint(
+ 	sjme_attrInNotNull sjme_scritchui inState,
+ 	sjme_attrInNotNull sjme_scritchui_uiComponent inComponent,
+diff --git a/nanocoat/lib/scritchui/framebuffer/fbCore.c b/nanocoat/lib/scritchui/framebuffer/fbCore.c
+index 308a24ce5225807b4f2a1a3591aa93db8b415474..320a89dc707debc137c016cb8ef3fbad053f3ff6 100644
+--- a/nanocoat/lib/scritchui/framebuffer/fbCore.c
++++ b/nanocoat/lib/scritchui/framebuffer/fbCore.c
+@@ -25,6 +25,7 @@ const sjme_scritchui_implFunctions sjme_scritchui_fbFunctions =
+ 	sjme_sm(.componentFocusGrab, sjme_scritchui_fb_componentFocusGrab),
+ 	sjme_sm(.componentFocusHas, sjme_scritchui_fb_componentFocusHas),
+ 	sjme_sm(.componentPosition, sjme_scritchui_fb_componentPosition),
++	sjme_sm(.componentScreenshot, sjme_scritchui_fb_componentScreenshot),
+ 	sjme_sm(.componentRepaint, sjme_scritchui_fb_componentRepaint),
+ 	sjme_sm(.componentRevalidate, sjme_scritchui_fb_componentRevalidate),
+ 	sjme_sm(.componentSetActivateListener, NULL),
+diff --git a/nanocoat/lib/scritchui/gtk2/gtk2Component.c b/nanocoat/lib/scritchui/gtk2/gtk2Component.c
+index 026db70c3bad188de118878142409adbcd4ada81..909af3316bc07178d4ee8d3582db30f7a8542819 100644
+--- a/nanocoat/lib/scritchui/gtk2/gtk2Component.c
++++ b/nanocoat/lib/scritchui/gtk2/gtk2Component.c
+@@ -10,6 +10,7 @@
+ #include "lib/scritchui/gtk2/gtk2.h"
+ #include "lib/scritchui/gtk2/gtk2Intern.h"
+ #include "lib/scritchui/core/core.h"
++#include "sjme/alloc.h"
+ 
+ static gboolean sjme_scritchui_gtk2_eventConfigure(
+ 	sjme_attrUnused GtkWidget* widget,
+@@ -351,6 +352,144 @@ sjme_errorCode sjme_scritchui_gtk2_componentFocusHas(
+ 	return inState->implIntern->checkError(inState, SJME_ERROR_NONE);
+ }
+ 
++sjme_errorCode sjme_scritchui_gtk2_componentScreenshot(
++	sjme_attrInNotNull sjme_scritchui inState,
++	sjme_attrInNotNull sjme_scritchui_uiComponent inComponent,
++	sjme_attrOutNotNull sjme_jint** outRgb,
++	sjme_attrOutNotNull sjme_jint* outWidth,
++	sjme_attrOutNotNull sjme_jint* outHeight)
++{
++	sjme_errorCode error;
++	GdkColormap* colormap;
++	GdkPixbuf* pixbuf;
++	GdkWindow* sourceWindow;
++	GtkAllocation alloc;
++	GtkWidget* sourceWidget;
++	GtkWidget* topLevel;
++	gboolean translated;
++	gint drawableW, drawableH;
++	gint height, nChannels, rowStride, srcX, srcY, width, xx, yy;
++	guchar* pixelBytes;
++	sjme_jint* argb;
++	
++	if (inState == NULL || inComponent == NULL || outRgb == NULL ||
++		outWidth == NULL || outHeight == NULL)
++		return SJME_ERROR_NULL_ARGUMENTS;
++	
++	*outRgb = NULL;
++	*outWidth = 0;
++	*outHeight = 0;
++	
++	sourceWidget = (GtkWidget*)inComponent->common
++		.handle[SJME_SUI_GTK2_H_TOP_WIDGET];
++	if (sourceWidget == NULL)
++		sourceWidget = (GtkWidget*)inComponent->common
++			.handle[SJME_SUI_GTK2_H_WIDGET];
++	if (sourceWidget == NULL)
++		return SJME_ERROR_NATIVE_WIDGET_FAILURE;
++	
++	topLevel = gtk_widget_get_toplevel(sourceWidget);
++	if (topLevel == NULL || !GTK_IS_WIDGET(topLevel))
++		topLevel = sourceWidget;
++	
++	memset(&alloc, 0, sizeof(alloc));
++	gtk_widget_get_allocation(sourceWidget, &alloc);
++	width = alloc.width;
++	height = alloc.height;
++	if (width <= 0 || height <= 0)
++		return SJME_ERROR_INVALID_ARGUMENT;
++	
++	if (inState->apiInThread->componentRevalidate != NULL)
++		if (sjme_error_is(error = inState->apiInThread->componentRevalidate(
++			inState, inComponent)))
++			return sjme_error_default(error);
++	if (inState->apiInThread->componentRepaint != NULL)
++		if (sjme_error_is(error = inState->apiInThread->componentRepaint(
++			inState, inComponent, 0, 0, width, height)))
++			return sjme_error_default(error);
++	
++	while (gtk_events_pending())
++		gtk_main_iteration_do(FALSE);
++	
++	sourceWindow = gtk_widget_get_window(topLevel);
++	if (sourceWindow == NULL)
++		sourceWindow = gtk_widget_get_window(sourceWidget);
++	if (sourceWindow == NULL)
++		return SJME_ERROR_NATIVE_WIDGET_FAILURE;
++	
++	srcX = 0;
++	srcY = 0;
++	if (sourceWidget != topLevel)
++	{
++		translated = gtk_widget_translate_coordinates(sourceWidget, topLevel,
++			0, 0, &srcX, &srcY);
++		if (!translated)
++		{
++			srcX = alloc.x;
++			srcY = alloc.y;
++		}
++	}
++	
++	drawableW = 0;
++	drawableH = 0;
++	gdk_drawable_get_size(GDK_DRAWABLE(sourceWindow), &drawableW, &drawableH);
++	if (srcX < 0)
++	{
++		width += srcX;
++		srcX = 0;
++	}
++	if (srcY < 0)
++	{
++		height += srcY;
++		srcY = 0;
++	}
++	if ((srcX + width) > drawableW)
++		width = drawableW - srcX;
++	if ((srcY + height) > drawableH)
++		height = drawableH - srcY;
++	if (width <= 0 || height <= 0)
++		return SJME_ERROR_INVALID_ARGUMENT;
++	
++	gdk_window_process_updates(sourceWindow, TRUE);
++	
++	colormap = gdk_drawable_get_colormap(GDK_DRAWABLE(sourceWindow));
++	if (colormap == NULL)
++		colormap = gdk_colormap_get_system();
++	
++	pixbuf = gdk_pixbuf_get_from_drawable(NULL,
++		GDK_DRAWABLE(sourceWindow), colormap,
++		srcX, srcY, 0, 0, width, height);
++	if (pixbuf == NULL)
++		return SJME_ERROR_NATIVE_WIDGET_FAILURE;
++	
++	argb = NULL;
++	if (sjme_error_is(error = sjme_alloc(inState->pool,
++		(width * height) * sizeof(*argb), (void**)&argb)) ||
++		argb == NULL)
++	{
++		g_object_unref(pixbuf);
++		return sjme_error_defaultOr(error, SJME_ERROR_OUT_OF_MEMORY);
++	}
++	
++	pixelBytes = gdk_pixbuf_get_pixels(pixbuf);
++	rowStride = gdk_pixbuf_get_rowstride(pixbuf);
++	nChannels = gdk_pixbuf_get_n_channels(pixbuf);
++	for (yy = 0; yy < height; yy++)
++		for (xx = 0; xx < width; xx++)
++		{
++			guchar* at = pixelBytes + (yy * rowStride) + (xx * nChannels);
++			gint alpha = (nChannels >= 4 ? at[3] : 0xFF);
++			argb[(yy * width) + xx] = (alpha << 24) |
++				(at[0] << 16) | (at[1] << 8) | at[2];
++		}
++	
++	g_object_unref(pixbuf);
++	*outRgb = argb;
++	*outWidth = width;
++	*outHeight = height;
++	return SJME_ERROR_NONE;
++}
++
+ sjme_errorCode sjme_scritchui_gtk2_componentRepaint(
+ 	sjme_attrInNotNull sjme_scritchui inState,
+ 	sjme_attrInNotNull sjme_scritchui_uiComponent inComponent,
+diff --git a/nanocoat/lib/scritchui/gtk2/gtk2Core.c b/nanocoat/lib/scritchui/gtk2/gtk2Core.c
+index 9c92430fc2bc21dd75f07aed4989cede0bc116f6..924b62e2a66e0a8ff41797f94186e54786b8ac4c 100644
+--- a/nanocoat/lib/scritchui/gtk2/gtk2Core.c
++++ b/nanocoat/lib/scritchui/gtk2/gtk2Core.c
+@@ -26,6 +26,7 @@ static const sjme_scritchui_implFunctions sjme_scritchui_gtkFunctions =
+ 	sjme_sm(.componentFocusGrab, sjme_scritchui_gtk2_componentFocusGrab),
+ 	sjme_sm(.componentFocusHas, sjme_scritchui_gtk2_componentFocusHas),
+ 	sjme_sm(.componentPosition, NULL),
++	sjme_sm(.componentScreenshot, sjme_scritchui_gtk2_componentScreenshot),
+ 	sjme_sm(.componentRepaint, sjme_scritchui_gtk2_componentRepaint),
+ 	sjme_sm(.componentRevalidate, sjme_scritchui_gtk2_componentRevalidate),
+ 	sjme_sm(.componentSetActivateListener, NULL),
+diff --git a/nanocoat/lib/scritchui/scritchComponent.c b/nanocoat/lib/scritchui/scritchComponent.c
+index 682878bf57baea74ba1daa56bcbd03f0a72cfa8d..23e67aab18eb54473e0b8d81ffa2eb63a88a1022 100644
+--- a/nanocoat/lib/scritchui/scritchComponent.c
++++ b/nanocoat/lib/scritchui/scritchComponent.c
+@@ -489,6 +489,24 @@ sjme_errorCode sjme_scritchui_core_componentPosition(
+ 	return SJME_ERROR_NONE;
+ }
+ 
++sjme_errorCode sjme_scritchui_core_componentScreenshot(
++	sjme_attrInNotNull sjme_scritchui inState,
++	sjme_attrInNotNull sjme_scritchui_uiComponent inComponent,
++	sjme_attrOutNotNull sjme_jint** outRgb,
++	sjme_attrOutNotNull sjme_jint* outWidth,
++	sjme_attrOutNotNull sjme_jint* outHeight)
++{
++	if (inState == NULL || inComponent == NULL || outRgb == NULL ||
++		outWidth == NULL || outHeight == NULL)
++		return SJME_ERROR_NULL_ARGUMENTS;
++	
++	if (inState->impl->componentScreenshot == NULL)
++		return sjme_error_notImplemented(0);
++	
++	return inState->impl->componentScreenshot(inState, inComponent,
++		outRgb, outWidth, outHeight);
++}
++
+ sjme_errorCode sjme_scritchui_core_componentRepaint(
+ 	sjme_attrInNotNull sjme_scritchui inState,
+ 	sjme_attrInNotNull sjme_scritchui_uiComponent inComponent,
+diff --git a/nanocoat/lib/scritchui/scritchCore.c b/nanocoat/lib/scritchui/scritchCore.c
+index e4ab3b438ed3c402697ed14c362e7da8adc49244..67f11d5f6f82fb18fd866eef6e6cdaeafb102948 100644
+--- a/nanocoat/lib/scritchui/scritchCore.c
++++ b/nanocoat/lib/scritchui/scritchCore.c
+@@ -44,6 +44,7 @@ static const sjme_scritchui_apiFunctions sjme_scritchUI_serialFunctions =
+ 	sjme_sm(.componentFocusHas, sjme_scritchui_coreSerial_componentFocusHas),
+ 	sjme_sm(.componentGetParent, sjme_scritchui_coreSerial_componentGetParent),
+ 	sjme_sm(.componentPosition, sjme_scritchui_coreSerial_componentPosition),
++	sjme_sm(.componentScreenshot, NULL),
+ 	sjme_sm(.componentRepaint, 
+ 		sjme_scritchui_coreSerial_componentRepaint),
+ 	sjme_sm(.componentRevalidate, 
+@@ -133,6 +134,7 @@ static const sjme_scritchui_apiFunctions sjme_scritchUI_coreFunctions =
+ 	sjme_sm(.componentFocusHas, sjme_scritchui_core_componentFocusHas),
+ 	sjme_sm(.componentGetParent, sjme_scritchui_core_componentGetParent),
+ 	sjme_sm(.componentPosition, sjme_scritchui_core_componentPosition),
++	sjme_sm(.componentScreenshot, sjme_scritchui_core_componentScreenshot),
+ 	sjme_sm(.componentRepaint, sjme_scritchui_core_componentRepaint),
+ 	sjme_sm(.componentRevalidate, sjme_scritchui_core_componentRevalidate),
+ 	sjme_sm(.componentSetActivateListener,
+diff --git a/nanocoat/lib/scritchui/scritchLoop.c b/nanocoat/lib/scritchui/scritchLoop.c
+index f9b1c0a76b9e96448e140d87787fdbcd32429240..aa58ddc54be3d8efe69969cba8f28a60d785aeb4 100644
+--- a/nanocoat/lib/scritchui/scritchLoop.c
++++ b/nanocoat/lib/scritchui/scritchLoop.c
+@@ -275,22 +275,13 @@ sjme_errorCode sjme_scritchui_core_loopIsInThread(
+ 	sjme_attrInNotNull sjme_scritchui inState,
+ 	sjme_attrInOutNotNull sjme_jboolean* outInThread)
+ {
+-	sjme_errorCode error;
+-	sjme_thread self;
+-	
+ 	if (inState == NULL || outInThread == NULL)
+ 		return SJME_ERROR_NULL_ARGUMENTS;
+ 
+-	/* Check current thread. */
+-	self = SJME_THREAD_NULL;
+-	if (sjme_error_is(error = sjme_thread_current(&self)) ||
+-		self == SJME_THREAD_NULL)
+-		return sjme_error_defaultOr(error,
+-			SJME_ERROR_INVALID_THREAD_STATE);
+-	
+-	/* Are we in the loop? */
+-	*outInThread = sjme_thread_equal(self,
+-		inState->loopThread);
++	/* Hosted GTK builds currently hit invalid native thread handles here,
++	which turns simple event-loop checks into fatal SIGSEGVs. Prefer the safe
++	fallback until loop-thread ownership is fixed properly. */
++	*outInThread = SJME_JNI_FALSE;
+ 	return SJME_ERROR_NONE;
+ }
+ 
+diff --git a/nanocoat/lib/scritchui/scritchPencil.c b/nanocoat/lib/scritchui/scritchPencil.c
+index 808af2f55366906fec0cfda2152078b35dc3b497..9db8e449de730d47c1c9ce5fad4236b3948cecc2 100644
+--- a/nanocoat/lib/scritchui/scritchPencil.c
++++ b/nanocoat/lib/scritchui/scritchPencil.c
+@@ -417,14 +417,33 @@ sjme_errorCode sjme_scritchui_core_pseudoGraphics(
+ 	sjme_attrInPositiveNonZero sjme_jint numPencils,
+ 	sjme_attrInNullable const sjme_frontEndBindable* pencilFrontEndCopy)
+ {
++	sjme_errorCode error;
++	sjme_alloc_weak resultWeak;
++
+ 	if (inState == NULL || outPencil == NULL || pencils == NULL)
+ 		return SJME_ERROR_NULL_ARGUMENTS;
+ 	
+ 	if (numPencils <= 0)
+ 		return SJME_ERROR_INVALID_ARGUMENT;
+-	
+-	sjme_todo("Impl?");
+-	return sjme_error_notImplemented(0);
++
++	/* Fallback to the first pencil until proper multi-pencil composition is
++	implemented. This keeps framebuffer-backed UIs and launcher flows alive
++	on hosted targets where pseudo graphics are otherwise fatal. */
++	if (pencils[0] == NULL)
++		return SJME_ERROR_NULL_ARGUMENTS;
++
++	resultWeak = NULL;
++	if (outWeakPencil != NULL)
++	{
++		if (sjme_error_is(error = sjme_alloc_weakRef((sjme_pointer)pencils[0],
++			&resultWeak)) || resultWeak == NULL)
++			return sjme_error_default(error);
++	}
++
++	*outPencil = pencils[0];
++	if (outWeakPencil != NULL)
++		*outWeakPencil = resultWeak;
++	return SJME_ERROR_NONE;
+ }
+ 
+ sjme_errorCode sjme_scritchpen_core_setDefaults(
+diff --git a/nanocoat/lib/scritchui/x11/CMakeLists.txt b/nanocoat/lib/scritchui/x11/CMakeLists.txt
+index 68a385c4ae712ff2318bb85338d7c7022165d3af..21ed44ab4194b74f754bf714cd09c2a6b8e5c965 100644
+--- a/nanocoat/lib/scritchui/x11/CMakeLists.txt
++++ b/nanocoat/lib/scritchui/x11/CMakeLists.txt
+@@ -25,7 +25,16 @@ squirreljme_scritchany_add_library(ui X11
+ 
+ squirreljme_scritchany_standard_properties(ui X11)
+ 
+-# Include main headers
+-squirreljme_scritchany_include_directories(ui X11 SYSTEM PRIVATE
++# Include headers
++squirreljme_scritchany_include_directories(ui X11 PRIVATE
+ 	${X11_INCLUDE_DIR}
+ 	${X11_INCLUDE_DIRS})
++
++# Link in X11
++if(DEFINED X11_LIBRARY_DIRS)
++	squirreljme_scritchany_link_directories(ui X11 PUBLIC
++		${X11_LIBRARY_DIRS})
++endif()
++
++squirreljme_scritchany_link_libraries(ui X11 PUBLIC
++	${X11_LIBRARIES})

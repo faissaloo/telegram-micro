@@ -9,6 +9,8 @@ import mtproto.Deserialize;
 import mtproto.MTProtoConnection;
 
 public class SendMsgsAck extends SendEncrypted {
+  public static final boolean INCLUDE_API_HEADER = false;
+
   public SendMsgsAck(long[] msg_ids) {
     message_data
       .append_int(CombinatorIds.msgs_ack)
@@ -16,7 +18,6 @@ public class SendMsgsAck extends SendEncrypted {
   }
   
   public void send(MTProtoConnection sender) {
-    super.send(sender);
-    sender.seq_no += 1;
+    super.send(sender, false, true, INCLUDE_API_HEADER);
   }
 }

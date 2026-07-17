@@ -14,4 +14,8 @@ public class SendPing extends SendEncrypted {
       .append_int(CombinatorIds.ping)
       .append_long(ping_id);
   }
+
+  public void send(mtproto.MTProtoConnection sender) {
+    super.send(sender, false, false, false);
+  }
 }

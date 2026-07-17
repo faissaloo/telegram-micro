@@ -34,6 +34,9 @@ public class EncryptedResponse extends Response {
       if (auth_key_id == 0) {
         return null; //this is an unencrypted response
       } else {
+        if (reciever == null || reciever.auth_key == null) {
+          throw new IOException("Encrypted response received without an auth key.");
+        }
         byte[] msg_key = ArrayPlus.subarray(response_data, skip, 16);
         skip += 16;
         

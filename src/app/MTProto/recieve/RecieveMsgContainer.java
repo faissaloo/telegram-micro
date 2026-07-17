@@ -45,7 +45,14 @@ msg_copy#e06046b2 orig_message:Message = MessageCopy;
         skip += 4;
         byte[] message_content = ArrayPlus.subarray(data, skip, message_length-4);
         skip += message_length-4;
-        messages[i] = new EncryptedResponse(message.salt, message.session_id, message_id, sequence_number, type, data);
+        messages[i] = new EncryptedResponse(
+          message.salt,
+          message.session_id,
+          message_id,
+          sequence_number,
+          type,
+          message_content
+        );
       }
       return new RecieveMsgContainer(messages);
     } else {

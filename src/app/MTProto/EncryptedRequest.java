@@ -18,21 +18,20 @@ public class EncryptedRequest {
     this.message_data = message_data;
   }
 
-  private long message_id() {
-    //https://core.telegram.org/mtproto/description#message-identifier-msg-id
-    long time_ms = System.currentTimeMillis();
-    return (time_ms/1000L)<<32|((time_ms%1000L)<<2); //Upper 32 bits contain unix time, lower contains 2 0 bits then the milliseconds since the time in the upper
-  }
-  
   public void send(MTProtoConnection sender) {
+    send(sender, false);
+  }
+
+  public void send(MTProtoConnection sender, boolean content_related) {
     //https://core.telegram.org/mtproto/description#encrypted-message-encrypted-data
     //https://core.telegram.org/mtproto/description#protocol-description
-    long message_id = message_id();
+    long message_id = sender.nextClientMessageId();
+    int seq_no = sender.nextWireSeqNo(content_related);
     byte[] unencrypted_data = (new ByteArrayPlus())
       .append_long(sender.server_salt)
       .append_long(sender.session_id)
       .append_long(message_id)
-      .append_int(sender.seq_no)
+      .append_int(seq_no)
       .append_int(message_data.length)
       .append_raw_bytes(message_data)
       .pad_random_align_range(16, 12, 1024, sender.random_number_generator)

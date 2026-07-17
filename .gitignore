@@ -3,3 +3,13 @@ bin/TelegramMicro.jar
 tmpclasses/*
 tmplib/*
 server/node_modules
+references/*
+!references/squirreljme/
+!references/squirreljme/**
+build/
+.telegrammicro.env
+.telegrammicro.local.env
+.codex
+.codex-skills/
+artifacts/
+hs_err_pid*.log

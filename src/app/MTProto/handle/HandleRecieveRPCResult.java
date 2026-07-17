@@ -19,5 +19,8 @@ public class HandleRecieveRPCResult extends MTProtoCallback {
     //for now we're assuming nothing on the RPC layer needs message ids or anything like that
     RPCResponse rpc_response = RPCResponse.from_bytes(recieve_rpc_result.body);
     connection.trigger_callbacks(rpc_response);
+    if (rpc_response.type != CombinatorIds.rpc_error) {
+      connection.clearPendingRetryRequest();
+    }
   }
 }

@@ -16,7 +16,6 @@ public class SendGetConfig extends SendEncrypted {
   }
   
   public void send(MTProtoConnection sender) {
-    super.send(sender);
-    sender.seq_no += 1;
+    super.send(sender, true, true);
   }
 }

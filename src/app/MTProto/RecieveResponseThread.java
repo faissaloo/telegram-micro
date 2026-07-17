@@ -16,16 +16,20 @@ public class RecieveResponseThread extends Thread {
   Queue waiting = new Queue();
   SocketConnection connection;
   InputStream response_stream;
+  boolean closed = false;
 
-  public TCPResponse dequeue_response() {
+  public synchronized TCPResponse dequeue_response() {
+    if (responses.length() <= 0) {
+      return null;
+    }
     return (TCPResponse) responses.dequeue();
   }
   
   public synchronized void wait_for_response() {
     waiting.enqueue(this);
-    if (!has_responses()) {
+    while (!closed && !has_responses()) {
       try {
-          wait();
+        wait();
       } catch (InterruptedException e) {
         return;
       }
@@ -38,6 +42,23 @@ public class RecieveResponseThread extends Thread {
 
   public RecieveResponseThread(SocketConnection connection) {
     this.connection = connection;
+  }
+
+  private synchronized void notify_waiters() {
+    while (waiting.length() > 0) {
+      Object waiter = (Object)waiting.dequeue();
+      synchronized(waiter) {
+        waiter.notify();
+      }
+    }
+  }
+
+  private synchronized void mark_closed() {
+    if (closed) {
+      return;
+    }
+    closed = true;
+    notify_waiters();
   }
 
   public void run() {
@@ -53,21 +74,21 @@ public class RecieveResponseThread extends Thread {
         //We should probably have different classes for recieved messages unlike the example
         responses.enqueue(response);
         
-        while (waiting.length() > 0) {
-          Object waiter = (Object)waiting.dequeue();
-          synchronized(waiter) {
-            waiter.notify();
-          }
-        }
+        notify_waiters();
       }
 
       close();
+      mark_closed();
     } catch (IOException exception) {
       System.out.println(exception);
+      mark_closed();
     }
   }
   
   public void close() throws IOException {
-    response_stream.close();
+    if (response_stream != null) {
+      response_stream.close();
+    }
+    mark_closed();
   }
 }

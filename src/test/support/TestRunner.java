@@ -1,13 +1,9 @@
 package test;
 
-import javax.microedition.lcdui.Form;
-import javax.microedition.lcdui.Display;
 import javax.microedition.midlet.MIDlet;
 import java.util.Vector;
 
 public class TestRunner extends MIDlet {
-  private Form form;
-  private Display display;
   private static Vector tests = new Vector();
   private static Vector failures = new Vector();
   private static int skipped = 0;
@@ -19,10 +15,6 @@ public class TestRunner extends MIDlet {
   }
 
   public void startApp() {
-    form = new Form("TestRunner");
-    form.append("See console for test suite status");
-    display = Display.getDisplay(this);
-    display.setCurrent(form);
     run_tests();
   }
 
@@ -51,6 +43,7 @@ public class TestRunner extends MIDlet {
 
     print_failures();
     print_conclusion();
+    System.exit(failures.size() == 0 ? 0 : 1);
   }
 
   private String pass_fail_string() {

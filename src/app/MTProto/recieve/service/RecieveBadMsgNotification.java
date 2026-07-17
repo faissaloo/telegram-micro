@@ -38,7 +38,8 @@ public class RecieveBadMsgNotification {
     byte[] data = message.data;
     int message_type = message.type;
 
-    if (message_type == CombinatorIds.bad_msg_notification) {
+    if (message_type == CombinatorIds.bad_msg_notification ||
+        message_type == CombinatorIds.bad_server_salt) {
       // bad_msg_id:long bad_msg_seqno:int error_code:int
       long bad_msg_id = Decode.Little.long_decode(data, skip);
       skip += 8;
@@ -46,7 +47,14 @@ public class RecieveBadMsgNotification {
       skip += 4;
       int error_code = Decode.Little.int_decode(data, skip);
       skip += 4;
-      return new RecieveBadMsgNotification(bad_msg_id, bad_msg_seqno, error_code);
+      long new_server_salt = 0;
+      boolean has_new_server_salt = false;
+
+      if (message_type == CombinatorIds.bad_server_salt) {
+        new_server_salt = Decode.Little.long_decode(data, skip);
+        has_new_server_salt = true;
+      }
+      return new RecieveBadMsgNotification(bad_msg_id, bad_msg_seqno, error_code, new_server_salt, has_new_server_salt);
     } else {
       throw new TypeMismatchException("Expected a %(bad_msg_notification)");
     }
@@ -55,11 +63,19 @@ public class RecieveBadMsgNotification {
   public long bad_msg_id;
   public int bad_msg_seqno;
   public int error_code;
+  public long new_server_salt;
+  public boolean has_new_server_salt;
   
   //new_session_created#9ec20908 first_msg_id:long unique_id:long server_salt:long = NewSession;
   public RecieveBadMsgNotification(long bad_msg_id, int bad_msg_seqno, int error_code) {
+    this(bad_msg_id, bad_msg_seqno, error_code, 0, false);
+  }
+
+  public RecieveBadMsgNotification(long bad_msg_id, int bad_msg_seqno, int error_code, long new_server_salt, boolean has_new_server_salt) {
     this.bad_msg_id = bad_msg_id;
     this.bad_msg_seqno = bad_msg_seqno;
     this.error_code = error_code;
+    this.new_server_salt = new_server_salt;
+    this.has_new_server_salt = has_new_server_salt;
   }
 }

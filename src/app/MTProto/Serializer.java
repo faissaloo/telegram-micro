@@ -34,7 +34,7 @@ public class Serializer {
   }
   
   public Serializer append_string(String data) {
-    return append_byte_string(data.getBytes());
+    return append_byte_string(support.Utf8String.encode(data));
   }
   
   public Serializer append_byte_string(byte[] data) {

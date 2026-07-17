@@ -12,7 +12,7 @@ Run commands from the repository root. Use root scripts directly; do not recreat
 - Production package only: `./scripts/build.sh` then `./scripts/check-device-budget.sh`.
 - Fast development regression: focused test if available, then `./scripts/test.sh`.
 - Standard offline checkpoint: `./scripts/verify.sh --full`.
-- Startup or LCDUI change: `./scripts/verify.sh --full --ui`.
+- Startup or LCDUI change: with a real display, run `./scripts/verify.sh --full --ui`; without one, run `./scripts/verify.sh --full` and report the UI lane unavailable.
 - Slow crypto inside the target VM: `./scripts/test-target-full.sh`; label this as a long soak.
 - Bootstrap/SquirrelJME patch change: use a new `SQUIRRELJME_DIR`, then run the standard offline checkpoint.
 
@@ -26,6 +26,7 @@ Read `docs/verification.md` before substituting one lane for another.
 4. Run the narrow check, then the change-type gate from `AGENTS.md`.
 5. Inspect `git diff --check`, the production artifact budget, and any UI artifact required by the change.
 6. Report target-VM, host, offline UI, live, and device evidence separately.
+7. After the checkpoint passes, commit the narrow change and push it when repository writes are authorized; never include unrelated or overlay-only changes.
 
 Do not report the full gate as passed if a lane was skipped, timed out, or replaced. Never use live Telegram helpers as ordinary build verification.
 
@@ -35,4 +36,4 @@ Do not report the full gate as passed if a lane was skipped, timed out, or repla
 - Java compile/package failure: inspect `build/app-classes`, generated config under `build`, and the first compiler error.
 - Target-VM-only test failure: compare the same focused test on the host only for diagnosis; target evidence remains required.
 - JAR/class budget failure: reduce production footprint or justify and document a measured budget change; never hide tests in the production JAR.
-- UI smoke failure: use the retained `artifacts/ui-smoke` log/capture and the emulator skill.
+- UI smoke exit 69: run the lane in a real graphical session and report it unavailable until then. For other UI failures, inspect the retained `artifacts/ui-smoke` log/capture and use the emulator skill.

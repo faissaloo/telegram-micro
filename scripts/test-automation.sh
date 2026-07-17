@@ -47,6 +47,8 @@ expect_status 64 'broad emulator cleanup requires an explicit flag' \
 if [[ "$(uname -s)" == 'Linux' ]]; then
   expect_status 69 'displayless UI verification fails before emulator startup' \
     env -u DISPLAY bash "${ROOT_DIR}/scripts/verify-ui.sh"
+  expect_status 69 'displayless history UI verification fails before emulator startup' \
+    env -u DISPLAY bash "${ROOT_DIR}/scripts/verify-history-ui.sh"
 fi
 
 dynamic_port="$(unset SQUIRRELJME_MCP_PORT; mcp_pick_port)"

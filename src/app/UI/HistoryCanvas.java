@@ -7,6 +7,8 @@ import javax.microedition.lcdui.Graphics;
 import reader.MessageListModel;
 
 final class HistoryCanvas extends Canvas {
+  // The pinned hosted backend leaves charsWidth/drawChars unfinished.
+  private static final String TIME_GLYPHS = "0123456789:Z";
   private final AppShellModel model;
   private final int[] messageTop;
   private final int[] messageHeight;
@@ -195,16 +197,29 @@ final class HistoryCanvas extends Canvas {
     }
     timeLength = MessageTime.formatUtc(item.dateSeconds, timeChars);
     if (timeLength > 0) {
-      int timeWidth = metaFont.charsWidth(timeChars, 0, timeLength);
-      g.drawChars(
-        timeChars,
-        0,
-        timeLength,
-        bubbleX + bubbleWidth - bubblePadding - timeWidth,
-        textY + 2,
-        Graphics.TOP | Graphics.LEFT
-      );
+      int timeWidth = charsWidth(metaFont, timeChars, timeLength);
+      int timeX = bubbleX + bubbleWidth - bubblePadding - timeWidth;
+
+      for (int i = 0; i < timeLength; ++i) {
+        char glyph = timeChars[i];
+        int glyphIndex = glyph >= '0' && glyph <= '9'
+          ? glyph - '0'
+          : (glyph == ':' ? 10 : 11);
+
+        g.drawSubstring(TIME_GLYPHS, glyphIndex, 1, timeX, textY + 2,
+          Graphics.TOP | Graphics.LEFT);
+        timeX += metaFont.charWidth(glyph);
+      }
     }
+  }
+
+  private static int charsWidth(Font font, char[] chars, int length) {
+    int width = 0;
+
+    for (int i = 0; i < length; ++i) {
+      width += font.charWidth(chars[i]);
+    }
+    return width;
   }
 
   private void ensureLayout() {

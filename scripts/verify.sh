@@ -50,8 +50,10 @@ else
 fi
 
 if [[ "${RUN_UI}" == '1' ]]; then
-  printf '[verify] offline UI smoke\n'
+  printf '[verify] offline first-install UI smoke\n'
   ./scripts/verify-ui.sh
+  printf '[verify] offline history UI smoke\n'
+  ./scripts/verify-history-ui.sh
 fi
 
 printf '[verify] all requested gates passed\n'

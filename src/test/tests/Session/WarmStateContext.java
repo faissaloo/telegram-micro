@@ -1,6 +1,7 @@
 package test;
 
 import media.MediaReference;
+import reader.SecretChatDirectory;
 import support.ByteArrayPlus;
 import session.OutboundRecoveryState;
 import session.WarmStateSnapshot;
@@ -301,6 +302,48 @@ public class WarmStateContext {
       expect(loaded.dialogCount, source.dialogCount);
       expect(loaded.composeText, source.composeText);
       expect(store.clear(), true);
+    }
+  }
+
+  public static class OversizedWarmStateIsRejectedTest extends Test {
+    public String label() {
+      return "Warm state rejects oversized records before parsing";
+    }
+
+    public void test() throws TestFailureException {
+      expect(
+        WarmStateSnapshotCodec.decode(
+          new WarmStateSnapshot(),
+          new byte[WarmStateSnapshotCodec.MAX_ENCODED_BYTES + 1]
+        ),
+        false
+      );
+    }
+  }
+
+  public static class SecretChatPendingKeyIsBoundedTest extends Test {
+    public String label() {
+      return "Secret-chat warm state rejects oversized pending key material";
+    }
+
+    public void test() throws TestFailureException {
+      SecretChatDirectory directory = new SecretChatDirectory(1);
+      expect(
+        directory.upsert(
+          1,
+          reader.DialogListModel.PEER_USER,
+          2,
+          3,
+          SecretChatDirectory.STATE_WAITING,
+          true,
+          4,
+          0,
+          new byte[SecretChatDirectory.PENDING_KEY_BYTES_MAX + 1],
+          SecretChatDirectory.PENDING_KEY_BYTES_MAX + 1
+        ),
+        false
+      );
+      expect(directory.count, 0);
     }
   }
 }

@@ -197,15 +197,15 @@ public final class MediaPlanQueue {
     return true;
   }
 
-  public boolean markReady(int peerKind, long peerId, int messageId, byte[] data, int expectedBytes) {
+  /** Stores a caller-owned, exact-length media buffer without another copy. */
+  public boolean markReadyOwned(int peerKind, long peerId, int messageId, byte[] data, int expectedBytes) {
     Entry entry = entryFor(peerKind, peerId, messageId);
 
     if (entry == null || data == null || data.length <= 0 || data.length > DATA_BYTES_MAX) {
       return false;
     }
     clearStoredDataExcept(entry);
-    entry.data = new byte[data.length];
-    System.arraycopy(data, 0, entry.data, 0, data.length);
+    entry.data = data;
     entry.loadedBytes = data.length;
     entry.expectedBytes = expectedBytes > 0 ? expectedBytes : data.length;
     entry.status = STATUS_READY;

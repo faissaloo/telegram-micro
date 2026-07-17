@@ -143,7 +143,7 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
   private long pendingMediaPeerId = 0;
   private int pendingMediaMessageId = 0;
   private final MediaReference pendingMediaReference = new MediaReference();
-  private final byte[] pendingMediaBuffer = new byte[MEDIA_DOWNLOAD_MAX_BYTES];
+  private byte[] pendingMediaBuffer = null;
   private int pendingMediaBufferLength = 0;
   private int pendingMediaExpectedBytes = 0;
 
@@ -1463,6 +1463,7 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     authHelpUrl = appPropertyOrNull("authHelpUrl");
 
     if (!initializeSecureRandomFromStore()) {
+      System.out.println("ENTROPY REQUIRED: network startup deferred.");
       entropyCanvas = new EntropyCanvas(this);
       display.setCurrent(entropyCanvas);
       return;
@@ -3193,6 +3194,9 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     pendingMediaReference.copyFrom(entry.mediaRef);
     pendingMediaBufferLength = 0;
     pendingMediaExpectedBytes = entry.mediaRef.expectedSize;
+    pendingMediaBuffer = new byte[
+      pendingMediaExpectedBytes > 0 ? pendingMediaExpectedBytes : MEDIA_DOWNLOAD_MAX_BYTES
+    ];
     appShellModel.mediaQueue.markLoading(
       entry.peerKind,
       entry.peerId,
@@ -3238,6 +3242,7 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     pendingMediaPeerId = 0;
     pendingMediaMessageId = 0;
     pendingMediaReference.clear();
+    pendingMediaBuffer = null;
     pendingMediaBufferLength = 0;
     pendingMediaExpectedBytes = 0;
   }
@@ -3265,7 +3270,8 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
 
     data = upload.bytes;
     if (data.length > 0) {
-      if (pendingMediaBufferLength + data.length > MEDIA_DOWNLOAD_MAX_BYTES) {
+      if (pendingMediaBuffer == null ||
+          data.length > pendingMediaBuffer.length - pendingMediaBufferLength) {
         failActiveMediaDownload("Media exceeds the device cache limit.");
         return;
       }
@@ -3298,9 +3304,14 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
       return;
     }
 
-    exact = new byte[pendingMediaBufferLength];
-    System.arraycopy(pendingMediaBuffer, 0, exact, 0, pendingMediaBufferLength);
-    appShellModel.mediaQueue.markReady(
+    if (pendingMediaBufferLength == pendingMediaBuffer.length) {
+      exact = pendingMediaBuffer;
+    } else {
+      exact = new byte[pendingMediaBufferLength];
+      System.arraycopy(pendingMediaBuffer, 0, exact, 0, pendingMediaBufferLength);
+    }
+    pendingMediaBuffer = null;
+    appShellModel.mediaQueue.markReadyOwned(
       pendingMediaPeerKind,
       pendingMediaPeerId,
       pendingMediaMessageId,

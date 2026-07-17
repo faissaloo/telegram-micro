@@ -1,12 +1,10 @@
 package mtproto.send;
-import java.util.Random;
 import java.io.IOException;
 import java.lang.Math;
 import java.lang.System;
 
 import support.ByteArrayPlus;
 import support.Integer128;
-import support.RandomPlus;
 
 import mtproto.CombinatorIds;
 import mtproto.UnencryptedRequest;

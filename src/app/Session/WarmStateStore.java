@@ -37,6 +37,10 @@ public final class WarmStateStore {
         byte[] data;
 
         try {
+          int recordSize = store.getRecordSize(id);
+          if (recordSize <= 0 || recordSize > WarmStateSnapshotCodec.MAX_ENCODED_BYTES) {
+            continue;
+          }
           data = store.getRecord(id);
         } catch (InvalidRecordIDException ignored) {
           continue;

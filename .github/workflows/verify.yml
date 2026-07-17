@@ -1,0 +1,27 @@
+name: verify
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  full-verification:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Run deterministic build and full tests
+        env:
+          TELEGRAM_MICRO_BOOTSTRAP_DIR: ${{ runner.temp }}/telegrammicro-bootstrap
+          SQUIRRELJME_DIR: ${{ runner.temp }}/SquirrelJME
+        run: ./scripts/verify.sh --full

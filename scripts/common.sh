@@ -446,7 +446,7 @@ write_app_manifest() {
   local target="$1"
   cat > "${target}" <<'EOF'
 MIDlet-1: TelegramMicro, , TelegramMicro
-MIDlet-Info-URL: https://github.com/faissaloo/telegram-lite
+MIDlet-Info-URL: https://github.com/faissaloo/telegram-micro
 MIDlet-Name: TelegramMicro
 MIDlet-Vendor: Faissaloo
 MIDlet-Version: 1.0
@@ -484,7 +484,7 @@ write_app_jad() {
   local jar_size="$2"
   cat > "${target}" <<EOF
 MIDlet-1: TelegramMicro, , TelegramMicro
-MIDlet-Info-URL: https://github.com/faissaloo/telegram-lite
+MIDlet-Info-URL: https://github.com/faissaloo/telegram-micro
 MIDlet-Jar-Size: ${jar_size}
 MIDlet-Jar-URL: TelegramMicro.jar
 MIDlet-Name: TelegramMicro
@@ -599,9 +599,14 @@ run_built_suite() {
     host_java_args+=("-Dcc.squirreljme.mcp.port=${SQUIRRELJME_MCP_PORT}")
   fi
 
-  SQUIRRELJME_STATE_HOME="${emulator_state_dir}" \
-    "${JDK_HOME}/bin/java" "${host_java_args[@]}" -jar "${standalone_jar}" \
-    "${vm_args[@]}" "-Xentry:${entry}" -jar "${suite_jar}" "$@"
+  env -u TELEGRAM_MICRO_API_ID \
+    -u TELEGRAM_MICRO_API_HASH \
+    -u TELEGRAM_MICRO_TEST_PHONE \
+    -u TELEGRAM_MICRO_TEST_CODE \
+    -u TELEGRAM_MICRO_TEST_PASSWORD \
+    SQUIRRELJME_STATE_HOME="${emulator_state_dir}" \
+      "${JDK_HOME}/bin/java" "${host_java_args[@]}" -jar "${standalone_jar}" \
+      "${vm_args[@]}" "-Xentry:${entry}" -jar "${suite_jar}" "$@"
 }
 
 run_app_suite() {

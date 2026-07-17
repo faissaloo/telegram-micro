@@ -2,6 +2,7 @@ package reader;
 
 public final class SecretChatDirectory {
   public static final int DEFAULT_CAPACITY = 12;
+  public static final int PENDING_KEY_BYTES_MAX = 256;
 
   public static final int STATE_UNKNOWN = 0;
   public static final int STATE_WAITING = 1;
@@ -138,6 +139,11 @@ public final class SecretChatDirectory {
     byte[] pendingKeyData,
     int pendingKeyLength
   ) {
+    if (pendingKeyLength < 0 || pendingKeyLength > PENDING_KEY_BYTES_MAX ||
+        (pendingKeyLength > 0 &&
+          (pendingKeyData == null || pendingKeyLength > pendingKeyData.length))) {
+      return false;
+    }
     Item item = findByChatId(chatId);
 
     if (item == null) {

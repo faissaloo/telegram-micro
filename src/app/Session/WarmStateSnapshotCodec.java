@@ -4,12 +4,14 @@ import compose.ComposeStateModel;
 import reader.DialogListModel;
 import reader.MessageListModel;
 import reader.PeerDirectory;
+import reader.SecretChatDirectory;
 import support.ByteArrayPlus;
 import support.Decode;
 
 public final class WarmStateSnapshotCodec {
   public static final int MAGIC = 0x53574d54;
   public static final int VERSION = 8;
+  public static final int MAX_ENCODED_BYTES = 128 * 1024;
   private static final int VERSION_V1 = 1;
   private static final int VERSION_V2 = 2;
   private static final int VERSION_V3 = 3;
@@ -68,6 +70,11 @@ public final class WarmStateSnapshotCodec {
 
     for (int i = 0; i < snapshot.secretChatCount && i < snapshot.secretChats.length; ++i) {
       WarmStateSnapshot.SecretChatEntry secretChat = snapshot.secretChats[i];
+
+      if (secretChat.pendingKeyData != null &&
+          secretChat.pendingKeyData.length > SecretChatDirectory.PENDING_KEY_BYTES_MAX) {
+        return null;
+      }
 
       out.append_int(secretChat.chatId);
       out.append_int(secretChat.peerKind);
@@ -135,13 +142,15 @@ public final class WarmStateSnapshotCodec {
     appendString(out, snapshot.loginPhoneNumber, WarmStateSnapshot.LOGIN_PHONE_MAX);
     appendString(out, snapshot.loginPhoneCodeHash, WarmStateSnapshot.LOGIN_CODE_HASH_MAX);
     out.append_long(snapshot.loginCodeSentAtMillis);
-    return out.toByteArray();
+    byte[] encoded = out.toByteArray();
+    return encoded.length <= MAX_ENCODED_BYTES ? encoded : null;
   }
 
   public static boolean decode(WarmStateSnapshot out, byte[] data) {
     int version;
 
-    if (out == null || data == null || data.length < 8) {
+    if (out == null || data == null || data.length < 8 ||
+        data.length > MAX_ENCODED_BYTES) {
       return false;
     }
     if (Decode.Little.int_decode(data, 0) != MAGIC) {
@@ -868,7 +877,9 @@ public final class WarmStateSnapshotCodec {
       offset += 8;
       pendingLength = Decode.Little.int_decode(data, offset);
       offset += 4;
-      if (pendingLength < 0 || offset + pendingLength > data.length) {
+      if (pendingLength < 0 ||
+          pendingLength > SecretChatDirectory.PENDING_KEY_BYTES_MAX ||
+          pendingLength > data.length - offset) {
         return -1;
       }
       if (pendingLength > 0) {

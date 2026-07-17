@@ -127,6 +127,8 @@ public class TestSuite {
     TestRunner.register(new WarmStateContext.LegacyWarmStateDecodeRemainsSupportedTest());
     TestRunner.register(new WarmStateContext.MediaWarmStateRoundTripTest());
     TestRunner.register(new WarmStateContext.WarmStateStoreRoundTripTest());
+    TestRunner.register(new WarmStateContext.OversizedWarmStateIsRejectedTest());
+    TestRunner.register(new WarmStateContext.SecretChatPendingKeyIsBoundedTest());
     TestRunner.register(new FailureLogContext.PushTracksLatestEntryTest());
     TestRunner.register(new FailureLogContext.RingRetainsNewestEntriesTest());
     TestRunner.register(new FailureLogContext.CodecRoundTripTest());

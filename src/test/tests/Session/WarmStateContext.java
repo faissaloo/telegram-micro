@@ -284,7 +284,7 @@ public class WarmStateContext {
     }
   }
 
-  public static class WarmStateStoreRoundTripTest extends SkippedTest {
+  public static class WarmStateStoreRoundTripTest extends Test {
     public String label() {
       return "Warm state snapshots round-trip through RMS";
     }

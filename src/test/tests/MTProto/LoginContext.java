@@ -182,14 +182,22 @@ public class LoginContext {
     }
 
     public void test() throws TestFailureException {
+      byte[] p = new byte[256];
+      byte[] srpB = new byte[248];
+      for (int i = 0; i < p.length; ++i) {
+        p[i] = (byte)(i + 1);
+      }
+      for (int i = 0; i < srpB.length; ++i) {
+        srpB[i] = (byte)(255 - i);
+      }
       byte[] body = (new Serializer())
         .append_int(RecievePasswordState.FLAG_HAS_PASSWORD | RecievePasswordState.FLAG_HAS_HINT)
         .append_int(CombinatorIds.password_kdf_algo_modpow)
         .append_byte_string(new byte[] {1, 2, 3})
         .append_byte_string(new byte[] {4, 5, 6})
         .append_int(3)
-        .append_byte_string(new byte[] {7, 8, 9})
-        .append_byte_string(new byte[] {10, 11, 12, 13})
+        .append_byte_string(p)
+        .append_byte_string(srpB)
         .append_long(0x1122334455667788L)
         .append_string("hint")
         .end();
@@ -201,8 +209,8 @@ public class LoginContext {
       expect(state.srp_id, 0x1122334455667788L);
       expect(state.salt1, new byte[] {1, 2, 3});
       expect(state.salt2, new byte[] {4, 5, 6});
-      expect(state.p, new byte[] {7, 8, 9});
-      expect(state.srp_B, new byte[] {10, 11, 12, 13});
+      expect(state.p, p);
+      expect(state.srp_B, srpB);
       expect(state.hint, "hint");
     }
   }
@@ -264,13 +272,23 @@ public class LoginContext {
     }
   }
 
-  public static class ComputePasswordCheckVectorTest extends SkippedTest {
+  public static class ComputePasswordCheckVectorTest extends SlowTest {
     public String label() {
       return "Can compute deterministic Telegram SRP password proofs";
     }
 
     public void test() throws TestFailureException {
-      BigInteger p_integer = BigInteger.ONE.shiftLeft(2048).subtract(BigInteger.valueOf(159));
+      BigInteger p_integer = new BigInteger(
+        "C71CAEB9C6B1C9048E6C522F70F13F73980D40238E3E21C14934D037563D930F" +
+        "48198A0AA7C14058229493D22530F4DBFA336F6E0AC925139543AED44CCE7C37" +
+        "20FD51F69458705AC68CD4FE6B6B13ABDC9746512969328454F18FAF8C595F64" +
+        "2477FE96BB2A941D5BCD1D4AC8CC49880708FA9B378E3C4F3A9060BEE67CF9A4" +
+        "A4A695811051907E162753B56B0F6B410DBA74D8A84B2A14B3144E0EF1284754" +
+        "FD17ED950D5965B4B9DD46582DB1178D169C6BC465B0D6FF9CA3928FEF5B9AE4" +
+        "E418FC15E83EBEA0F87FA9FF5EED70050DED2849F47BF959D956850CE929851F" +
+        "0D8115F635B105EE2E4E15D04B2454BF6F4FADF034B10403119CD8E3B92FCC5B",
+        16
+      );
       BigInteger B_integer = p_integer.subtract(new BigInteger("123456789abcdef", 16));
       byte[] p = PasswordCheck.left_pad(p_integer.magnitudeToBytes(), 256);
       byte[] B = PasswordCheck.left_pad(B_integer.magnitudeToBytes(), 256);
@@ -294,18 +312,19 @@ public class LoginContext {
 
       expect(
         Debug.bytes_to_hex(check.A),
-        "e9d8eb6ba6165a0dfd0b89baf7b6d3b86742030fa02334532c6e02f3d3e8d266" +
-        "0f43b4941e5a576c7f1959385105dca0e8c2e8663215b7a7df39e66e61bfc611" +
-        "208d6ddc7e3c7fdd39c9cf21c9a72b31856c3109edae4cc0db1cac752639679c" +
-        "766881bc8a08ac487b846f933c4308a2cf2317803a866c9853c7904d5d0b7b7b" +
-        "da7a3578db6eccad26082d85abebd657ac937b1f2f617fd1d4199a860f7cefab" +
-        "1db580bce3f6b1490d4d4f848293931b4c0e10a0098e77020dc203c7c8d9d729" +
-        "913763d1488745259c3d5f49896be1d4ac32aa1644cce99df71dac73dc56e535" +
-        "9da4a452a1abb41e20a2ab934a70bd48556b8bb4a449d28cb17eb21686558674"
+        "882aac74b56e2a5884d858316667b33fa09f10e867919ca457221229d82c41c3" +
+        "426bdd405f9a1f19ec4172c273771ef1e713cbcb8a6d40247c56bc6ff788f7ce" +
+        "41ce69f8c524bfc54e458e7168ee2c36152f9d65ac78b7da27cc02dd31ec5f2" +
+        "eb0a61f1c02685cb3572d9946e15d55a8dd668f85c342fe70a213b86f5c1801" +
+        "4b6a666fc85675e2b3e8da17f415cf6002ad69f4ed6354b438d19e320249e4d" +
+        "3b5fe22ac67a15a1b8dd6f0120779f392f75ebbd2c49c313ce6a9dc9310283c" +
+        "e3b29dd21ba6575feab1454f088c182641c682a1e2cfa8b399e43b0c1eea8dd" +
+        "24b7aa3ac1d0a367c459078a3f02c162e22236e14def5f85d2ce36db3c6ed2d" +
+        "f22fad"
       );
       expect(
         Debug.bytes_to_hex(check.M1),
-        "54d45af3e7a38709d9db518a0d3ac8fed0a2568641b298bdafbd3fbdd37d9479"
+        "30f80ea7dbfc2b4a89100cdc6ebbc5e4bfefb642960e8f57a57086ffa8c0e528"
       );
     }
   }

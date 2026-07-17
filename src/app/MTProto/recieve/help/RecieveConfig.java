@@ -4,6 +4,7 @@ import mtproto.CombinatorIds;
 import mtproto.Deserialize;
 import mtproto.RPCResponse;
 import mtproto.TypeMismatchException;
+import mtproto.ProtocolLimits;
 
 import support.Decode;
 
@@ -44,6 +45,7 @@ public class RecieveConfig {
     if (!is_config_type(message_type)) {
       throw new TypeMismatchException("Expected a %(Config)");
     }
+    require(data, skip, 28);
 
     int flags = Decode.Little.int_decode(data, skip);
     skip += 4;
@@ -74,8 +76,17 @@ public class RecieveConfig {
 
     int dc_option_count = Decode.Little.int_decode(data, skip);
     skip += 4;
+    ProtocolLimits.requireLength(
+      dc_option_count,
+      ProtocolLimits.MAX_DC_OPTIONS,
+      "DC option vector"
+    );
+    if (dc_option_count > (data.length - skip) / 20) {
+      throw new IllegalArgumentException("DC option count exceeds its payload.");
+    }
     DCOption[] dc_options = new DCOption[dc_option_count];
     for (int i = 0; i < dc_option_count; i += 1) {
+      require(data, skip, 12);
       int option_type = Decode.Little.int_decode(data, skip);
       skip += 4;
       if (option_type != dc_option) {
@@ -90,6 +101,7 @@ public class RecieveConfig {
       String ip_address = Deserialize.utf8string_deserialize(data, skip).ascii_string();
       skip += Deserialize.utf8string_length_deserialize(data, skip);
 
+      require(data, skip, 4);
       int port = Decode.Little.int_decode(data, skip);
       skip += 4;
 
@@ -103,6 +115,12 @@ public class RecieveConfig {
     }
 
     return new RecieveConfig(flags, date, expires, test_mode, this_dc, dc_options);
+  }
+
+  private static void require(byte[] data, int offset, int amount) {
+    if (data == null || offset < 0 || amount < 0 || offset > data.length - amount) {
+      throw new IllegalArgumentException("Config payload is truncated.");
+    }
   }
 
   public int flags;

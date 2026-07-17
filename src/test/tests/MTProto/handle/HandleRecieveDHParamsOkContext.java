@@ -5,7 +5,7 @@ import mtproto.handle.HandleRecieveDHParamsOk;
 import bouncycastle.BigInteger;
 
 public class HandleRecieveDHParamsOkContext {
-  public static class GenerateAuthKeyTest extends SkippedTest {
+  public static class GenerateAuthKeyTest extends SlowTest {
     public String label() {
       return "It can generate auth keys correctly";
     }

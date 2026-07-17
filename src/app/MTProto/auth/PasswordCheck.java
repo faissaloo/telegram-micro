@@ -6,11 +6,15 @@ import crypto.SHA256;
 import crypto.SHA512;
 
 import mtproto.recieve.auth.RecievePasswordState;
+import mtproto.handle.HandleRecieveDHParamsOk;
 import support.Utf8String;
 
 public class PasswordCheck {
   public static final int PBKDF2_ROUNDS = 100000;
   public static final int SRP_PAD_LENGTH = 256;
+  public static final int MAX_SALT_BYTES = 64;
+  public static final int MAX_PASSWORD_BYTES = 256;
+  public static final int MAX_PBKDF2_OUTPUT_BYTES = 64;
 
   public static class Check {
     public byte[] A;
@@ -29,14 +33,25 @@ public class PasswordCheck {
     if (password == null || password.length() == 0) {
       throw new IllegalArgumentException("Password is required.");
     }
-    if (a_bytes == null || a_bytes.length == 0) {
-      throw new IllegalArgumentException("SRP random input is required.");
+    if (a_bytes == null || a_bytes.length != SRP_PAD_LENGTH) {
+      throw new IllegalArgumentException("A 2048-bit SRP random input is required.");
+    }
+    if (state.salt1 == null || state.salt1.length == 0 ||
+        state.salt1.length > MAX_SALT_BYTES || state.salt2 == null ||
+        state.salt2.length == 0 || state.salt2.length > MAX_SALT_BYTES) {
+      throw new IllegalArgumentException("Telegram returned invalid SRP salts.");
+    }
+    if (state.p == null || state.p.length != SRP_PAD_LENGTH) {
+      throw new IllegalArgumentException("Telegram returned an invalid SRP prime.");
     }
     if (state.srp_B == null || state.srp_B.length < 248 || state.srp_B.length > SRP_PAD_LENGTH) {
       throw new IllegalArgumentException("Telegram returned an invalid SRP B value.");
     }
 
     byte[] password_bytes = Utf8String.encode(password);
+    if (password_bytes.length > MAX_PASSWORD_BYTES) {
+      throw new IllegalArgumentException("Password exceeds the device budget.");
+    }
     byte[] hash1 = sha256_concat3(state.salt1, password_bytes, state.salt1);
     byte[] hash2 = sha256_concat3(state.salt2, hash1, state.salt2);
     byte[] pbkdf = pbkdf2_hmac_sha512(hash2, state.salt1, PBKDF2_ROUNDS, 64);
@@ -46,6 +61,10 @@ public class PasswordCheck {
     BigInteger g = BigInteger.valueOf((long)state.g);
     BigInteger B = new BigInteger(1, state.srp_B);
     BigInteger zero = BigInteger.ZERO;
+
+    if (!HandleRecieveDHParamsOk.validate_diffie_hellman_prime(state.g, p)) {
+      throw new IllegalArgumentException("Telegram returned invalid SRP prime parameters.");
+    }
 
     if (B.compareTo(zero) <= 0 || B.compareTo(p) >= 0) {
       throw new IllegalArgumentException("Telegram returned an out-of-range SRP B value.");
@@ -78,7 +97,9 @@ public class PasswordCheck {
   }
 
   public static byte[] pbkdf2_hmac_sha512(byte[] password, byte[] salt, int rounds, int out_length) {
-    if (password == null || salt == null || rounds <= 0 || out_length <= 0) {
+    if (password == null || password.length > 128 || salt == null ||
+        salt.length > MAX_SALT_BYTES || rounds <= 0 || rounds > PBKDF2_ROUNDS ||
+        out_length <= 0 || out_length > MAX_PBKDF2_OUTPUT_BYTES) {
       throw new IllegalArgumentException("Invalid PBKDF2 input.");
     }
 

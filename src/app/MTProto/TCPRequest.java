@@ -12,6 +12,12 @@ import support.Debug;
 public class TCPRequest {
   ByteArrayPlus request_data;
   public TCPRequest(byte[] data) {
+    if (data == null) {
+      throw new NullPointerException("Request data is required.");
+    }
+    if (data.length > ProtocolLimits.MAX_WIRE_FRAME_BYTES) {
+      throw new IllegalArgumentException("TCP request exceeds the device budget.");
+    }
     //https://core.telegram.org/mtproto/mtproto-transports#intermediate
     request_data = new ByteArrayPlus();
 

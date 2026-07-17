@@ -45,6 +45,12 @@ public class ArrayPlus {
   }
   
   public static byte[] subarray(byte[] array, int from, int length) {
+    if (array == null) {
+      throw new NullPointerException("Source array is required.");
+    }
+    if (from < 0 || length < 0 || from > array.length - length) {
+      throw new IllegalArgumentException("Subarray range exceeds source data.");
+    }
     byte[] new_array = new byte[length];
     System.arraycopy(array, from, new_array, 0, length);
     return new_array;

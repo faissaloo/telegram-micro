@@ -94,7 +94,7 @@ public class FailureLogContext {
     }
   }
 
-  public static class FailureLogStoreRoundTripTest extends SkippedTest {
+  public static class FailureLogStoreRoundTripTest extends Test {
     public String label() {
       return "Failure logs round-trip through RMS";
     }

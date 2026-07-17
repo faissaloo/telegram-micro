@@ -6,11 +6,13 @@ import java.util.Vector;
 public class TestRunner extends MIDlet {
   private static Vector tests = new Vector();
   private static Vector failures = new Vector();
-  private static int skipped = 0;
+  private static int omitted = 0;
   private static boolean focus_mode = false;
+  private static boolean full_mode = false;
 
   public TestRunner() {
     super();
+    full_mode = "full".equals(getAppProperty("TelegramMicro-Test-Mode"));
     TestSuite.register_all_tests();
   }
 
@@ -21,11 +23,28 @@ public class TestRunner extends MIDlet {
   private void run_tests() {
     System.out.println();
     System.out.println("[TestRunner]");
-    System.out.println("Loaded "+Integer.toString(tests.size())+" tests");
+    System.out.println(
+      "Loaded " + Integer.toString(tests.size()) + " tests (" +
+      (full_mode ? "full" : "quick") + " lane)"
+    );
 
     for (int i = 0; i < tests.size(); i++) {
       Test current_test = (Test)tests.elementAt(i);
-      if ((!(focus_mode||current_test.skipped())) || current_test.focused()) {
+      boolean omitted_for_focus = focus_mode && !current_test.focused();
+      boolean omitted_for_lane = current_test.slow() && !full_mode;
+
+      if (current_test.skipped()) {
+        failures.addElement(new TestFailure(
+          current_test,
+          new TestFailureException(
+            "Unclassified skipped test. Use SlowTest or make the gate explicit."
+          )
+        ));
+        System.out.println(" ✗ " + current_test.label() + " (unclassified skip)");
+        continue;
+      }
+
+      if (!omitted_for_focus && !omitted_for_lane) {
         try {
           current_test.run_tests();
           System.out.println(" ✔ " +current_test.label());
@@ -35,9 +54,12 @@ public class TestRunner extends MIDlet {
         }
       }
 
-      if (current_test.skipped() || (focus_mode && !current_test.focused())) {
-        skipped++;
-        System.out.println(" - " +current_test.label());
+      if (omitted_for_focus || omitted_for_lane) {
+        omitted++;
+        System.out.println(
+          " - " + current_test.label() +
+          (omitted_for_lane ? " (slow lane)" : " (focus filter)")
+        );
       }
     }
 
@@ -47,12 +69,12 @@ public class TestRunner extends MIDlet {
   }
 
   private String pass_fail_string() {
-    return "(" + Integer.toString(tests.size()-failures.size()-skipped) + "/" + Integer.toString(tests.size()-skipped) + ")";
+    return "(" + Integer.toString(tests.size()-failures.size()-omitted) + "/" + Integer.toString(tests.size()-omitted) + ")";
   }
 
   private void print_conclusion() {
     System.out.println();
-    print_skipped();
+    print_omitted();
     if (failures.size() == 0) {
       System.out.println(pass_fail_string() + " Test suite passed!");
     } else {
@@ -71,9 +93,13 @@ public class TestRunner extends MIDlet {
     }
   }
 
-  private void print_skipped() {
-    if (skipped > 0) {
-      System.out.println(Integer.toString(skipped)+" tests skipped");
+  private void print_omitted() {
+    if (omitted > 0) {
+      System.out.println(
+        Integer.toString(omitted) +
+        " tests omitted by the explicit " +
+        (focus_mode ? "focus" : "quick") + " lane"
+      );
     }
   }
 

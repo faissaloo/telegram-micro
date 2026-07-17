@@ -9,6 +9,7 @@ import support.ByteArrayPlus;
 import support.Decode;
 import support.Encode;
 import support.Debug;
+import support.ArrayPlus;
 
 import crypto.SHA1;
 import crypto.AES256IGE;
@@ -17,6 +18,7 @@ import mtproto.UnencryptedResponse;
 import mtproto.TypeMismatchException;
 import mtproto.CombinatorIds;
 import mtproto.Deserialize;
+import mtproto.ProtocolLimits;
 
 public class RecieveServerDHParamsOk {
   public static RecieveServerDHParamsOk from_unencrypted_message(UnencryptedResponse message, Integer256 new_nonce) throws TypeMismatchException {
@@ -25,11 +27,22 @@ public class RecieveServerDHParamsOk {
     int message_type = message.type;
 
     if (message_type == CombinatorIds.server_DH_params_ok) {
+      if (new_nonce == null) {
+        throw new IllegalArgumentException("New nonce is required for server DH parameters.");
+      }
+      require(data, skip, 32);
       Integer128 nonce = Decode.Little.Integer128_decode(data, skip);
       skip += 16;
       Integer128 server_nonce = Decode.Little.Integer128_decode(data, skip);
       skip += 16;
-      byte[] encrypted_data = Deserialize.bytes_deserialize(data, skip);
+      byte[] encrypted_data = Deserialize.bytes_deserialize(
+        data,
+        skip,
+        ProtocolLimits.MAX_AUTH_DH_BYTES
+      );
+      if (encrypted_data.length < 16 || (encrypted_data.length & 15) != 0) {
+        throw new IllegalArgumentException("Server DH answer is not block aligned.");
+      }
       
       byte[] tmp_aes_key;
       byte[] tmp_aes_iv;
@@ -77,12 +90,16 @@ public class RecieveServerDHParamsOk {
       }
       
       byte[] decrypted_data = AES256IGE.decrypt(tmp_aes_key, tmp_aes_iv, encrypted_data);
+      if (decrypted_data == null || decrypted_data.length < 64) {
+        throw new IllegalArgumentException("Server DH answer is truncated.");
+      }
       byte[] answer_hash = new byte[SHA1.HASH_SIZE];
       int decrypted_skip = 0;
       System.arraycopy(decrypted_data, 0, answer_hash, 0, SHA1.HASH_SIZE);
       decrypted_skip += SHA1.HASH_SIZE;
       if (Decode.Little.int_decode(decrypted_data, decrypted_skip) == CombinatorIds.server_DH_inner_data) {
         decrypted_skip += 4;
+        require(decrypted_data, decrypted_skip, 36);
         nonce = Decode.Little.Integer128_decode(decrypted_data, decrypted_skip);
         decrypted_skip += 16;
         server_nonce = Decode.Little.Integer128_decode(decrypted_data, decrypted_skip);
@@ -90,18 +107,48 @@ public class RecieveServerDHParamsOk {
         //https://en.wikipedia.org/wiki/Cyclic_group
         int group_generator = Decode.Little.int_decode(decrypted_data, decrypted_skip);
         decrypted_skip += 4;
-        BigInteger diffie_hellman_prime = new BigInteger(1, Deserialize.bytes_deserialize(decrypted_data, decrypted_skip));
+        byte[] primeBytes = Deserialize.bytes_deserialize(decrypted_data, decrypted_skip, 256);
+        if (primeBytes.length != 256) {
+          throw new SecurityException("Server DH prime is not 2048 bits.");
+        }
+        BigInteger diffie_hellman_prime = new BigInteger(1, primeBytes);
         decrypted_skip += Deserialize.bytes_length_deserialize(decrypted_data, decrypted_skip);
-        BigInteger group_generator_power_a = new BigInteger(1, Deserialize.bytes_deserialize(decrypted_data, decrypted_skip));
+        byte[] publicValueBytes = Deserialize.bytes_deserialize(decrypted_data, decrypted_skip, 256);
+        if (publicValueBytes.length != 256) {
+          throw new SecurityException("Server DH public value is not 2048 bits.");
+        }
+        BigInteger group_generator_power_a = new BigInteger(1, publicValueBytes);
         decrypted_skip += Deserialize.bytes_length_deserialize(decrypted_data, decrypted_skip);
+        require(decrypted_data, decrypted_skip, 4);
         int server_time = Decode.Little.int_decode(decrypted_data, decrypted_skip);
         decrypted_skip += 4;
+
+        int paddingLength = decrypted_data.length - decrypted_skip;
+        if (paddingLength < 0 || paddingLength >= 16) {
+          throw new SecurityException("Server DH answer has invalid padding.");
+        }
+        byte[] actualHash = (new SHA1()).digest(
+          ArrayPlus.subarray(decrypted_data, SHA1.HASH_SIZE, decrypted_skip - SHA1.HASH_SIZE)
+        );
+        int hashDifference = 0;
+        for (int i = 0; i < answer_hash.length; ++i) {
+          hashDifference |= answer_hash[i] ^ actualHash[i];
+        }
+        if (hashDifference != 0) {
+          throw new SecurityException("Server DH answer hash mismatch.");
+        }
         return new RecieveServerDHParamsOk(nonce, server_nonce, group_generator, diffie_hellman_prime, group_generator_power_a, server_time, tmp_aes_key, tmp_aes_iv);
       } else {
         throw new TypeMismatchException("Expected a %(server_DH_inner_data)");
       }
     } else {
       throw new TypeMismatchException("Expected a %(server_DH_params_ok)");
+    }
+  }
+
+  private static void require(byte[] data, int offset, int amount) {
+    if (data == null || offset < 0 || amount < 0 || offset > data.length - amount) {
+      throw new IllegalArgumentException("Server DH payload is truncated.");
     }
   }
   

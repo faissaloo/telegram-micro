@@ -18,6 +18,7 @@ import mtproto.EncryptedResponse;
 import mtproto.TypeMismatchException;
 import mtproto.CombinatorIds;
 import mtproto.Deserialize;
+import mtproto.ProtocolLimits;
 
 public class RecieveMsgContainer {
   public static RecieveMsgContainer from_encrypted_message(EncryptedResponse message) throws TypeMismatchException {
@@ -30,17 +31,29 @@ message msg_id:long seqno:int bytes:int body:Object = Message;
 msg_copy#e06046b2 orig_message:Message = MessageCopy;
     */
     if (message_type == CombinatorIds.msg_container) {
+      require(data, skip, 4);
       int length = Decode.Little.int_decode(data, skip);
-
       skip += 4;
+      ProtocolLimits.requireLength(
+        length,
+        ProtocolLimits.MAX_CONTAINER_MESSAGES,
+        "Message container"
+      );
+      if (length > (data.length - skip) / 20) {
+        throw new IllegalArgumentException("Message container count exceeds its payload.");
+      }
       EncryptedResponse messages[] = new EncryptedResponse[length];
       for (int i = 0; i < length; i++) {
+        require(data, skip, 16);
         long message_id = Decode.Little.long_decode(data, skip);
         skip += 8;
         int sequence_number = Decode.Little.int_decode(data, skip);
         skip += 4;
         int message_length = Decode.Little.int_decode(data, skip);
         skip += 4;
+        if (message_length < 4 || message_length > data.length - skip) {
+          throw new IllegalArgumentException("Invalid nested MTProto message length.");
+        }
         int type = Decode.Little.int_decode(data, skip);
         skip += 4;
         byte[] message_content = ArrayPlus.subarray(data, skip, message_length-4);
@@ -57,6 +70,12 @@ msg_copy#e06046b2 orig_message:Message = MessageCopy;
       return new RecieveMsgContainer(messages);
     } else {
       throw new TypeMismatchException("Expected a %(msg_container)");
+    }
+  }
+
+  private static void require(byte[] data, int offset, int amount) {
+    if (data == null || offset < 0 || amount < 0 || offset > data.length - amount) {
+      throw new IllegalArgumentException("Message container is truncated.");
     }
   }
   

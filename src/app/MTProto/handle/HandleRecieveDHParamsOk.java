@@ -21,12 +21,25 @@ public class HandleRecieveDHParamsOk extends MTProtoCallback {
   public void execute(Response response) {
     UnencryptedResponse unencrypted_response = (UnencryptedResponse)response;
     RecieveServerDHParamsOk dh_params_ok = RecieveServerDHParamsOk.from_unencrypted_message(unencrypted_response, connection.new_nonce);
+    if (connection.nonce == null || !connection.nonce.equals(dh_params_ok.nonce) ||
+        connection.server_nonce == null || !connection.server_nonce.equals(dh_params_ok.server_nonce)) {
+      throw new SecurityException("server_DH_params nonce mismatch.");
+    }
     
-    /* Telegram specifies a 2048-bit client exponent, not 2048 bytes. */
-    BigInteger b = new BigInteger(1, connection.random_number_generator.nextBytes(2048 / 8));
+    BigInteger b;
     if (!validate_diffie_hellman_prime(dh_params_ok.group_generator, dh_params_ok.diffie_hellman_prime)) {
       throw new SecurityException("Diffie hellman prime is not known and may be insecure");
     }
+    if (!validate_diffie_hellman_public_value(
+        dh_params_ok.group_generator_power_a,
+        dh_params_ok.diffie_hellman_prime)) {
+      throw new SecurityException("Server Diffie-Hellman public value is outside the safe range.");
+    }
+    /* Telegram specifies a 2048-bit client exponent, not 2048 bytes. */
+    do {
+      b = new BigInteger(1, connection.random_number_generator.nextBytes(2048 / 8));
+    } while (b.compareTo(BigInteger.ONE) <= 0 ||
+      b.compareTo(dh_params_ok.diffie_hellman_prime.subtract(BigInteger.ONE)) >= 0);
     
     SendSetClientDHParams set_client_dh_params = new SendSetClientDHParams(
       connection.random_number_generator,
@@ -49,9 +62,27 @@ public class HandleRecieveDHParamsOk extends MTProtoCallback {
   }
   
   public static byte[] generate_auth_key(BigInteger group_generator_power_a, BigInteger b, BigInteger diffie_hellman_prime) {
-    return group_generator_power_a
+    byte[] magnitude = group_generator_power_a
       .modPow(b, diffie_hellman_prime)
       .magnitudeToBytes();
+    if (magnitude.length > 256) {
+      throw new SecurityException("Generated auth key exceeds 2048 bits.");
+    }
+    if (magnitude.length == 256) {
+      return magnitude;
+    }
+    byte[] normalized = new byte[256];
+    System.arraycopy(magnitude, 0, normalized, normalized.length - magnitude.length, magnitude.length);
+    return normalized;
+  }
+
+  public static boolean validate_diffie_hellman_public_value(BigInteger value, BigInteger prime) {
+    if (value == null || prime == null) {
+      return false;
+    }
+    BigInteger lower = BigInteger.ONE.shiftLeft(2048 - 64);
+    BigInteger upper = prime.subtract(lower);
+    return value.compareTo(lower) >= 0 && value.compareTo(upper) <= 0;
   }
   
   /*

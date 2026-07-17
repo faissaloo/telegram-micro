@@ -459,11 +459,19 @@ EOF
 
 write_test_manifest() {
   local target="$1"
-  cat > "${target}" <<'EOF'
+  local test_mode="${TELEGRAM_MICRO_TEST_MODE:-quick}"
+
+  if [[ "${test_mode}" != 'quick' && "${test_mode}" != 'full' ]]; then
+    printf 'TELEGRAM_MICRO_TEST_MODE must be quick or full.\n' >&2
+    exit 1
+  fi
+
+  cat > "${target}" <<EOF
 MIDlet-1: TestRunner, , test.TestRunner
 MIDlet-Name: TelegramMicroTests
 MIDlet-Vendor: Faissaloo
 MIDlet-Version: 1.0
+TelegramMicro-Test-Mode: ${test_mode}
 Nokia-MIDlet-Original-Display-Size: 240,320
 X-SquirrelJME-Resolution: 240x320
 MicroEdition-Configuration: CLDC-1.1
@@ -569,9 +577,12 @@ run_built_suite() {
   shift 2
 
   local standalone_jar
+  local emulator_state_dir
   local -a host_java_args=()
   local -a vm_args=()
   standalone_jar="$(find_squirreljme_standalone_jar)"
+  emulator_state_dir="${TELEGRAM_MICRO_EMULATOR_STATE_DIR:-${BUILD_DIR}/emulator-state/${entry}}"
+  mkdir -p "${emulator_state_dir}"
 
   if [[ -n "${SQUIRRELJME_HOST_JAVA_ARGS:-}" ]]; then
     read -r -a host_java_args <<< "${SQUIRRELJME_HOST_JAVA_ARGS}"
@@ -588,7 +599,8 @@ run_built_suite() {
     host_java_args+=("-Dcc.squirreljme.mcp.port=${SQUIRRELJME_MCP_PORT}")
   fi
 
-  "${JDK_HOME}/bin/java" "${host_java_args[@]}" -jar "${standalone_jar}" \
+  SQUIRRELJME_STATE_HOME="${emulator_state_dir}" \
+    "${JDK_HOME}/bin/java" "${host_java_args[@]}" -jar "${standalone_jar}" \
     "${vm_args[@]}" "-Xentry:${entry}" -jar "${suite_jar}" "$@"
 }
 
@@ -600,4 +612,14 @@ run_app_suite() {
 run_test_suite() {
   build_test_suite
   run_built_suite TestRunner "${TEST_JAR}" "$@"
+}
+
+run_full_test_suite() {
+  TELEGRAM_MICRO_TEST_MODE=quick
+  export TELEGRAM_MICRO_TEST_MODE
+
+  build_test_suite
+  run_built_suite TestRunner "${TEST_JAR}" "$@"
+  "${JDK_HOME}/bin/java" -classpath "${TEST_JAR}:${COMPILE_CLASSPATH}" \
+    test.SlowCryptoRunner
 }

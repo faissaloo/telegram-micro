@@ -8,9 +8,10 @@ import mtproto.TypeMismatchException;
 import mtproto.RPCResponse;
 import mtproto.Deserialize;
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import compression.Gzip;
 import java.io.IOException;
+import mtproto.ProtocolLimits;
+import support.BoundedByteArrayOutputStream;
 
 public class RecieveGzipPacked {
   public static RecieveGzipPacked from_encrypted_message(RPCResponse message) throws TypeMismatchException {
@@ -21,7 +22,10 @@ public class RecieveGzipPacked {
     if (message_type == CombinatorIds.gzip_packed) {
       byte[] packed_data = Deserialize.bytes_deserialize(message.body, 0);
       ByteArrayInputStream input_stream = new ByteArrayInputStream(packed_data);
-      ByteArrayOutputStream output_stream = new ByteArrayOutputStream();
+      BoundedByteArrayOutputStream output_stream = new BoundedByteArrayOutputStream(
+        packed_data.length < 1024 ? 1024 : packed_data.length,
+        ProtocolLimits.MAX_INFLATED_BYTES
+      );
       try {
         Gzip.gunzip(input_stream, output_stream);
       } catch (IOException e) {

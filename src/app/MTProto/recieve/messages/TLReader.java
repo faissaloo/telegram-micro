@@ -1,6 +1,7 @@
 package mtproto.recieve.messages;
 
 import support.Decode;
+import mtproto.ProtocolLimits;
 
 final class TLReader {
   private final byte[] data;
@@ -70,6 +71,7 @@ final class TLReader {
   byte[] readBytes() {
     int byteLength = readByteLength();
     int paddedLength = paddedByteLength(byteLength);
+    ProtocolLimits.requireLength(byteLength, ProtocolLimits.MAX_TL_BYTES, "TL bytes");
     byte[] result = new byte[byteLength];
 
     require(byteLength);
@@ -82,6 +84,7 @@ final class TLReader {
     int byteLength = readByteLength();
     int paddedLength = paddedByteLength(byteLength);
 
+    ProtocolLimits.requireLength(byteLength, ProtocolLimits.MAX_TL_BYTES, "TL bytes");
     if (out == null || byteLength > out.length) {
       throw new IllegalArgumentException("Target buffer is too small for TL bytes.");
     }
@@ -93,6 +96,12 @@ final class TLReader {
   }
 
   String readDisplayString() {
+    int savedOffset = offset;
+    int byteLength = readByteLength();
+    if (byteLength > ProtocolLimits.MAX_DISPLAY_STRING_BYTES) {
+      throw new IllegalArgumentException("Display string exceeds the device budget.");
+    }
+    offset = savedOffset;
     support.Utf8String value = new support.Utf8String(readBytes());
     return value.string();
   }
@@ -109,7 +118,7 @@ final class TLReader {
     if (constructor != 0x1cb5c415) {
       throw new IllegalArgumentException("Expected vector constructor.");
     }
-    return readInt();
+    return ProtocolLimits.requireVectorCount(readInt(), length - offset);
   }
 
   private int readByteLength() {
@@ -137,7 +146,7 @@ final class TLReader {
   }
 
   private void require(int amount) {
-    if (amount < 0 || offset + amount > length) {
+    if (amount < 0 || offset > length - amount) {
       throw new IllegalArgumentException("TL payload underflow.");
     }
   }

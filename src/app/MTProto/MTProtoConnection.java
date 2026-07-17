@@ -77,6 +77,7 @@ public class MTProtoConnection {
   public long last_message_id = 0;
   public long retry_id = 0;
   public Integer128 nonce;
+  public Integer128 server_nonce;
   public Integer256 new_nonce;
   public RecieveConfig current_config = null;
   public RecievePong last_pong = null;
@@ -287,6 +288,9 @@ public class MTProtoConnection {
   }
 
   public void clearSavedAuth() {
+    nonce = null;
+    server_nonce = null;
+    new_nonce = null;
     auth_key = null;
     auth_key_full_hash = null;
     server_salt = 0;
@@ -547,6 +551,7 @@ public class MTProtoConnection {
     direct_authorized_restore = false;
     restored_session_prepared = false;
     nonce = random_number_generator.nextInteger128();
+    server_nonce = null;
     new_nonce = null;
     session_id = 0;
     seq_no = 0;
@@ -625,7 +630,11 @@ public class MTProtoConnection {
       response = EncryptedResponse.from_tcp_response(tcp_response, this);
     }
     
-    trigger_callbacks(response);
+    try {
+      trigger_callbacks(response);
+    } catch (RuntimeException invalidResponse) {
+      throw new IOException("Rejected invalid MTProto response: " + invalidResponse.toString());
+    }
   }
   
   public void trigger_callbacks(Response response) {

@@ -17,11 +17,21 @@ public class RecieveResPQ {
     int message_type = message.type;
 
     if (message_type == CombinatorIds.resPQ) {
+      if (data == null || data.length < 36) {
+        throw new IllegalArgumentException("resPQ payload is truncated.");
+      }
       Integer128 nonce = Decode.Little.Integer128_decode(data, skip);
       skip += 16;
       Integer128 server_nonce = Decode.Little.Integer128_decode(data, skip);
       skip += 16;
-      long pq = Decode.Big.long_decode(Deserialize.bytes_deserialize(data, skip), 0); //this probably deserializes some stuff wrong on rare occasions
+      byte[] pqBytes = Deserialize.bytes_deserialize(data, skip, 8);
+      if (pqBytes.length == 0) {
+        throw new IllegalArgumentException("resPQ contains an empty pq value.");
+      }
+      long pq = 0;
+      for (int i = 0; i < pqBytes.length; ++i) {
+        pq = (pq << 8) | (pqBytes[i] & 0xffL);
+      }
 
       skip += Deserialize.bytes_length_deserialize(data, skip); //this breaks without including the offset in the calculation
       

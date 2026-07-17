@@ -3,6 +3,7 @@ package mtproto.recieve.auth;
 import mtproto.CombinatorIds;
 import mtproto.RPCResponse;
 import mtproto.TypeMismatchException;
+import mtproto.ProtocolLimits;
 
 import support.Utf8String;
 import support.Decode;
@@ -75,7 +76,7 @@ public class RecieveSentCode {
       reader.offset += 3;
     }
 
-    if (reader.remaining() < size) {
+    if (size > ProtocolLimits.MAX_DISPLAY_STRING_BYTES || reader.remaining() < size) {
       reader.error = true;
       return null;
     }

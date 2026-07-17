@@ -25,6 +25,9 @@ public class RecieveServerDHGenOk {
     int message_type = message.type;
 
     if (message_type == CombinatorIds.dh_gen_ok) {
+      if (data == null || data.length < 48) {
+        throw new IllegalArgumentException("dh_gen_ok payload is truncated.");
+      }
       Integer128 nonce = Decode.Little.Integer128_decode(data, skip);
       skip += 16;
       Integer128 server_nonce = Decode.Little.Integer128_decode(data, skip);
@@ -43,6 +46,6 @@ public class RecieveServerDHGenOk {
   public RecieveServerDHGenOk(Integer128 nonce, Integer128 server_nonce, Integer128 new_nonce_hash1) {
     this.nonce = nonce;
     this.server_nonce = server_nonce;
-    this.new_nonce_hash1 = server_nonce;
+    this.new_nonce_hash1 = new_nonce_hash1;
   }
 }

@@ -12,8 +12,7 @@ import support.ByteArrayPlus;
 import support.Queue;
 
 public class RecieveResponseThread extends Thread {
-  Queue responses = new Queue();
-  Queue waiting = new Queue();
+  Queue responses = new Queue(ProtocolLimits.MAX_PENDING_RESPONSES);
   SocketConnection connection;
   InputStream response_stream;
   boolean closed = false;
@@ -22,11 +21,12 @@ public class RecieveResponseThread extends Thread {
     if (responses.length() <= 0) {
       return null;
     }
-    return (TCPResponse) responses.dequeue();
+    TCPResponse response = (TCPResponse)responses.dequeue();
+    notifyAll();
+    return response;
   }
   
   public synchronized void wait_for_response() {
-    waiting.enqueue(this);
     while (!closed && !has_responses()) {
       try {
         wait();
@@ -36,7 +36,7 @@ public class RecieveResponseThread extends Thread {
     }
   }
 
-  public boolean has_responses() {
+  public synchronized boolean has_responses() {
     return responses.length() > 0;
   }
 
@@ -45,12 +45,7 @@ public class RecieveResponseThread extends Thread {
   }
 
   private synchronized void notify_waiters() {
-    while (waiting.length() > 0) {
-      Object waiter = (Object)waiting.dequeue();
-      synchronized(waiter) {
-        waiter.notify();
-      }
-    }
+    notifyAll();
   }
 
   private synchronized void mark_closed() {
@@ -72,9 +67,21 @@ public class RecieveResponseThread extends Thread {
         // unencrypted messages start with a 8 bytes/long of zero (auth_key_id)
         // encrypted messages start with a 8 bytes/long with a non-zero value (auth_key_id)
         //We should probably have different classes for recieved messages unlike the example
-        responses.enqueue(response);
-        
-        notify_waiters();
+        synchronized (this) {
+          while (!closed && responses.length() >= ProtocolLimits.MAX_PENDING_RESPONSES) {
+            try {
+              wait();
+            } catch (InterruptedException interrupted) {
+              mark_closed();
+              return;
+            }
+          }
+          if (closed) {
+            return;
+          }
+          responses.enqueue(response);
+          notify_waiters();
+        }
       }
 
       close();

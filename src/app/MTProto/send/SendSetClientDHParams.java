@@ -14,6 +14,12 @@ import mtproto.Serializer;
 public class SendSetClientDHParams extends SendUnencrypted {
   public SendSetClientDHParams(SecureRandomPlus random_number_generator, Integer128 nonce, Integer128 server_nonce, long retry_id, int group_generator, BigInteger diffie_hellman_prime, BigInteger b, byte[] tmp_aes_key, byte[] tmp_aes_iv) {
     BigInteger group_generator_power_b = BigInteger.valueOf(group_generator).modPow(b, diffie_hellman_prime);
+    BigInteger lower = BigInteger.ONE.shiftLeft(2048 - 64);
+    BigInteger upper = diffie_hellman_prime.subtract(lower);
+    if (group_generator_power_b.compareTo(lower) < 0 ||
+        group_generator_power_b.compareTo(upper) > 0) {
+      throw new SecurityException("Client Diffie-Hellman public value is outside the safe range.");
+    }
     
     byte[] inner_data = inner_data(nonce, server_nonce, retry_id, group_generator_power_b);
     byte[] inner_data_hash = (new SHA1()).digest(inner_data);

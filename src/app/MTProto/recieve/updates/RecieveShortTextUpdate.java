@@ -4,6 +4,7 @@ import mtproto.CombinatorIds;
 import mtproto.EncryptedResponse;
 import reader.DialogListModel;
 import support.Decode;
+import mtproto.ProtocolLimits;
 
 public final class RecieveShortTextUpdate {
   private static final int ALLOWED_FLAGS =
@@ -247,6 +248,11 @@ public final class RecieveShortTextUpdate {
     String readDisplayString() {
       int byteLength = readByteLength();
       int paddedLength = paddedByteLength(byteLength);
+      ProtocolLimits.requireLength(
+        byteLength,
+        ProtocolLimits.MAX_DISPLAY_STRING_BYTES,
+        "Display string"
+      );
       StringBuffer buffer = new StringBuffer(byteLength);
       int i;
 
@@ -271,7 +277,7 @@ public final class RecieveShortTextUpdate {
       if (constructor != TG_VECTOR_ID) {
         throw new IllegalArgumentException("Expected vector constructor.");
       }
-      return readInt();
+      return ProtocolLimits.requireVectorCount(readInt(), length - offset);
     }
 
     private int readByteLength() {
@@ -300,7 +306,7 @@ public final class RecieveShortTextUpdate {
     }
 
     private void require(int amount) {
-      if (amount < 0 || offset + amount > length) {
+      if (amount < 0 || offset > length - amount) {
         throw new IllegalArgumentException("TL payload underflow.");
       }
     }

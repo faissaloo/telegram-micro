@@ -22,6 +22,10 @@ public class HandleRecieveResPQ extends MTProtoCallback {
     UnencryptedResponse unencrypted_response = (UnencryptedResponse)response;
     System.out.println("RECIEVING RES PQ");
     RecieveResPQ pq_data = RecieveResPQ.from_unencrypted_message(unencrypted_response);
+    if (connection.nonce == null || !connection.nonce.equals(pq_data.nonce)) {
+      throw new SecurityException("resPQ nonce mismatch.");
+    }
+    connection.server_nonce = pq_data.server_nonce;
     PrimeDecomposer.Coprimes decomposed_pq = PrimeDecomposer.decompose(pq_data.pq, authHelpUrl);
     TelegramPublicKeys public_keys = new TelegramPublicKeys();
     RSAPublicKey public_key = public_keys.find_public_key(pq_data.server_public_key_fingerprints);

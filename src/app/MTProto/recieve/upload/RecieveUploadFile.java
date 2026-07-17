@@ -2,6 +2,7 @@ package mtproto.recieve.upload;
 
 import mtproto.CombinatorIds;
 import mtproto.RPCResponse;
+import mtproto.ProtocolLimits;
 import support.ArrayPlus;
 import support.Decode;
 
@@ -65,7 +66,8 @@ public final class RecieveUploadFile {
       byteLength = Decode.Little.int24_decode(body, offset);
       offset += 3;
     }
-    if (byteLength < 0 || offset + byteLength > body.length) {
+    if (byteLength < 0 || byteLength > ProtocolLimits.MAX_MEDIA_CHUNK_BYTES ||
+        offset > body.length - byteLength) {
       throw new IllegalArgumentException("upload.File bytes payload is truncated.");
     }
 

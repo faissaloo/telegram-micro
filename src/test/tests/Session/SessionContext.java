@@ -250,7 +250,7 @@ public class SessionContext {
     }
   }
 
-  public static class SessionStoreRoundTripTest extends SkippedTest {
+  public static class SessionStoreRoundTripTest extends Test {
     public String label() {
       return "Session stores round-trip snapshots through RMS";
     }

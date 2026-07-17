@@ -9,6 +9,10 @@ public abstract class Test {
     return false;
   }
 
+  public boolean slow() {
+    return false;
+  }
+
   public abstract void test() throws TestFailureException;
   public String label() {
     return getClass().getName();

@@ -21,12 +21,18 @@ public class EncryptedResponse extends Response {
     TCPResponse response,
     MTProtoConnection reciever
   ) throws IOException {
+    if (response == null || response.data == null || response.data.length < 4) {
+      throw new IOException("Encrypted response is truncated.");
+    }
     byte[] response_data = response.data;
     if (response_data.length == 4) {
       int error_value = Decode.Little.int_decode(response_data, 0);
       throw new IOException("Recieved error "+error_value+" from server");
     } else {
       int skip = 0;
+      if (response_data.length < 8) {
+        throw new IOException("Response auth key id is truncated.");
+      }
       long auth_key_id = Decode.Little.long_decode(response_data, skip); //this is fine
       
       skip += 8;
@@ -34,13 +40,22 @@ public class EncryptedResponse extends Response {
       if (auth_key_id == 0) {
         return null; //this is an unencrypted response
       } else {
-        if (reciever == null || reciever.auth_key == null) {
+        if (reciever == null || reciever.auth_key == null || reciever.auth_key.length < 128) {
           throw new IOException("Encrypted response received without an auth key.");
+        }
+        if (reciever.auth_key_id != 0 && auth_key_id != reciever.auth_key_id) {
+          throw new IOException("Encrypted response uses an unexpected auth key.");
+        }
+        if (response_data.length < 40) {
+          throw new IOException("Encrypted response body is truncated.");
         }
         byte[] msg_key = ArrayPlus.subarray(response_data, skip, 16);
         skip += 16;
         
         int encrypted_data_length = response_data.length-skip;
+        if (encrypted_data_length < 16 || (encrypted_data_length & 15) != 0) {
+          throw new IOException("Encrypted response is not block aligned.");
+        }
         byte[] encrypted_data = ArrayPlus.subarray(response_data, skip, encrypted_data_length);
         
         //basically copied from EncryptedRequest, can probably be broken out into something else
@@ -73,6 +88,23 @@ public class EncryptedResponse extends Response {
           .toByteArray();
           
         byte[] decrypted_data = AES256IGE.decrypt(aes_key, aes_iv, encrypted_data);
+        if (decrypted_data == null || decrypted_data.length < 48) {
+          throw new IOException("Decrypted response is too short.");
+        }
+
+        byte[] msg_key_large = (new SHA256()).digest(
+          (new ByteArrayPlus())
+            .append_raw_bytes_from_up_to(reciever.auth_key, 96, 32)
+            .append_raw_bytes(decrypted_data)
+            .toByteArray()
+        );
+        int msg_key_difference = 0;
+        for (int i = 0; i < msg_key.length; ++i) {
+          msg_key_difference |= msg_key[i] ^ msg_key_large[8 + i];
+        }
+        if (msg_key_difference != 0) {
+          throw new IOException("Encrypted response message key verification failed.");
+        }
         
         int decrypted_skip = 0;
         long salt = Decode.Little.long_decode(decrypted_data, decrypted_skip);
@@ -80,12 +112,24 @@ public class EncryptedResponse extends Response {
         decrypted_skip += 8;
         long session_id = Decode.Little.long_decode(decrypted_data, decrypted_skip);
         decrypted_skip += 8;
+        if (reciever.session_id != 0 && session_id != reciever.session_id) {
+          throw new IOException("Encrypted response uses an unexpected session.");
+        }
         long message_id = Decode.Little.long_decode(decrypted_data, decrypted_skip);
         decrypted_skip += 8;
         int seq_no = Decode.Little.int_decode(decrypted_data, decrypted_skip);
         decrypted_skip += 4;
         int message_data_length = Decode.Little.int_decode(decrypted_data, decrypted_skip);
         decrypted_skip += 4;
+        if (message_data_length < 4 ||
+            message_data_length > ProtocolLimits.MAX_TL_BYTES ||
+            message_data_length > decrypted_data.length - decrypted_skip) {
+          throw new IOException("Invalid encrypted message length.");
+        }
+        int padding_length = decrypted_data.length - decrypted_skip - message_data_length;
+        if (padding_length < 12 || padding_length > 1024) {
+          throw new IOException("Invalid encrypted message padding length.");
+        }
         int type = Decode.Little.int_decode(decrypted_data, decrypted_skip);
         decrypted_skip += 4;
         byte[] message_data = ArrayPlus.subarray(decrypted_data, decrypted_skip, message_data_length-4);

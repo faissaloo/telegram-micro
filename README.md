@@ -86,6 +86,8 @@ Sign-in stores reusable emulator state under its ignored evidence directory and 
 - [Verification and live-operation safety](docs/verification.md)
 - [Real Nokia proof checklist](docs/device-proof.md)
 - [Prioritized parity roadmap](docs/parity-roadmap.md)
+- [Telegram feature matrix](docs/telegram-feature-matrix.md)
+- [Keypad-first UX guidance](docs/ux-guidelines.md)
 - [Agent development contract](AGENTS.md)
 
 Local Telegram/MTProto reference implementations are under the ignored `references/ps2` tree. Protocol changes should be reference-first and should include hostile boundary tests.

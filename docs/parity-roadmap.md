@@ -1,6 +1,6 @@
 # Capability roadmap
 
-This is a prioritized evidence backlog, not a claim of parity with Telegram clients or the local PS2 reference. The target is the narrow useful core in [north-star.md](north-star.md), constrained by Nokia C2-01 resources.
+This is a prioritized evidence backlog, not a claim of parity with Telegram clients or the local PS2 reference. The target is the narrow useful core in [north-star.md](north-star.md), constrained by Nokia C2-01 resources. Use [telegram-feature-matrix.md](telegram-feature-matrix.md) for the extensive product inventory and [ux-guidelines.md](ux-guidelines.md) for keypad-first interaction decisions.
 
 ## Evidence states
 
@@ -23,6 +23,7 @@ These states are independent. A parser can be unit verified while the end-to-end
 | Login UI | Phone/code/password state models and MCP automation | Error/retry/expiry UI proof; physical keypad proof |
 | Durable session | Versioned bounded snapshots, corrupt/oversized rejection, RMS tests | Power-loss/full-storage device scenarios and migration policy |
 | Dialog/history read | Bounded models, parsing, cache and update foundations | Expand constructor interoperability conservatively; long-session live/device proof |
+| Message context | Sender, content, media and pending state are bounded; wire dates are parsed | Preserve/restore timestamps, then add compact delivery/read state without paint-time allocation |
 | Text send | Bounded compose/request/reconciliation and recovery foundations | Transport-loss duplicate/retry matrix; live/device proof |
 | Reconnect/catch-up | Session restore, difference/channel-difference and fallback foundations | More gap/too-long/unknown-update traces and device radio-loss proof |
 | Failure visibility | Bounded failure log/status surfaces | Make every P0 terminal failure actionable without exposing secrets |
@@ -66,4 +67,4 @@ Every advancement should include:
 5. Honest labels for live and device lanes not run.
 6. Updated limits/checklists when new measurement changes the design budget.
 
-Do not expand this roadmap with exhaustive Telegram surface area. Add work only when it protects the north-star path or represents the next smallest useful, device-safe capability.
+Keep exhaustive Telegram surface area in `telegram-feature-matrix.md`. Add an item here only when it protects the north-star path or represents the next smallest useful, device-bounded capability.

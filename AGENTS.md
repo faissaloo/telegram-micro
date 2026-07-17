@@ -38,6 +38,8 @@ Do not stop for a choice that can be resolved from local code, tests, references
 - `docs/verification.md`: evidence lanes and operator-safe live validation.
 - `docs/device-proof.md`: real Nokia evidence checklist.
 - `docs/parity-roadmap.md`: prioritized capability backlog, not a parity claim.
+- `docs/telegram-feature-matrix.md`: extensive Telegram surface inventory and constrained-client disposition.
+- `docs/ux-guidelines.md`: NN/g-derived keypad-first interaction and heuristic review rules.
 
 ## Scripted workflow
 

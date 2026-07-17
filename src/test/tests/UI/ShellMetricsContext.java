@@ -1,6 +1,6 @@
 package test;
 
-import ui.ShellMetrics;
+import ui.ShellLayout;
 
 public class ShellMetricsContext {
   public static class WideHostedCanvasUsesPhoneViewportTest extends Test {
@@ -9,7 +9,7 @@ public class ShellMetricsContext {
     }
 
     public void test() throws TestFailureException {
-      ShellMetrics metrics = ShellMetrics.forCanvas(480);
+      ShellLayout metrics = ShellLayout.forCanvas(480);
 
       expect(metrics.frameWidth, 240);
       expect(metrics.frameX, 120);
@@ -24,13 +24,13 @@ public class ShellMetricsContext {
     }
 
     public void test() throws TestFailureException {
-      ShellMetrics metrics = ShellMetrics.forCanvas(176);
+      ShellLayout metrics = ShellLayout.forCanvas(176);
 
       expect(metrics.frameWidth, 176);
       expect(metrics.frameX, 0);
       expect(metrics.edgePadding, 4);
       expect(metrics.contentWidth, 168);
-      expect(metrics.titleFont.getHeight() >= metrics.bodyFont.getHeight(), true);
+      expect(metrics.innerPadding, 5);
     }
   }
 }

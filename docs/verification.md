@@ -14,7 +14,7 @@ TelegramMicro separates deterministic offline proof from production-account and 
 | `./scripts/verify.sh --full` | Standard offline pre-push gate | UI, production Telegram, physical Nokia |
 | `./scripts/verify.sh --full --ui` | Standard gate plus clean-state first-install/entropy UI capture | Login interoperability or real device |
 
-`verify-ui.sh` requires the first-install entropy marker and rejects evidence if bootstrap/reconnect starts before it. It writes ignored artifacts under `artifacts/ui-smoke` and cleans only its isolated temporary state.
+`verify-ui.sh` requires a real display for the pinned GTK2 ScritchUI backend, even though the app runs through the hosted VM. It fails before starting the emulator when Linux has no `DISPLAY`; do not replace this evidence lane with a virtual X server. When available, it requires the first-install entropy marker and rejects evidence if bootstrap/reconnect starts before it. It writes ignored artifacts under `artifacts/ui-smoke` and cleans only its isolated temporary state.
 
 ## Change-to-proof matrix
 

@@ -44,6 +44,11 @@ expect_status 64 'restore gate requires explicit state' \
 expect_status 64 'broad emulator cleanup requires an explicit flag' \
   env -u SQUIRRELJME_MCP_PORT bash "${ROOT_DIR}/scripts/stop-emulator.sh"
 
+if [[ "$(uname -s)" == 'Linux' ]]; then
+  expect_status 69 'displayless UI verification fails before emulator startup' \
+    env -u DISPLAY bash "${ROOT_DIR}/scripts/verify-ui.sh"
+fi
+
 dynamic_port="$(unset SQUIRRELJME_MCP_PORT; mcp_pick_port)"
 mcp_validate_port "${dynamic_port}"
 if SQUIRRELJME_MCP_PORT=invalid mcp_pick_port >/dev/null 2>&1; then

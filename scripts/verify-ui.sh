@@ -6,6 +6,13 @@ umask 077
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "${ROOT_DIR}/scripts/lib/mcp.sh"
 
+if [[ "$(uname -s)" == 'Linux' && -z "${DISPLAY:-}" ]]; then
+  printf '%s\n' \
+    'Offline UI verification requires a real X display for the pinned GTK2 ScritchUI backend.' \
+    'No emulator was started. Run this lane in a graphical session; do not use a virtual X server.' >&2
+  exit 69
+fi
+
 MCP_PORT="$(mcp_pick_port)"
 WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/telegrammicro-ui-smoke.XXXXXX")"
 ARTIFACT_DIR="${TELEGRAM_MICRO_UI_ARTIFACT_DIR:-${ROOT_DIR}/artifacts/ui-smoke/$(date -u +%Y%m%dT%H%M%SZ)-$$}"

@@ -57,7 +57,7 @@ Edit the ignored local file before building. Without credentials, the login UI r
 SQUIRRELJME_MCP_PORT="$PORT" ./scripts/run.sh
 ```
 
-Use the embedded ScritchUI MCP endpoint and `scritch.screenshot` for headless UI evidence. Keep isolated state in `TELEGRAM_MICRO_EMULATOR_STATE_DIR`; do not replace the process `HOME`.
+Use the embedded ScritchUI MCP endpoint and `scritch.screenshot` for direct application-surface evidence. The pinned GTK2 backend still needs a real X display even in hosted mode; a displayless agent should report the UI lane unavailable rather than add a virtual X server. Keep isolated state in `TELEGRAM_MICRO_EMULATOR_STATE_DIR`; do not replace the process `HOME`.
 
 Stop a known run with:
 

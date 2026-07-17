@@ -3685,15 +3685,6 @@ diff --git a/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scrit
 index fcbd3bcc565d3cffb084726296be01c1f0705cea..8ca0eddd824946dc4cc10ec56c6aeae0ea94a67e 100644
 --- a/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibScritchInterface.java
 +++ b/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibScritchInterface.java
-@@ -60,7 +60,7 @@ public class DylibScritchInterface
- 	
- 	/** The internal default order of interfaces. */
- 	private static final List<String> _ORDER =
--		UnmodifiableList.of(Arrays.asList("cocoa", "win32", "gtk2"));
-+		UnmodifiableList.of(Arrays.asList("cocoa", "win32", "gtk2", "x11"));
- 	
- 	/** The default instance of this. */
- 	private static volatile DylibScritchInterface _INSTANCE;
 @@ -68,6 +68,9 @@ public class DylibScritchInterface
  	/** The native dynamic library to use. */
  	protected final NativeScritchDylib dyLib;
@@ -5659,40 +5650,6 @@ index c83eb5b04328a84b838728728b99ded4b11fa0c0..1ef190fea6cc214e9ffc5f985a78acf8
  	
  	/** Repaint component. */
  	SJME_SCRITCHUI_QUICK_SAME(componentRepaint);
-diff --git a/nanocoat/lib/base/dylibExtra.c b/nanocoat/lib/base/dylibExtra.c
-index 6c8e5cd114839361e11b1263b77f5a92cffc025b..cd675bcf73e6f8051ac82ff3cebc38118ceb97a5 100644
---- a/nanocoat/lib/base/dylibExtra.c
-+++ b/nanocoat/lib/base/dylibExtra.c
-@@ -29,6 +29,7 @@ static const sjme_lpcstr sjme_dylib_extraAudio[] =
- static const sjme_lpcstr sjme_dylib_extraUi[] =
- {
- 	"ui-gtk2",
-+	"ui-x11",
- 	
- #if defined(SJME_CONFIG_HAS_OS_WINDOWS) || \
- 	defined(SJME_CONFIG_HAS_OS_WINDOWS_CE)
-diff --git a/nanocoat/lib/scritchui/CMakeLists.txt b/nanocoat/lib/scritchui/CMakeLists.txt
-index c8d71d573512fd03cd513cccae94e085adeceaae..f9230fa5d155d250f19954125921e900d2f25625 100644
---- a/nanocoat/lib/scritchui/CMakeLists.txt
-+++ b/nanocoat/lib/scritchui/CMakeLists.txt
-@@ -83,13 +83,11 @@ if(SQUIRRELJME_ENABLE_GUI_DEVELOPER)
- endif()
- 
- # X11?
--if(SQUIRRELJME_ENABLE_GUI_DEVELOPER)
--	squirreljme_include("find-x11.cmake")
-+squirreljme_include("find-x11.cmake")
- 
--	option(SQUIRRELJME_ENABLE_GUI_X11 "Enable X11 GUI" ON)
--	if(SQUIRRELJME_ENABLE_GUI_X11)
--		squirreljme_scritchui_build(x11 X11)
--	endif()
-+option(SQUIRRELJME_ENABLE_GUI_X11 "Enable X11 GUI" ON)
-+if(SQUIRRELJME_ENABLE_GUI_X11)
-+	squirreljme_scritchui_build(x11 X11)
- endif()
- 
- # GTK2?
 diff --git a/nanocoat/lib/scritchui/framebuffer/fbComponent.c b/nanocoat/lib/scritchui/framebuffer/fbComponent.c
 index d24ccf497d3ddf7400c96c8fc93de95bbb05247c..0d3d73d2ca8947d42eb1ffbcf64e31345f3ad86a 100644
 --- a/nanocoat/lib/scritchui/framebuffer/fbComponent.c
@@ -6031,26 +5988,3 @@ index 808af2f55366906fec0cfda2152078b35dc3b497..9db8e449de730d47c1c9ce5fad4236b3
  }
  
  sjme_errorCode sjme_scritchpen_core_setDefaults(
-diff --git a/nanocoat/lib/scritchui/x11/CMakeLists.txt b/nanocoat/lib/scritchui/x11/CMakeLists.txt
-index 68a385c4ae712ff2318bb85338d7c7022165d3af..21ed44ab4194b74f754bf714cd09c2a6b8e5c965 100644
---- a/nanocoat/lib/scritchui/x11/CMakeLists.txt
-+++ b/nanocoat/lib/scritchui/x11/CMakeLists.txt
-@@ -25,7 +25,16 @@ squirreljme_scritchany_add_library(ui X11
- 
- squirreljme_scritchany_standard_properties(ui X11)
- 
--# Include main headers
--squirreljme_scritchany_include_directories(ui X11 SYSTEM PRIVATE
-+# Include headers
-+squirreljme_scritchany_include_directories(ui X11 PRIVATE
- 	${X11_INCLUDE_DIR}
- 	${X11_INCLUDE_DIRS})
-+
-+# Link in X11
-+if(DEFINED X11_LIBRARY_DIRS)
-+	squirreljme_scritchany_link_directories(ui X11 PUBLIC
-+		${X11_LIBRARY_DIRS})
-+endif()
-+
-+squirreljme_scritchany_link_libraries(ui X11 PUBLIC
-+	${X11_LIBRARIES})

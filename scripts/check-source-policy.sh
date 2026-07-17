@@ -103,6 +103,14 @@ if [[ -n "${patch_whitespace}" ]]; then
   failures=$((failures + 1))
 fi
 
+unsafe_x11="$(grep -Ein '^\+[^+].*(ui-x11|scritchui[^[:space:]]*-x11|Arrays\.asList\([^)]*x11)' \
+  references/squirreljme/*.patch 2>/dev/null || true)"
+if [[ -n "${unsafe_x11}" ]]; then
+  printf 'Policy violation: the unfinished SquirrelJME X11 ScritchUI backend is enabled.\n%s\n' \
+    "${unsafe_x11}" >&2
+  failures=$((failures + 1))
+fi
+
 if (( failures > 0 )); then
   exit 1
 fi

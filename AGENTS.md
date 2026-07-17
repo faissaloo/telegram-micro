@@ -94,7 +94,8 @@ Treat references as specifications and implementation evidence, not code to copy
 
 - Prefer hosted SquirrelJME unless investigating a hosted-runtime defect.
 - Prefer the embedded MCP server for inspection and input.
-- Use `scritch.screenshot` for direct application-surface captures; routine proof must remain headless.
+- Use `scritch.screenshot` for direct application-surface captures instead of desktop screenshots.
+- Hosted mode is not displayless: the pinned GTK2 ScritchUI backend still requires a real X display. In a displayless environment, run deterministic model/target-VM gates and report the UI lane unavailable; do not substitute a virtual X server.
 - Use dynamic localhost MCP ports unless a caller explicitly supplies one.
 - Keep emulator state in `TELEGRAM_MICRO_EMULATOR_STATE_DIR`; never repurpose `HOME`.
 - Stop only the run associated with a known MCP port. `stop-emulator.sh --all` is an explicit emergency cleanup.

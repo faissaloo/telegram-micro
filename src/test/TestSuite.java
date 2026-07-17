@@ -33,6 +33,7 @@ public class TestSuite {
     TestRunner.register(new SyncContext.SyncStateMarksDifferenceTooLongTest());
     TestRunner.register(new SyncContext.ChannelSyncStateBuildsForcedBootstrapRequestTest());
     TestRunner.register(new LiveUpdateContext.ParseShortPrivateUpdatePayloadTest());
+    TestRunner.register(new LiveUpdateContext.RejectNegativeShortUpdateDateTest());
     TestRunner.register(new LiveUpdateContext.ParseShortChatUpdatePayloadTest());
     TestRunner.register(new LiveUpdateContext.SyncStateTracksAppliedShortUpdatesTest());
     TestRunner.register(new LiveUpdateContext.ParseWrappedShortNewMessagePayloadTest());
@@ -56,6 +57,7 @@ public class TestSuite {
     TestRunner.register(new OutboundContext.BuildReplySendMessageRequestTest());
     TestRunner.register(new OutboundContext.BuildForwardMessagesRequestTest());
     TestRunner.register(new OutboundContext.ParseUpdateShortSentMessageTest());
+    TestRunner.register(new OutboundContext.RejectNegativeShortSentDateTest());
     TestRunner.register(new OutboundContext.BuildUploadGetFileRequestTest());
     TestRunner.register(new OutboundContext.ParseUploadFileResponseTest());
     TestRunner.register(new OutboundContext.BuildJoinChannelRequestTest());
@@ -72,6 +74,7 @@ public class TestSuite {
     TestRunner.register(new ReaderContext.ParseDialogsPayloadWithCurrentDraftTest());
     TestRunner.register(new ReaderContext.ParseDialogsSliceChannelPayloadTest());
     TestRunner.register(new ReaderContext.ParseHistoryPayloadTest());
+    TestRunner.register(new ReaderContext.RejectNegativeHistoryMessageDateTest());
     TestRunner.register(new ReaderContext.ParseLegacyMessageConstructorTest());
     TestRunner.register(new ReaderContext.ParseCurrentMessageOptionalFieldsTest());
     TestRunner.register(new ReaderContext.ParseCurrentPhotoMediaWithEntitiesTest());
@@ -125,9 +128,13 @@ public class TestSuite {
     TestRunner.register(new WarmStateContext.AppShellRestoresWarmStateTest());
     TestRunner.register(new WarmStateContext.ForwardComposeContextRoundTripTest());
     TestRunner.register(new WarmStateContext.LegacyWarmStateDecodeRemainsSupportedTest());
+    TestRunner.register(new WarmStateContext.PreviousWarmStateVersionDefaultsMessageDateTest());
+    TestRunner.register(new WarmStateContext.TruncatedCurrentWarmStateIsRejectedTest());
+    TestRunner.register(new WarmStateContext.CorruptCurrentWarmStateDateIsRejectedTest());
     TestRunner.register(new WarmStateContext.MediaWarmStateRoundTripTest());
     TestRunner.register(new WarmStateContext.WarmStateStoreRoundTripTest());
     TestRunner.register(new WarmStateContext.OversizedWarmStateIsRejectedTest());
+    TestRunner.register(new WarmStateContext.NegativeMessageDateIsNotEncodedTest());
     TestRunner.register(new WarmStateContext.SecretChatPendingKeyIsBoundedTest());
     TestRunner.register(new FailureLogContext.PushTracksLatestEntryTest());
     TestRunner.register(new FailureLogContext.RingRetainsNewestEntriesTest());
@@ -150,6 +157,7 @@ public class TestSuite {
     TestRunner.register(new ReaderStateModelContext.LiveShortUpdateRefreshesDialogAndCachedHistoryTest());
     TestRunner.register(new ReaderStateModelContext.LiveShortUpdateFallsBackWhenPeerIsUnknownTest());
     TestRunner.register(new ReaderStateModelContext.LiveEditUpdatesCachedMessageInPlaceTest());
+    TestRunner.register(new ReaderStateModelContext.MessageDatesSurviveBoundedLiveUpdatesTest());
     TestRunner.register(new ReaderStateModelContext.LiveDeleteRemovesCachedMessageAndClearsPreviewTest());
     TestRunner.register(new ReaderStateModelContext.LiveUnreadUpdatesDialogBadgeTest());
     TestRunner.register(new LoginStateModelContext.BootstrapTransitionsToPhoneStageTest());
@@ -205,6 +213,7 @@ public class TestSuite {
     TestRunner.register(new AppShellModelContext.PeerInfoAppliesAboutAndCountTest());
     TestRunner.register(new ShellMetricsContext.WideHostedCanvasUsesPhoneViewportTest());
     TestRunner.register(new ShellMetricsContext.NarrowCanvasKeepsNativeWidthTest());
+    TestRunner.register(new MessageTimeContext.FormatsUtcWithoutDateObjectsTest());
     TestRunner.register(new ComposeStateModelContext.BindPeerResetsDraftTest());
     TestRunner.register(new ComposeStateModelContext.SendTransitionsClearDraftOnSuccessTest());
     TestRunner.register(new ComposeStateModelContext.FailedSendRetainsDraftTest());

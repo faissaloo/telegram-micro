@@ -364,6 +364,32 @@ public class AppShellModel {
     String mediaInfo,
     media.MediaReference mediaRef
   ) {
+    return appendHistoryMessage(
+      messageId,
+      sender,
+      text,
+      outgoing,
+      pending,
+      hasMedia,
+      mediaLabel,
+      mediaInfo,
+      mediaRef,
+      0
+    );
+  }
+
+  public boolean appendHistoryMessage(
+    int messageId,
+    String sender,
+    String text,
+    boolean outgoing,
+    boolean pending,
+    boolean hasMedia,
+    String mediaLabel,
+    String mediaInfo,
+    media.MediaReference mediaRef,
+    int dateSeconds
+  ) {
     boolean appended = reader.appendHistoryMessage(
       messageId,
       sender,
@@ -373,7 +399,8 @@ public class AppShellModel {
       hasMedia,
       mediaLabel,
       mediaInfo,
-      mediaRef
+      mediaRef,
+      dateSeconds
     );
     recomputeWorkingSet();
     return appended;
@@ -1462,8 +1489,8 @@ public class AppShellModel {
   }
 
   public void recomputeWorkingSet() {
-    int historyBytes = reader.historyCapacityPerSlot() * 128;
-    int cachedHistoryBytes = (reader.historySlotCount() - 1) * reader.historyCapacityPerSlot() * 96;
+    int historyBytes = reader.historyCapacityPerSlot() * 132;
+    int cachedHistoryBytes = (reader.historySlotCount() - 1) * reader.historyCapacityPerSlot() * 100;
     int composeBytes = compose.text.length() > 0 ? compose.text.length() * 2 : 0;
     int mediaQueueBytes = mediaQueue.count * 96 + mediaQueue.totalStoredBytes();
 

@@ -179,6 +179,34 @@ public class LiveUpdateContext {
     }
   }
 
+  public static class RejectNegativeShortUpdateDateTest extends Test {
+    public String label() {
+      return "Short updates reject negative server dates";
+    }
+
+    public void test() throws TestFailureException {
+      byte[] body = (new Serializer())
+        .append_int(0)
+        .append_int(77)
+        .append_long(1001L)
+        .append_raw_bytes(encodedString("invalid"))
+        .append_int(900)
+        .append_int(1)
+        .append_int(-1)
+        .end();
+      boolean rejected = false;
+
+      try {
+        RecieveShortTextUpdate.from_encrypted_message(
+          new EncryptedResponse(0, 0, 0, 0, CombinatorIds.update_short_message, body)
+        );
+      } catch (IllegalArgumentException e) {
+        rejected = true;
+      }
+      expect(rejected, true);
+    }
+  }
+
   public static class ParseShortChatUpdatePayloadTest extends Test {
     public String label() {
       return "Can parse updateShortChatMessage payloads for live group messages";

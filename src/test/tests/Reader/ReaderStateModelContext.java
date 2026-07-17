@@ -124,9 +124,10 @@ public class ReaderStateModelContext {
       expect(reader.appendPendingOutboundText(DialogListModel.PEER_USER, 1, "YOU", "pending"), true);
       expect(reader.history.count, 1);
       expect(reader.history.items[0].pending, true);
-      expect(reader.markLatestPendingOutboundSent(DialogListModel.PEER_USER, 1, 77), true);
+      expect(reader.markLatestPendingOutboundSent(DialogListModel.PEER_USER, 1, 77, 1700000000), true);
       expect(reader.history.items[0].pending, false);
       expect(reader.history.items[0].messageId, 77);
+      expect(reader.history.items[0].dateSeconds, 1700000000);
 
       expect(reader.appendPendingOutboundText(DialogListModel.PEER_USER, 1, "YOU", "retry"), true);
       expect(reader.history.count, 2);
@@ -272,6 +273,57 @@ public class ReaderStateModelContext {
       expect(reader.history.items[0].messageId, 77);
       expect(reader.history.items[0].text, "edited");
       expect(reader.dialogs.items[0].preview, "edited");
+    }
+  }
+
+  public static class MessageDatesSurviveBoundedLiveUpdatesTest extends Test {
+    public String label() {
+      return "Message dates survive edits and bounded eviction while invalid dates are atomic";
+    }
+
+    public void test() throws TestFailureException {
+      ReaderStateModel reader = new ReaderStateModel(2, 2, 1);
+
+      reader.peers.upsertIdentity(DialogListModel.PEER_USER, 2, 0, false, false, "Bob", "bob");
+      reader.appendDialog(DialogListModel.PEER_USER, 2, "Bob", "old", 0, false);
+      reader.selectDialog(0);
+
+      expect(reader.applyLiveTextUpdate(
+        DialogListModel.PEER_USER, 2,
+        DialogListModel.PEER_USER, 2,
+        1, "one", false, false, "", "", null, 1700000000, 0
+      ), true);
+      expect(reader.applyLiveTextUpdate(
+        DialogListModel.PEER_USER, 2,
+        DialogListModel.PEER_USER, 2,
+        2, "two", false, false, "", "", null, 1700000060, 0
+      ), true);
+      expect(reader.applyLiveEditedTextUpdate(
+        DialogListModel.PEER_USER, 2,
+        DialogListModel.PEER_USER, 2,
+        2, "two edited", false, false, "", "", null, 0
+      ), true);
+      expect(reader.history.items[1].dateSeconds, 1700000060);
+
+      expect(reader.applyLiveTextUpdate(
+        DialogListModel.PEER_USER, 2,
+        DialogListModel.PEER_USER, 2,
+        3, "three", false, false, "", "", null, 1700000120, 0
+      ), true);
+      expect(reader.history.count, 2);
+      expect(reader.history.items[0].messageId, 2);
+      expect(reader.history.items[0].dateSeconds, 1700000060);
+      expect(reader.history.items[1].dateSeconds, 1700000120);
+
+      expect(reader.applyLiveTextUpdate(
+        DialogListModel.PEER_USER, 2,
+        DialogListModel.PEER_USER, 2,
+        4, "invalid", false, false, "", "", null, -1, 1
+      ), false);
+      expect(reader.history.count, 2);
+      expect(reader.dialogs.items[0].topMessageId, 3);
+      expect(reader.dialogs.items[0].preview, "three");
+      expect(reader.dialogs.items[0].unreadCount, 0);
     }
   }
 

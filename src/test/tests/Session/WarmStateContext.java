@@ -34,7 +34,9 @@ public class WarmStateContext {
     );
     shell.selectDialog(0);
     shell.beginHistoryLoadForSelected();
-    shell.appendHistoryMessage(11, "Alice", "older", false, false, false);
+    shell.appendHistoryMessage(
+      11, "Alice", "older", false, false, false, "", "", null, 1700000000
+    );
     shell.finishHistoryLoad();
     shell.openComposeForSelectedDialog();
     shell.updateComposeDraft("draft warm state");
@@ -112,6 +114,91 @@ public class WarmStateContext {
     return out.toByteArray();
   }
 
+  private static byte[] encodeLegacyV8WithMessage() {
+    ByteArrayPlus out = new ByteArrayPlus();
+
+    out.append_int(WarmStateSnapshotCodec.MAGIC);
+    out.append_int(8);
+    out.append_int(0);
+    out.append_int(0);
+    out.append_int(0);
+    out.append_int(0);
+    out.append_int(0);
+    out.append_int(1);
+
+    out.append_int(reader.DialogListModel.PEER_USER);
+    out.append_long(1L);
+    out.append_int(1);
+    out.append_int(1);
+    out.append_int(1);
+    out.append_int(11);
+    out.append_int(0);
+    appendString(out, "Alice");
+    appendString(out, "legacy");
+    appendString(out, "");
+    appendString(out, "");
+    out.append_int(0);
+    out.append_long(0L);
+    out.append_long(0L);
+    out.append_int(0);
+    out.append_int(0);
+    appendString(out, "");
+    appendString(out, "");
+    out.append_int(0);
+
+    out.append_int(reader.DialogListModel.PEER_UNKNOWN);
+    out.append_long(0L);
+    out.append_int(compose.ComposeStateModel.STATUS_IDLE);
+    out.append_long(0L);
+    out.append_int(0);
+    out.append_int(0);
+    out.append_int(0);
+    appendString(out, "");
+    appendString(out, "");
+    appendString(out, "");
+    out.append_int(compose.ComposeStateModel.CONTEXT_NONE);
+    out.append_int(0);
+    out.append_int(reader.DialogListModel.PEER_UNKNOWN);
+    out.append_long(0L);
+    out.append_int(0);
+    appendString(out, "");
+    appendString(out, "");
+
+    out.append_int(0);
+    out.append_int(0);
+    out.append_int(0);
+    out.append_int(reader.DialogListModel.PEER_UNKNOWN);
+    out.append_long(0L);
+    out.append_int(0);
+    out.append_int(0);
+    appendString(out, "");
+    appendString(out, "");
+    appendString(out, "");
+    out.append_long(0L);
+    return out.toByteArray();
+  }
+
+  private static byte[] encodeCurrentWithMessageDate(int dateSeconds) {
+    byte[] legacy = encodeLegacyV8WithMessage();
+    byte[] current = new byte[legacy.length + 4];
+    int dateOffset = 64;
+
+    System.arraycopy(legacy, 0, current, 0, dateOffset);
+    current[4] = (byte)WarmStateSnapshotCodec.VERSION;
+    current[dateOffset] = (byte)dateSeconds;
+    current[dateOffset + 1] = (byte)(dateSeconds >> 8);
+    current[dateOffset + 2] = (byte)(dateSeconds >> 16);
+    current[dateOffset + 3] = (byte)(dateSeconds >> 24);
+    System.arraycopy(
+      legacy,
+      dateOffset,
+      current,
+      dateOffset + 4,
+      legacy.length - dateOffset
+    );
+    return current;
+  }
+
   private static void appendString(ByteArrayPlus out, String value) {
     String text = value != null ? value : "";
     char[] chars = new char[text.length()];
@@ -154,6 +241,7 @@ public class WarmStateContext {
       expect(decoded.secretChats[0].pendingKeyData, new byte[] {1, 2, 3, 4});
       expect(decoded.historySlotCount, 1);
       expect(decoded.historySlots[0].messageCount, 2);
+      expect(decoded.historySlots[0].messages[0].dateSeconds, 1700000000);
       expect(decoded.historySlots[0].messages[1].pending, true);
       expect(decoded.composeText, "draft warm state");
       expect(decoded.composeStatus, compose.ComposeStateModel.STATUS_SENDING);
@@ -186,6 +274,7 @@ public class WarmStateContext {
       expect(restored.reader.secretChats.findByPeer(reader.DialogListModel.PEER_USER, 1).keyFingerprint, 0x1122334455667788L);
       expect(restored.reader.secretChats.findByPeer(reader.DialogListModel.PEER_USER, 1).pendingKeyData, new byte[] {1, 2, 3, 4});
       expect(restored.reader.history.count, 2);
+      expect(restored.reader.history.items[0].dateSeconds, 1700000000);
       expect(restored.reader.history.items[1].pending, true);
       expect(restored.compose.text, "draft warm state");
       expect(restored.outbound.phase, OutboundRecoveryState.PHASE_IN_FLIGHT);
@@ -242,10 +331,57 @@ public class WarmStateContext {
       expect(decoded.peerCount, 0);
       expect(decoded.secretChatCount, 0);
       expect(decoded.historySlotCount, 1);
+      expect(decoded.historySlots[0].messages[0].dateSeconds, 0);
       expect(decoded.composeText, "draft warm state");
       expect(decoded.outbound.phase, OutboundRecoveryState.PHASE_IN_FLIGHT);
       expect(decoded.loginPhoneNumber, "");
       expect(decoded.loginCodeSentAtMillis, 0L);
+    }
+  }
+
+  public static class PreviousWarmStateVersionDefaultsMessageDateTest extends Test {
+    public String label() {
+      return "Warm state version 8 remains readable with unknown message dates";
+    }
+
+    public void test() throws TestFailureException {
+      WarmStateSnapshot decoded = new WarmStateSnapshot();
+
+      expect(WarmStateSnapshotCodec.decode(decoded, encodeLegacyV8WithMessage()), true);
+      expect(decoded.version, 8);
+      expect(decoded.historySlotCount, 1);
+      expect(decoded.historySlots[0].messageCount, 1);
+      expect(decoded.historySlots[0].messages[0].messageId, 11);
+      expect(decoded.historySlots[0].messages[0].text, "legacy");
+      expect(decoded.historySlots[0].messages[0].dateSeconds, 0);
+    }
+  }
+
+  public static class TruncatedCurrentWarmStateIsRejectedTest extends Test {
+    public String label() {
+      return "Warm state version 9 rejects a truncated record";
+    }
+
+    public void test() throws TestFailureException {
+      byte[] encoded = WarmStateSnapshotCodec.encode(buildWarmShell().captureWarmState());
+      byte[] truncated = new byte[encoded.length - 1];
+
+      System.arraycopy(encoded, 0, truncated, 0, truncated.length);
+      expect(WarmStateSnapshotCodec.decode(new WarmStateSnapshot(), truncated), false);
+    }
+  }
+
+  public static class CorruptCurrentWarmStateDateIsRejectedTest extends Test {
+    public String label() {
+      return "Warm state version 9 rejects a corrupt negative message date atomically";
+    }
+
+    public void test() throws TestFailureException {
+      WarmStateSnapshot decoded = new WarmStateSnapshot();
+
+      expect(WarmStateSnapshotCodec.decode(decoded, encodeCurrentWithMessageDate(-1)), false);
+      expect(decoded.historySlotCount, 0);
+      expect(decoded.historySlots[0].messageCount, 0);
     }
   }
 
@@ -318,6 +454,19 @@ public class WarmStateContext {
         ),
         false
       );
+    }
+  }
+
+  public static class NegativeMessageDateIsNotEncodedTest extends Test {
+    public String label() {
+      return "Warm state refuses to encode a negative message date";
+    }
+
+    public void test() throws TestFailureException {
+      WarmStateSnapshot snapshot = buildWarmShell().captureWarmState();
+
+      snapshot.historySlots[0].messages[0].dateSeconds = -1;
+      expect(WarmStateSnapshotCodec.encode(snapshot) == null, true);
     }
   }
 

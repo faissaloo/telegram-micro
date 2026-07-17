@@ -9,7 +9,7 @@ import reader.ReaderStateModel;
 import reader.SecretChatDirectory;
 
 public final class WarmStateSnapshot {
-  public static final int VERSION = 8;
+  public static final int VERSION = 9;
   public static final int COMPOSE_ERROR_MAX = 96;
   public static final int COMPOSE_CONTEXT_LABEL_MAX = ComposeStateModel.CONTEXT_LABEL_MAX;
   public static final int COMPOSE_CONTEXT_PREVIEW_MAX = ComposeStateModel.CONTEXT_PREVIEW_MAX;
@@ -91,6 +91,7 @@ public final class WarmStateSnapshot {
     public String mediaLabel = "";
     public String mediaInfo = "";
     public final MediaReference mediaRef = new MediaReference();
+    public int dateSeconds = 0;
     public boolean outgoing = false;
     public boolean pending = false;
     public boolean hasMedia = false;
@@ -102,6 +103,7 @@ public final class WarmStateSnapshot {
       mediaLabel = "";
       mediaInfo = "";
       mediaRef.clear();
+      dateSeconds = 0;
       outgoing = false;
       pending = false;
       hasMedia = false;

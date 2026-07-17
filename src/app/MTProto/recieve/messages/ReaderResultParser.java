@@ -1175,7 +1175,8 @@ public final class ReaderResultParser {
             message.hasMedia,
             message.mediaLabel,
             message.mediaInfo,
-            message.mediaRef)) {
+            message.mediaRef,
+            message.date)) {
           lastError = "History capacity exceeded.";
           return false;
         }
@@ -1910,6 +1911,9 @@ public final class ReaderResultParser {
       skipMessageReplyHeader(reader);
     }
     out.date = reader.readInt();
+    if (out.date < 0) {
+      throw new IllegalArgumentException("Message date must not be negative.");
+    }
 
     if (service) {
       if ((flags & (1 << 20)) != 0) {

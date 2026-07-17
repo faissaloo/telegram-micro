@@ -16,12 +16,13 @@ public class MessageListModel {
     public String mediaLabel = "";
     public String mediaInfo = "";
     public final MediaReference mediaRef = new MediaReference();
+    public int dateSeconds = 0;
     public boolean outgoing = false;
     public boolean pending = false;
     public boolean hasMedia = false;
 
     public void set(int messageId, String sender, String text, boolean outgoing, boolean pending, boolean hasMedia) {
-      set(messageId, sender, text, outgoing, pending, hasMedia, "", "", null);
+      set(messageId, sender, text, outgoing, pending, hasMedia, "", "", null, 0);
     }
 
     public void set(
@@ -34,7 +35,7 @@ public class MessageListModel {
       String mediaLabel,
       String mediaInfo
     ) {
-      set(messageId, sender, text, outgoing, pending, hasMedia, mediaLabel, mediaInfo, null);
+      set(messageId, sender, text, outgoing, pending, hasMedia, mediaLabel, mediaInfo, null, 0);
     }
 
     public void set(
@@ -48,12 +49,31 @@ public class MessageListModel {
       String mediaInfo,
       MediaReference mediaRef
     ) {
+      set(messageId, sender, text, outgoing, pending, hasMedia, mediaLabel, mediaInfo, mediaRef, 0);
+    }
+
+    public void set(
+      int messageId,
+      String sender,
+      String text,
+      boolean outgoing,
+      boolean pending,
+      boolean hasMedia,
+      String mediaLabel,
+      String mediaInfo,
+      MediaReference mediaRef,
+      int dateSeconds
+    ) {
+      if (dateSeconds < 0) {
+        throw new IllegalArgumentException("Message date must not be negative.");
+      }
       this.messageId = messageId;
       this.sender = DialogListModel.limit(sender, SENDER_MAX);
       this.text = DialogListModel.limit(text, TEXT_MAX);
       this.mediaLabel = DialogListModel.limit(mediaLabel, MEDIA_LABEL_MAX);
       this.mediaInfo = DialogListModel.limit(mediaInfo, MEDIA_INFO_MAX);
       this.mediaRef.copyFrom(mediaRef);
+      this.dateSeconds = dateSeconds;
       this.outgoing = outgoing;
       this.pending = pending;
       this.hasMedia = hasMedia;
@@ -73,7 +93,8 @@ public class MessageListModel {
         other.hasMedia,
         other.mediaLabel,
         other.mediaInfo,
-        other.mediaRef
+        other.mediaRef,
+        other.dateSeconds
       );
     }
 
@@ -84,6 +105,7 @@ public class MessageListModel {
       mediaLabel = "";
       mediaInfo = "";
       mediaRef.clear();
+      dateSeconds = 0;
       outgoing = false;
       pending = false;
       hasMedia = false;
@@ -152,31 +174,46 @@ public class MessageListModel {
     int messageId,
     String sender,
     String text,
-      boolean outgoing,
-      boolean pending,
-      boolean hasMedia,
-      String mediaLabel,
-      String mediaInfo
-    ) {
-      return append(messageId, sender, text, outgoing, pending, hasMedia, mediaLabel, mediaInfo, null);
+    boolean outgoing,
+    boolean pending,
+    boolean hasMedia,
+    String mediaLabel,
+    String mediaInfo
+  ) {
+    return append(messageId, sender, text, outgoing, pending, hasMedia, mediaLabel, mediaInfo, null, 0);
+  }
+
+  public boolean append(
+    int messageId,
+    String sender,
+    String text,
+    boolean outgoing,
+    boolean pending,
+    boolean hasMedia,
+    String mediaLabel,
+    String mediaInfo,
+    MediaReference mediaRef
+  ) {
+    return append(messageId, sender, text, outgoing, pending, hasMedia, mediaLabel, mediaInfo, mediaRef, 0);
+  }
+
+  public boolean append(
+    int messageId,
+    String sender,
+    String text,
+    boolean outgoing,
+    boolean pending,
+    boolean hasMedia,
+    String mediaLabel,
+    String mediaInfo,
+    MediaReference mediaRef,
+    int dateSeconds
+  ) {
+    if (count >= items.length || dateSeconds < 0) {
+      return false;
     }
 
-    public boolean append(
-      int messageId,
-      String sender,
-      String text,
-      boolean outgoing,
-      boolean pending,
-      boolean hasMedia,
-      String mediaLabel,
-      String mediaInfo,
-      MediaReference mediaRef
-    ) {
-      if (count >= items.length) {
-        return false;
-      }
-
-    items[count].set(messageId, sender, text, outgoing, pending, hasMedia, mediaLabel, mediaInfo, mediaRef);
+    items[count].set(messageId, sender, text, outgoing, pending, hasMedia, mediaLabel, mediaInfo, mediaRef, dateSeconds);
     count += 1;
     if (selectedIndex >= count) {
       selectedIndex = count - 1;
@@ -196,31 +233,49 @@ public class MessageListModel {
     int messageId,
     String sender,
     String text,
-      boolean outgoing,
-      boolean pending,
-      boolean hasMedia,
-      String mediaLabel,
-      String mediaInfo
-    ) {
-      return pushBounded(messageId, sender, text, outgoing, pending, hasMedia, mediaLabel, mediaInfo, null);
+    boolean outgoing,
+    boolean pending,
+    boolean hasMedia,
+    String mediaLabel,
+    String mediaInfo
+  ) {
+    return pushBounded(messageId, sender, text, outgoing, pending, hasMedia, mediaLabel, mediaInfo, null, 0);
+  }
+
+  public boolean pushBounded(
+    int messageId,
+    String sender,
+    String text,
+    boolean outgoing,
+    boolean pending,
+    boolean hasMedia,
+    String mediaLabel,
+    String mediaInfo,
+    MediaReference mediaRef
+  ) {
+    return pushBounded(messageId, sender, text, outgoing, pending, hasMedia, mediaLabel, mediaInfo, mediaRef, 0);
+  }
+
+  public boolean pushBounded(
+    int messageId,
+    String sender,
+    String text,
+    boolean outgoing,
+    boolean pending,
+    boolean hasMedia,
+    String mediaLabel,
+    String mediaInfo,
+    MediaReference mediaRef,
+    int dateSeconds
+  ) {
+    int i;
+
+    if (dateSeconds < 0) {
+      return false;
     }
-
-    public boolean pushBounded(
-      int messageId,
-      String sender,
-      String text,
-      boolean outgoing,
-      boolean pending,
-      boolean hasMedia,
-      String mediaLabel,
-      String mediaInfo,
-      MediaReference mediaRef
-    ) {
-      int i;
-
-      if (count < items.length) {
-      return append(messageId, sender, text, outgoing, pending, hasMedia, mediaLabel, mediaInfo, mediaRef);
-      }
+    if (count < items.length) {
+      return append(messageId, sender, text, outgoing, pending, hasMedia, mediaLabel, mediaInfo, mediaRef, dateSeconds);
+    }
     if (items.length <= 0) {
       return false;
     }
@@ -228,7 +283,7 @@ public class MessageListModel {
     for (i = 1; i < items.length; ++i) {
       items[i - 1].copyFrom(items[i]);
     }
-    items[items.length - 1].set(messageId, sender, text, outgoing, pending, hasMedia, mediaLabel, mediaInfo, mediaRef);
+    items[items.length - 1].set(messageId, sender, text, outgoing, pending, hasMedia, mediaLabel, mediaInfo, mediaRef, dateSeconds);
     if (selectedIndex > 0) {
       selectedIndex -= 1;
     }

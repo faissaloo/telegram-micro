@@ -23,7 +23,7 @@ These states are independent. A parser can be unit verified while the end-to-end
 | Login UI | Phone/code/password state models and MCP automation | Error/retry/expiry UI proof; physical keypad proof |
 | Durable session | Versioned bounded snapshots, corrupt/oversized rejection, RMS tests | Power-loss/full-storage device scenarios and migration policy |
 | Dialog/history read | Bounded models, parsing, cache and update foundations | Expand constructor interoperability conservatively; long-session live/device proof |
-| Message context | Sender, content, media and pending state are bounded; wire dates are parsed | Preserve/restore timestamps, then add compact delivery/read state without paint-time allocation |
+| Message context | Sender, content, media, pending state, and UTC timestamps are bounded and warm-restorable | Add compact delivery/read state without paint-time allocation; prove local-time behavior on-device |
 | Text send | Bounded compose/request/reconciliation and recovery foundations | Transport-loss duplicate/retry matrix; live/device proof |
 | Reconnect/catch-up | Session restore, difference/channel-difference and fallback foundations | More gap/too-long/unknown-update traces and device radio-loss proof |
 | Failure visibility | Bounded failure log/status surfaces | Make every P0 terminal failure actionable without exposing secrets |

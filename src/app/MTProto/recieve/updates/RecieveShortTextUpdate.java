@@ -112,6 +112,9 @@ public final class RecieveShortTextUpdate {
     pts = reader.readInt();
     ptsCount = reader.readInt();
     date = reader.readInt();
+    if (date < 0) {
+      throw new IllegalArgumentException("Short update date must not be negative.");
+    }
 
     if ((flags & (1 << 11)) != 0) {
       reader.readLong();

@@ -213,6 +213,24 @@ public class ReaderContext {
 
   private static byte[] textMessageWithConstructor(
     int constructor, int messageId, byte[] fromPeer, byte[] peer, String text) {
+    return textMessageWithConstructorAtDate(
+      constructor,
+      messageId,
+      fromPeer,
+      peer,
+      text,
+      1700000000
+    );
+  }
+
+  private static byte[] textMessageWithConstructorAtDate(
+    int constructor,
+    int messageId,
+    byte[] fromPeer,
+    byte[] peer,
+    String text,
+    int date
+  ) {
     return (new Serializer())
       .append_int(constructor)
       .append_int(1 << 8)
@@ -220,7 +238,7 @@ public class ReaderContext {
       .append_int(messageId)
       .append_raw_bytes(fromPeer)
       .append_raw_bytes(peer)
-      .append_int(1700000000)
+      .append_int(date)
       .append_string(text)
       .end();
   }
@@ -664,13 +682,63 @@ public class ReaderContext {
       expect(reader.history.items[0].sender, "Bob");
       expect(reader.history.items[0].text, "hi");
       expect(reader.history.items[0].messageId, 90);
+      expect(reader.history.items[0].dateSeconds, 1700000000);
       expect(reader.history.items[0].hasMedia, false);
       expect(reader.history.items[1].sender, "Bob");
       expect(reader.history.items[1].text, "DOCUMENT");
       expect(reader.history.items[1].messageId, 91);
+      expect(reader.history.items[1].dateSeconds, 1700000001);
       expect(reader.history.items[1].hasMedia, true);
       expect(reader.historyPeerKind, DialogListModel.PEER_USER);
       expect(reader.historyPeerId, 3001L);
+    }
+  }
+
+  public static class RejectNegativeHistoryMessageDateTest extends Test {
+    public String label() {
+      return "History parsing rejects a negative message date before reader mutation";
+    }
+
+    public void test() throws TestFailureException {
+      byte[] body = (new Serializer())
+        .append_raw_bytes(vector(new byte[][] {
+          textMessageWithConstructorAtDate(
+            ReaderResultParser.TG_MESSAGE_ID,
+            91,
+            peerUser(2001L),
+            peerUser(3001L),
+            "invalid",
+            -1
+          )
+        }))
+        .append_raw_bytes(vector(new byte[][] {}))
+        .append_raw_bytes(vector(new byte[][] {}))
+        .append_raw_bytes(vector(new byte[][] {}))
+        .end();
+      ReaderStateModel reader = new ReaderStateModel(4, 4);
+      ReaderResultParser parser = new ReaderResultParser(
+        reader.dialogs.capacity(),
+        reader.history.capacity(),
+        reader.peers.items.length
+      );
+
+      reader.appendDialog(DialogListModel.PEER_USER, 3001L, "Alice", "old", 0, false);
+      reader.selectDialog(0);
+      reader.beginHistoryLoad(DialogListModel.PEER_USER, 3001L);
+      reader.appendHistoryMessage(90, "Bob", "kept", false, false, false);
+      reader.finishHistoryLoad();
+
+      expect(parser.applyHistory(
+        new RPCResponse(CombinatorIds.messages_messages, body),
+        reader,
+        DialogListModel.PEER_USER,
+        3001L
+      ), false);
+      expect(reader.history.count, 1);
+      expect(reader.history.items[0].messageId, 90);
+      expect(reader.history.items[0].text, "kept");
+      expect(reader.dialogs.items[0].preview, "old");
+      expect(parser.lastError().indexOf("Message date must not be negative.") >= 0, true);
     }
   }
 

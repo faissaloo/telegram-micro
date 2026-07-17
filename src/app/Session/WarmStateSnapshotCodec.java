@@ -10,7 +10,7 @@ import support.Decode;
 
 public final class WarmStateSnapshotCodec {
   public static final int MAGIC = 0x53574d54;
-  public static final int VERSION = 8;
+  public static final int VERSION = 9;
   public static final int MAX_ENCODED_BYTES = 128 * 1024;
   private static final int VERSION_V1 = 1;
   private static final int VERSION_V2 = 2;
@@ -18,6 +18,8 @@ public final class WarmStateSnapshotCodec {
   private static final int VERSION_V4 = 4;
   private static final int VERSION_V5 = 5;
   private static final int VERSION_V6 = 6;
+  private static final int VERSION_V7 = 7;
+  private static final int VERSION_V8 = 8;
 
   private WarmStateSnapshotCodec() {
   }
@@ -99,12 +101,16 @@ public final class WarmStateSnapshotCodec {
       for (int j = 0; j < slot.messageCount && j < slot.messages.length; ++j) {
         WarmStateSnapshot.MessageEntry message = slot.messages[j];
 
+        if (message.dateSeconds < 0) {
+          return null;
+        }
         out.append_int(message.messageId);
         out.append_int(
           (message.outgoing ? 1 : 0) |
           ((message.pending ? 1 : 0) << 1) |
           ((message.hasMedia ? 1 : 0) << 2)
         );
+        out.append_int(message.dateSeconds);
         appendString(out, message.sender, MessageListModel.SENDER_MAX);
         appendString(out, message.text, MessageListModel.TEXT_MAX);
         appendString(out, message.mediaLabel, MessageListModel.MEDIA_LABEL_MAX);
@@ -176,11 +182,14 @@ public final class WarmStateSnapshotCodec {
     if (version == VERSION_V6) {
       return decodeV6(out, data, 8);
     }
-    if (version == 7) {
+    if (version == VERSION_V7) {
       return decodeV7(out, data, 8);
     }
-    if (version == VERSION) {
+    if (version == VERSION_V8) {
       return decodeV8(out, data, 8);
+    }
+    if (version == VERSION) {
+      return decodeV9(out, data, 8);
     }
     return false;
   }
@@ -354,7 +363,7 @@ public final class WarmStateSnapshotCodec {
       out.clear();
       return false;
     }
-    out.version = 7;
+    out.version = VERSION_V7;
 
     out.loginPhoneNumber = readString(data, WarmStateSnapshot.LOGIN_PHONE_MAX, offset);
     if (out.loginPhoneNumber == null) {
@@ -379,6 +388,35 @@ public final class WarmStateSnapshotCodec {
 
   private static boolean decodeV8(WarmStateSnapshot out, byte[] data, int offset) {
     offset = decodeV8Body(out, data, offset);
+    if (offset < 0) {
+      out.clear();
+      return false;
+    }
+    out.version = VERSION_V8;
+
+    out.loginPhoneNumber = readString(data, WarmStateSnapshot.LOGIN_PHONE_MAX, offset);
+    if (out.loginPhoneNumber == null) {
+      out.clear();
+      return false;
+    }
+    offset = stringNextOffset(data, offset);
+    out.loginPhoneCodeHash = readString(data, WarmStateSnapshot.LOGIN_CODE_HASH_MAX, offset);
+    if (out.loginPhoneCodeHash == null) {
+      out.clear();
+      return false;
+    }
+    offset = stringNextOffset(data, offset);
+    if (offset + 8 > data.length) {
+      out.clear();
+      return false;
+    }
+    out.loginCodeSentAtMillis = Decode.Little.long_decode(data, offset);
+    offset += 8;
+    return offset == data.length;
+  }
+
+  private static boolean decodeV9(WarmStateSnapshot out, byte[] data, int offset) {
+    offset = decodeV9Body(out, data, offset);
     if (offset < 0) {
       out.clear();
       return false;
@@ -648,7 +686,7 @@ public final class WarmStateSnapshotCodec {
     }
 
     out.clear();
-    out.version = VERSION;
+    out.version = VERSION_V7;
     out.route = Decode.Little.int_decode(data, offset);
     offset += 4;
     out.dialogCount = Decode.Little.int_decode(data, offset);
@@ -701,12 +739,26 @@ public final class WarmStateSnapshotCodec {
   }
 
   private static int decodeV8Body(WarmStateSnapshot out, byte[] data, int offset) {
+    return decodeCurrentBody(out, data, offset, VERSION_V8, false);
+  }
+
+  private static int decodeV9Body(WarmStateSnapshot out, byte[] data, int offset) {
+    return decodeCurrentBody(out, data, offset, VERSION, true);
+  }
+
+  private static int decodeCurrentBody(
+    WarmStateSnapshot out,
+    byte[] data,
+    int offset,
+    int decodedVersion,
+    boolean messageDates
+  ) {
     if (offset + 24 > data.length) {
       return -1;
     }
 
     out.clear();
-    out.version = VERSION;
+    out.version = decodedVersion;
     out.route = Decode.Little.int_decode(data, offset);
     offset += 4;
     out.dialogCount = Decode.Little.int_decode(data, offset);
@@ -743,7 +795,9 @@ public final class WarmStateSnapshotCodec {
       return -1;
     }
 
-    offset = decodeHistorySlotsV8(out, data, offset);
+    offset = messageDates
+      ? decodeHistorySlotsV9(out, data, offset)
+      : decodeHistorySlotsV8(out, data, offset);
     if (offset < 0) {
       out.clear();
       return -1;
@@ -1044,6 +1098,78 @@ public final class WarmStateSnapshotCodec {
         offset += 4;
         flags = Decode.Little.int_decode(data, offset);
         offset += 4;
+        message.outgoing = (flags & 1) != 0;
+        message.pending = (flags & 2) != 0;
+        message.hasMedia = (flags & 4) != 0;
+        message.sender = readString(data, MessageListModel.SENDER_MAX, offset);
+        if (message.sender == null) {
+          return -1;
+        }
+        offset = stringNextOffset(data, offset);
+        message.text = readString(data, MessageListModel.TEXT_MAX, offset);
+        if (message.text == null) {
+          return -1;
+        }
+        offset = stringNextOffset(data, offset);
+        message.mediaLabel = readString(data, MessageListModel.MEDIA_LABEL_MAX, offset);
+        if (message.mediaLabel == null) {
+          return -1;
+        }
+        offset = stringNextOffset(data, offset);
+        message.mediaInfo = readString(data, MessageListModel.MEDIA_INFO_MAX, offset);
+        if (message.mediaInfo == null) {
+          return -1;
+        }
+        offset = stringNextOffset(data, offset);
+        offset = readMediaReference(message.mediaRef, data, offset);
+        if (offset < 0) {
+          return -1;
+        }
+      }
+    }
+    return offset;
+  }
+
+  private static int decodeHistorySlotsV9(WarmStateSnapshot out, byte[] data, int offset) {
+    for (int i = 0; i < out.historySlotCount; ++i) {
+      WarmStateSnapshot.HistorySlotEntry slot = out.historySlots[i];
+      int loaded;
+
+      if (offset + 24 > data.length) {
+        return -1;
+      }
+      slot.peerKind = Decode.Little.int_decode(data, offset);
+      offset += 4;
+      slot.peerId = Decode.Little.long_decode(data, offset);
+      offset += 8;
+      loaded = Decode.Little.int_decode(data, offset);
+      offset += 4;
+      slot.loaded = loaded != 0;
+      slot.lastAccessTick = Decode.Little.int_decode(data, offset);
+      offset += 4;
+      slot.messageCount = Decode.Little.int_decode(data, offset);
+      offset += 4;
+
+      if (slot.messageCount < 0 || slot.messageCount > slot.messages.length) {
+        return -1;
+      }
+
+      for (int j = 0; j < slot.messageCount; ++j) {
+        WarmStateSnapshot.MessageEntry message = slot.messages[j];
+        int flags;
+
+        if (offset + 12 > data.length) {
+          return -1;
+        }
+        message.messageId = Decode.Little.int_decode(data, offset);
+        offset += 4;
+        flags = Decode.Little.int_decode(data, offset);
+        offset += 4;
+        message.dateSeconds = Decode.Little.int_decode(data, offset);
+        offset += 4;
+        if (message.dateSeconds < 0) {
+          return -1;
+        }
         message.outgoing = (flags & 1) != 0;
         message.pending = (flags & 2) != 0;
         message.hasMedia = (flags & 4) != 0;

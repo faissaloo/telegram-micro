@@ -51,7 +51,7 @@ Prefer work with high everyday frequency, recovery or compliance value, existing
 | Supergroups | `partial` through channel peers | P0/P1 constructor and update hardening. |
 | Broadcast channels | `foundation` read/join/leave paths | P0/P1; channel compliance features remain. |
 | Recent history pagination | `foundation` bounded window | P0; add explicit older/newer slices without unbounded retention. |
-| Message timestamps | parsed then discarded | `next`; retain one signed 32-bit epoch value and draw a fixed label. |
+| Message timestamps | `foundation` | Server epoch seconds survive history/live/send/warm-state paths and render as allocation-free `HH:MMZ`; local-zone/device proof remains. |
 | Text send | `foundation` | P0; ambiguous-ack/restart idempotence remains. |
 | Pending/sent state | `foundation` | P0; keep immediate visible feedback and recoverable failure. |
 | Delivery/read checkmarks | absent | `next`; compact state only, no per-recipient expansion. |
@@ -193,13 +193,12 @@ Prefer work with high everyday frequency, recovery or compliance value, existing
 
 ## Current ordered implementation queue
 
-1. Preserve and display message timestamps with no per-message label allocation.
-2. Add bounded mark-read/read-state semantics and compact delivery indicators.
-3. Harden ambiguous send acknowledgement and restart idempotence.
-4. Add server-backed in-chat text search with a small result page.
-5. Model protected-content restrictions before offering forward/save actions.
-6. Add bounded DC auth export/import, then cross-DC media download.
-7. Add a small constructor/fixture corpus and long-session capacity soak.
-8. Investigate sponsored-message requirements before stronger channel claims.
+1. Add bounded mark-read/read-state semantics and compact delivery indicators.
+2. Harden ambiguous send acknowledgement and restart idempotence.
+3. Add server-backed in-chat text search with a small result page.
+4. Model protected-content restrictions before offering forward/save actions.
+5. Add bounded DC auth export/import, then cross-DC media download.
+6. Add a small constructor/fixture corpus and long-session capacity soak.
+7. Investigate sponsored-message requirements before stronger channel claims.
 
 Reorder this queue only when local references, a live interoperability failure, device evidence, or user research demonstrates higher core value.

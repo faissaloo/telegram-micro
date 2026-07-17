@@ -2112,12 +2112,17 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     syncState.noteShortSent(sent);
     syncShellRuntimeState();
 
-    if (!appShellModel.reader.markLatestPendingOutboundSent(pendingSendPeerKind, pendingSendPeerId, sent.messageId)) {
+    if (!appShellModel.reader.markLatestPendingOutboundSent(
+          pendingSendPeerKind,
+          pendingSendPeerId,
+          sent.messageId,
+          sent.date)) {
       appShellModel.reader.appendOutboundText(
         pendingSendPeerKind,
         pendingSendPeerId,
         "YOU",
-        appShellModel.compose.text
+        appShellModel.compose.text,
+        sent.date
       );
     }
     appShellModel.onComposeSent(sent.messageId);
@@ -2439,6 +2444,7 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
             event.mediaLabel,
             event.mediaInfo,
             event.mediaRef,
+            event.date,
             unreadDelta
           );
           if (!applied) {
@@ -2456,7 +2462,8 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
             event.hasMedia,
             event.mediaLabel,
             event.mediaInfo,
-            event.mediaRef
+            event.mediaRef,
+            event.date
           );
           if (!applied) {
             return false;
@@ -2660,6 +2667,7 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
             event.mediaLabel,
             event.mediaInfo,
             event.mediaRef,
+            event.date,
             unreadDelta
           );
           if (!applied) {
@@ -2681,7 +2689,8 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
             event.hasMedia,
             event.mediaLabel,
             event.mediaInfo,
-            event.mediaRef
+            event.mediaRef,
+            event.date
           );
           if (!applied) {
             selected = selectedDialogForPeer(DialogListModel.PEER_CHANNEL, difference.peerId);
@@ -2768,6 +2777,8 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
         false,
         "",
         "",
+        null,
+        update.date,
         unreadDelta
       );
       if (!applied) {
@@ -2846,6 +2857,8 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
             event.hasMedia,
             event.mediaLabel,
             event.mediaInfo,
+            event.mediaRef,
+            eventDate,
             unreadDelta
           );
         } else if (event.kind == ReaderResultParser.LiveMessageEvent.KIND_EDIT) {
@@ -2859,7 +2872,9 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
             event.outgoing,
             event.hasMedia,
             event.mediaLabel,
-            event.mediaInfo
+            event.mediaInfo,
+            event.mediaRef,
+            eventDate
           );
         } else if (event.kind == ReaderResultParser.LiveMessageEvent.KIND_DELETE) {
           applied = event.peerKind != DialogListModel.PEER_UNKNOWN && event.peerId != 0
@@ -2951,6 +2966,7 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
         wrapped.mediaLabel,
         wrapped.mediaInfo,
         wrapped.mediaRef,
+        wrapped.date,
         unreadDelta
       );
     } else if (wrapped.kind == ReaderResultParser.LiveMessageEvent.KIND_EDIT) {
@@ -2965,7 +2981,8 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
         wrapped.hasMedia,
         wrapped.mediaLabel,
         wrapped.mediaInfo,
-        wrapped.mediaRef
+        wrapped.mediaRef,
+        wrapped.date
       );
     } else {
       return false;

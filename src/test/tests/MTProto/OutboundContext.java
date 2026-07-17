@@ -168,6 +168,31 @@ public class OutboundContext {
     }
   }
 
+  public static class RejectNegativeShortSentDateTest extends Test {
+    public String label() {
+      return "Send acknowledgements reject negative server dates";
+    }
+
+    public void test() throws TestFailureException {
+      byte[] body = (new Serializer())
+        .append_int(CombinatorIds.update_short_sent_message)
+        .append_int(1 << 1)
+        .append_int(77)
+        .append_int(88)
+        .append_int(1)
+        .append_int(-1)
+        .end();
+      boolean rejected = false;
+
+      try {
+        RecieveUpdateShortSentMessage.from_rpc_response(RPCResponse.from_bytes(body));
+      } catch (IllegalArgumentException e) {
+        rejected = true;
+      }
+      expect(rejected, true);
+    }
+  }
+
   public static class BuildUploadGetFileRequestTest extends Test {
     public String label() {
       return "Can build upload.getFile requests";

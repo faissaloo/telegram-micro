@@ -190,8 +190,38 @@ public class ReaderStateModel {
     String mediaInfo,
     MediaReference mediaRef
   ) {
-    HistorySlot target = appendTargetSlot();
+    return appendHistoryMessage(
+      messageId,
+      sender,
+      text,
+      outgoing,
+      pending,
+      hasMedia,
+      mediaLabel,
+      mediaInfo,
+      mediaRef,
+      0
+    );
+  }
 
+  public boolean appendHistoryMessage(
+    int messageId,
+    String sender,
+    String text,
+    boolean outgoing,
+    boolean pending,
+    boolean hasMedia,
+    String mediaLabel,
+    String mediaInfo,
+    MediaReference mediaRef,
+    int dateSeconds
+  ) {
+    HistorySlot target;
+
+    if (dateSeconds < 0) {
+      return false;
+    }
+    target = appendTargetSlot();
     if (target == null) {
       return false;
     }
@@ -207,7 +237,8 @@ public class ReaderStateModel {
       hasMedia,
       mediaLabel,
       mediaInfo,
-      mediaRef
+      mediaRef,
+      dateSeconds
     );
   }
 
@@ -310,7 +341,11 @@ public class ReaderStateModel {
   }
 
   public boolean appendOutboundText(int peerKind, long peerId, String sender, String text) {
-    return appendOutboundEntry(peerKind, peerId, sender, text, false, false);
+    return appendOutboundText(peerKind, peerId, sender, text, 0);
+  }
+
+  public boolean appendOutboundText(int peerKind, long peerId, String sender, String text, int dateSeconds) {
+    return appendOutboundEntry(peerKind, peerId, sender, text, false, false, "", "", dateSeconds);
   }
 
   public boolean appendPendingOutboundText(int peerKind, long peerId, String sender, String text) {
@@ -393,6 +428,38 @@ public class ReaderStateModel {
     MediaReference mediaRef,
     int unreadDelta
   ) {
+    return applyLiveTextUpdate(
+      peerKind,
+      peerId,
+      senderPeerKind,
+      senderPeerId,
+      messageId,
+      text,
+      outgoing,
+      hasMedia,
+      mediaLabel,
+      mediaInfo,
+      mediaRef,
+      0,
+      unreadDelta
+    );
+  }
+
+  public boolean applyLiveTextUpdate(
+    int peerKind,
+    long peerId,
+    int senderPeerKind,
+    long senderPeerId,
+    int messageId,
+    String text,
+    boolean outgoing,
+    boolean hasMedia,
+    String mediaLabel,
+    String mediaInfo,
+    MediaReference mediaRef,
+    int dateSeconds,
+    int unreadDelta
+  ) {
     DialogListModel.Item dialog;
     PeerDirectory.Item peer;
     HistorySlot slot;
@@ -403,7 +470,7 @@ public class ReaderStateModel {
     int dialogIndex;
     int messageIndex;
 
-    if (peerKind == DialogListModel.PEER_UNKNOWN || peerId == 0 || text == null) {
+    if (peerKind == DialogListModel.PEER_UNKNOWN || peerId == 0 || text == null || dateSeconds < 0) {
       return false;
     }
 
@@ -467,6 +534,10 @@ public class ReaderStateModel {
     touchHistorySlot(slot);
     messageIndex = messageIndexById(slot.messages, messageId);
     if (messageIndex >= 0) {
+      int appliedDateSeconds = dateSeconds > 0
+        ? dateSeconds
+        : slot.messages.items[messageIndex].dateSeconds;
+
       slot.messages.items[messageIndex].set(
         messageId,
         sender,
@@ -476,7 +547,8 @@ public class ReaderStateModel {
         hasMedia,
         mediaLabel,
         mediaInfo,
-        mediaRef
+        mediaRef,
+        appliedDateSeconds
       );
       updateDialogPreviewFromSlot(peerKind, peerId, slot);
       slot.messages.selectLast();
@@ -500,7 +572,8 @@ public class ReaderStateModel {
         hasMedia,
         mediaLabel,
         mediaInfo,
-        mediaRef)) {
+        mediaRef,
+        dateSeconds)) {
       return false;
     }
     slot.messages.selectLast();
@@ -581,6 +654,36 @@ public class ReaderStateModel {
     String mediaInfo,
     MediaReference mediaRef
   ) {
+    return applyLiveEditedTextUpdate(
+      peerKind,
+      peerId,
+      senderPeerKind,
+      senderPeerId,
+      messageId,
+      text,
+      outgoing,
+      hasMedia,
+      mediaLabel,
+      mediaInfo,
+      mediaRef,
+      0
+    );
+  }
+
+  public boolean applyLiveEditedTextUpdate(
+    int peerKind,
+    long peerId,
+    int senderPeerKind,
+    long senderPeerId,
+    int messageId,
+    String text,
+    boolean outgoing,
+    boolean hasMedia,
+    String mediaLabel,
+    String mediaInfo,
+    MediaReference mediaRef,
+    int dateSeconds
+  ) {
     DialogListModel.Item dialog;
     PeerDirectory.Item peer;
     HistorySlot slot;
@@ -588,7 +691,7 @@ public class ReaderStateModel {
     int dialogIndex;
     int messageIndex;
 
-    if (peerKind == DialogListModel.PEER_UNKNOWN || peerId == 0 || text == null) {
+    if (peerKind == DialogListModel.PEER_UNKNOWN || peerId == 0 || text == null || dateSeconds < 0) {
       return false;
     }
 
@@ -626,7 +729,8 @@ public class ReaderStateModel {
           hasMedia,
           mediaLabel,
           mediaInfo,
-          mediaRef
+          mediaRef,
+          dateSeconds > 0 ? dateSeconds : slot.messages.items[messageIndex].dateSeconds
         );
         updateDialogPreviewFromSlot(peerKind, peerId, slot);
         if (isSelectedPeer(peerKind, peerId) ||
@@ -740,9 +844,16 @@ public class ReaderStateModel {
   }
 
   public boolean markLatestPendingOutboundSent(int peerKind, long peerId, int messageId) {
+    return markLatestPendingOutboundSent(peerKind, peerId, messageId, 0);
+  }
+
+  public boolean markLatestPendingOutboundSent(int peerKind, long peerId, int messageId, int dateSeconds) {
     HistorySlot slot;
     int index;
 
+    if (dateSeconds < 0) {
+      return false;
+    }
     slot = findHistorySlot(peerKind, peerId);
     if (slot == null) {
       return false;
@@ -755,6 +866,7 @@ public class ReaderStateModel {
 
     slot.messages.items[index].messageId = messageId;
     slot.messages.items[index].pending = false;
+    slot.messages.items[index].dateSeconds = dateSeconds;
     updateDialogPreviewFromSlot(peerKind, peerId, slot);
     if (isSelectedPeer(peerKind, peerId)) {
       currentHistorySlot = slot;
@@ -797,7 +909,7 @@ public class ReaderStateModel {
   }
 
   private boolean appendOutboundEntry(int peerKind, long peerId, String sender, String text, boolean pending, boolean hasMedia) {
-    return appendOutboundEntry(peerKind, peerId, sender, text, pending, hasMedia, "", "");
+    return appendOutboundEntry(peerKind, peerId, sender, text, pending, hasMedia, "", "", 0);
   }
 
   private boolean appendOutboundEntry(
@@ -808,18 +920,19 @@ public class ReaderStateModel {
     boolean pending,
     boolean hasMedia,
     String mediaLabel,
-    String mediaInfo
+    String mediaInfo,
+    int dateSeconds
   ) {
     HistorySlot slot;
 
-    if (peerKind == DialogListModel.PEER_UNKNOWN || peerId == 0 || text == null) {
+    if (peerKind == DialogListModel.PEER_UNKNOWN || peerId == 0 || text == null || dateSeconds < 0) {
       return false;
     }
 
     slot = prepareHistorySlot(peerKind, peerId);
     slot.loaded = true;
     touchHistorySlot(slot);
-    if (!slot.messages.pushBounded(0, sender, text, true, pending, hasMedia, mediaLabel, mediaInfo)) {
+    if (!slot.messages.pushBounded(0, sender, text, true, pending, hasMedia, mediaLabel, mediaInfo, null, dateSeconds)) {
       return false;
     }
     slot.messages.selectLast();
@@ -1164,6 +1277,7 @@ public class ReaderStateModel {
         targetMessage.outgoing = sourceMessage.outgoing;
         targetMessage.pending = sourceMessage.pending;
         targetMessage.hasMedia = sourceMessage.hasMedia;
+        targetMessage.dateSeconds = sourceMessage.dateSeconds;
         targetMessage.mediaRef.copyFrom(sourceMessage.mediaRef);
       }
       slotCount += 1;
@@ -1260,7 +1374,8 @@ public class ReaderStateModel {
           sourceMessage.hasMedia,
           sourceMessage.mediaLabel,
           sourceMessage.mediaInfo,
-          sourceMessage.mediaRef
+          sourceMessage.mediaRef,
+          sourceMessage.dateSeconds
         );
       }
     }

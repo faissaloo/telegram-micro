@@ -22,6 +22,7 @@ public class RecieveUpdateShortSentMessage {
   public static RecieveUpdateShortSentMessage from_rpc_response(RPCResponse response) {
     int offset = 0;
     int flags;
+    int date;
 
     if (response == null || response.type != CombinatorIds.update_short_sent_message || response.body == null) {
       throw new IllegalArgumentException("updateShortSentMessage response is required.");
@@ -37,12 +38,17 @@ public class RecieveUpdateShortSentMessage {
       throw new IllegalArgumentException("updateShortSentMessage has unsupported optional fields.");
     }
 
+    date = Decode.Little.int_decode(response.body, offset + 12);
+    if (date < 0) {
+      throw new IllegalArgumentException("updateShortSentMessage date must not be negative.");
+    }
+
     return new RecieveUpdateShortSentMessage(
       ((flags >> 1) & 1) != 0,
       Decode.Little.int_decode(response.body, offset),
       Decode.Little.int_decode(response.body, offset + 4),
       Decode.Little.int_decode(response.body, offset + 8),
-      Decode.Little.int_decode(response.body, offset + 12)
+      date
     );
   }
 }

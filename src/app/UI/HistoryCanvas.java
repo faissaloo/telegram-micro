@@ -15,6 +15,7 @@ final class HistoryCanvas extends Canvas {
   private final int[] wrapLengths = new int[24];
   private final int[] mediaWrapStarts = new int[16];
   private final int[] mediaWrapLengths = new int[16];
+  private final char[] timeChars = new char[MessageTime.LABEL_LENGTH];
   private ShellMetrics metrics = ShellMetrics.forCanvas(ShellMetrics.TARGET_PHONE_WIDTH);
   private int scrollY = 0;
   private int contentHeight = 0;
@@ -154,6 +155,7 @@ final class HistoryCanvas extends Canvas {
     int textColor = selected
       ? ShellTheme.SELECT_TEXT
       : (item.outgoing ? ShellTheme.OUTGOING_TEXT : ShellTheme.INCOMING_TEXT);
+    int timeLength;
 
     ShellTheme.fillBevelBox(
       g,
@@ -191,6 +193,18 @@ final class HistoryCanvas extends Canvas {
     if (item.pending) {
       g.drawString("pending", textX, textY + 2, Graphics.TOP | Graphics.LEFT);
     }
+    timeLength = MessageTime.formatUtc(item.dateSeconds, timeChars);
+    if (timeLength > 0) {
+      int timeWidth = metaFont.charsWidth(timeChars, 0, timeLength);
+      g.drawChars(
+        timeChars,
+        0,
+        timeLength,
+        bubbleX + bubbleWidth - bubblePadding - timeWidth,
+        textY + 2,
+        Graphics.TOP | Graphics.LEFT
+      );
+    }
   }
 
   private void ensureLayout() {
@@ -217,7 +231,16 @@ final class HistoryCanvas extends Canvas {
         ? ShellTextWrap.widestLine(mediaSummary, metaFont, mediaWrapStarts, mediaWrapLengths, mediaLineCount)
         : 0;
       int pendingWidth = item.pending ? metaFont.stringWidth("pending") : 0;
-      int metaWidth = mediaWidth > pendingWidth ? mediaWidth : pendingWidth;
+      int timeWidth = item.dateSeconds > 0 ? metaFont.stringWidth("00:00Z") : 0;
+      int statusWidth = pendingWidth;
+      int metaWidth;
+
+      if (pendingWidth > 0 && timeWidth > 0) {
+        statusWidth += 8 + timeWidth;
+      } else if (timeWidth > statusWidth) {
+        statusWidth = timeWidth;
+      }
+      metaWidth = mediaWidth > statusWidth ? mediaWidth : statusWidth;
       int widest = textWidth;
 
       if (senderWidth > widest) {
@@ -238,7 +261,7 @@ final class HistoryCanvas extends Canvas {
       messageHeight[i] = 10 + senderFont.getHeight() +
         (lineCount * bodyFont.getHeight()) +
         (mediaLineCount * metaFont.getHeight()) +
-        (item.pending ? metaFont.getHeight() : 0) + 8;
+        ((item.pending || item.dateSeconds > 0) ? metaFont.getHeight() : 0) + 8;
       y += messageHeight[i] + 6;
     }
     contentHeight = y;

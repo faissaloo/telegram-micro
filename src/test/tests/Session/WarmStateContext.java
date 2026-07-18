@@ -3,6 +3,7 @@ package test;
 import media.MediaReference;
 import reader.SecretChatDirectory;
 import support.ByteArrayPlus;
+import support.Decode;
 import session.OutboundRecoveryState;
 import session.WarmStateSnapshot;
 import session.WarmStateSnapshotCodec;
@@ -18,6 +19,8 @@ public class WarmStateContext {
     shell.appendDialog(reader.DialogListModel.PEER_USER, 1, 0x1122334455667788L, true, 11, "Alice", "Ping", 2, false);
     shell.appendDialog(reader.DialogListModel.PEER_CHANNEL, 2, 0x0102030405060708L, true, 22, "Builders", "Pong", 0, false);
     shell.finishLocalDialogsLoad();
+    shell.reader.applyLiveInboxRead(reader.DialogListModel.PEER_USER, 1, 10, 2);
+    shell.reader.applyLiveOutboxRead(reader.DialogListModel.PEER_USER, 1, 11);
     shell.reader.peers.upsertIdentity(reader.DialogListModel.PEER_USER, 1, 0x1122334455667788L, true, false, "Alice", "alice");
     shell.reader.peers.upsertIdentity(reader.DialogListModel.PEER_CHANNEL, 2, 0x0102030405060708L, true, false, "Builders", "builders");
     shell.reader.secretChats.upsert(
@@ -199,6 +202,37 @@ public class WarmStateContext {
     return current;
   }
 
+  private static byte[] downgradeCurrentToV9(byte[] current) {
+    int dialogCount = Decode.Little.int_decode(current, 12);
+    byte[] legacy = new byte[current.length - (dialogCount * 8)];
+    int sourceStart = 0;
+    int targetOffset = 0;
+    int dialogOffset = 32;
+
+    for (int i = 0; i < dialogCount; ++i) {
+      int readWatermarkOffset = dialogOffset + 28;
+      int segmentLength = readWatermarkOffset - sourceStart;
+      int titleOffset = dialogOffset + 40;
+      int titleLength = Decode.Little.int_decode(current, titleOffset);
+      int previewOffset = titleOffset + 4 + (titleLength * 4);
+      int previewLength = Decode.Little.int_decode(current, previewOffset);
+
+      System.arraycopy(current, sourceStart, legacy, targetOffset, segmentLength);
+      targetOffset += segmentLength;
+      sourceStart = readWatermarkOffset + 8;
+      dialogOffset = previewOffset + 4 + (previewLength * 4);
+    }
+    System.arraycopy(
+      current,
+      sourceStart,
+      legacy,
+      targetOffset,
+      current.length - sourceStart
+    );
+    legacy[4] = 9;
+    return legacy;
+  }
+
   private static void appendString(ByteArrayPlus out, String value) {
     String text = value != null ? value : "";
     char[] chars = new char[text.length()];
@@ -230,6 +264,8 @@ public class WarmStateContext {
       expect(WarmStateSnapshotCodec.decode(decoded, encoded), true);
       expect(decoded.version, WarmStateSnapshotCodec.VERSION);
       expect(decoded.dialogCount, 2);
+      expect(decoded.dialogs[0].readInboxMaxId, 10);
+      expect(decoded.dialogs[0].readOutboxMaxId, 11);
       expect(decoded.selectedDialogIndex, 0);
       expect(decoded.peerCount, 2);
       expect(decoded.secretChatCount, 1);
@@ -357,9 +393,31 @@ public class WarmStateContext {
     }
   }
 
+  public static class Version9WarmStateDefaultsReadWatermarksTest extends Test {
+    public String label() {
+      return "Warm state version 9 remains readable with unknown read watermarks";
+    }
+
+    public void test() throws TestFailureException {
+      WarmStateSnapshot decoded = new WarmStateSnapshot();
+      byte[] current = WarmStateSnapshotCodec.encode(buildWarmShell().captureWarmState());
+
+      expect(WarmStateSnapshotCodec.decode(
+        decoded,
+        downgradeCurrentToV9(current)
+      ), true);
+      expect(decoded.version, 9);
+      expect(decoded.dialogCount, 2);
+      expect(decoded.dialogs[0].peerId, 1L);
+      expect(decoded.dialogs[0].readInboxMaxId, 0);
+      expect(decoded.dialogs[0].readOutboxMaxId, 0);
+      expect(decoded.historySlots[0].messages[0].dateSeconds, 1700000000);
+    }
+  }
+
   public static class TruncatedCurrentWarmStateIsRejectedTest extends Test {
     public String label() {
-      return "Warm state version 9 rejects a truncated record";
+      return "Warm state version 10 rejects a truncated record";
     }
 
     public void test() throws TestFailureException {
@@ -373,7 +431,7 @@ public class WarmStateContext {
 
   public static class CorruptCurrentWarmStateDateIsRejectedTest extends Test {
     public String label() {
-      return "Warm state version 9 rejects a corrupt negative message date atomically";
+      return "Warm state version 10 rejects a corrupt negative message date atomically";
     }
 
     public void test() throws TestFailureException {
@@ -382,6 +440,26 @@ public class WarmStateContext {
       expect(WarmStateSnapshotCodec.decode(decoded, encodeCurrentWithMessageDate(-1)), false);
       expect(decoded.historySlotCount, 0);
       expect(decoded.historySlots[0].messageCount, 0);
+    }
+  }
+
+  public static class CorruptCurrentDialogReadWatermarkIsRejectedTest extends Test {
+    public String label() {
+      return "Warm state version 10 rejects a corrupt dialog read watermark atomically";
+    }
+
+    public void test() throws TestFailureException {
+      WarmStateSnapshot decoded = new WarmStateSnapshot();
+      byte[] encoded = WarmStateSnapshotCodec.encode(buildWarmShell().captureWarmState());
+      int readOutboxOffset = 64;
+
+      encoded[readOutboxOffset] = (byte)0xff;
+      encoded[readOutboxOffset + 1] = (byte)0xff;
+      encoded[readOutboxOffset + 2] = (byte)0xff;
+      encoded[readOutboxOffset + 3] = (byte)0xff;
+      expect(WarmStateSnapshotCodec.decode(decoded, encoded), false);
+      expect(decoded.dialogCount, 0);
+      expect(decoded.historySlotCount, 0);
     }
   }
 
@@ -466,6 +544,19 @@ public class WarmStateContext {
       WarmStateSnapshot snapshot = buildWarmShell().captureWarmState();
 
       snapshot.historySlots[0].messages[0].dateSeconds = -1;
+      expect(WarmStateSnapshotCodec.encode(snapshot) == null, true);
+    }
+  }
+
+  public static class NegativeDialogReadWatermarkIsNotEncodedTest extends Test {
+    public String label() {
+      return "Warm state refuses to encode a negative dialog read watermark";
+    }
+
+    public void test() throws TestFailureException {
+      WarmStateSnapshot snapshot = buildWarmShell().captureWarmState();
+
+      snapshot.dialogs[0].readOutboxMaxId = -1;
       expect(WarmStateSnapshotCodec.encode(snapshot) == null, true);
     }
   }

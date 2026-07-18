@@ -282,12 +282,42 @@ public class AppShellModel {
     int unreadCount,
     boolean hasMedia
   ) {
+    return appendDialog(
+      peerKind,
+      peerId,
+      accessHash,
+      hasAccessHash,
+      topMessageId,
+      0,
+      0,
+      title,
+      preview,
+      unreadCount,
+      hasMedia
+    );
+  }
+
+  public boolean appendDialog(
+    int peerKind,
+    long peerId,
+    long accessHash,
+    boolean hasAccessHash,
+    int topMessageId,
+    int readInboxMaxId,
+    int readOutboxMaxId,
+    String title,
+    String preview,
+    int unreadCount,
+    boolean hasMedia
+  ) {
     boolean appended = reader.appendDialog(
       peerKind,
       peerId,
       accessHash,
       hasAccessHash,
       topMessageId,
+      readInboxMaxId,
+      readOutboxMaxId,
       title,
       preview,
       unreadCount,
@@ -1504,7 +1534,7 @@ public class AppShellModel {
     if (mediaQueueBytes > 0) {
       workingSet.add(WorkingSet.WORK_UI, mediaQueueBytes, false);
     }
-    workingSet.add(WorkingSet.WORK_READER_DIALOGS, reader.dialogs.capacity() * 160, true);
+    workingSet.add(WorkingSet.WORK_READER_DIALOGS, reader.dialogs.capacity() * 168, true);
     workingSet.add(WorkingSet.WORK_READER_HISTORY, historyBytes, true);
     if (cachedHistoryBytes > 0) {
       workingSet.add(WorkingSet.WORK_READER_HISTORY, cachedHistoryBytes, false);

@@ -157,6 +157,8 @@ public class ReaderStateModelContext {
       source.beginHistoryLoad(DialogListModel.PEER_USER, 1);
       source.appendHistoryMessage(11, "Alice", "hello", false, false, false);
       source.finishHistoryLoad();
+      source.applyLiveInboxRead(DialogListModel.PEER_USER, 1, 10, 1);
+      source.applyLiveOutboxRead(DialogListModel.PEER_USER, 1, 11);
 
       source.exportWarmState(snapshot);
       restored.importWarmState(snapshot);
@@ -171,6 +173,8 @@ public class ReaderStateModelContext {
       expect(channel.title, "Updates");
       expect(channel.username, "updates");
       expect(restored.dialogs.items[1].accessHash, 0x0102030405060708L);
+      expect(restored.dialogs.items[0].readInboxMaxId, 10);
+      expect(restored.dialogs.items[0].readOutboxMaxId, 11);
       expect(restored.peers.titleOrFallback(DialogListModel.PEER_CHANNEL, 3), "Updates");
     }
   }
@@ -359,17 +363,33 @@ public class ReaderStateModelContext {
 
   public static class LiveUnreadUpdatesDialogBadgeTest extends Test {
     public String label() {
-      return "Live read-state updates change the bounded unread badge";
+      return "Live read-state watermarks advance monotonically in bounded dialogs";
     }
 
     public void test() throws TestFailureException {
       ReaderStateModel reader = new ReaderStateModel(3, 3, 1);
 
       reader.appendDialog(DialogListModel.PEER_USER, 9, "Alice", "Ping", 4, false);
-      expect(reader.applyLiveUnreadCount(DialogListModel.PEER_USER, 9, 1), true);
+      reader.selectDialog(0);
+      reader.beginHistoryLoad(DialogListModel.PEER_USER, 9);
+      reader.appendHistoryMessage(51, "Alice", "incoming", false, false, false);
+      reader.appendHistoryMessage(52, "YOU", "outgoing", true, false, false);
+      reader.finishHistoryLoad();
+
+      expect(reader.applyLiveInboxRead(DialogListModel.PEER_USER, 9, 51, 1), true);
       expect(reader.dialogs.items[0].unreadCount, 1);
-      expect(reader.applyLiveUnreadCount(DialogListModel.PEER_USER, 9, 0), true);
+      expect(reader.dialogs.items[0].readInboxMaxId, 51);
+      expect(reader.applyLiveInboxRead(DialogListModel.PEER_USER, 9, 49, 0), true);
+      expect(reader.dialogs.items[0].unreadCount, 1);
+      expect(reader.applyLiveInboxRead(DialogListModel.PEER_USER, 9, 53, 0), true);
       expect(reader.dialogs.items[0].unreadCount, 0);
+      expect(reader.dialogs.items[0].readInboxMaxId, 53);
+      expect(reader.applyLiveOutboxRead(DialogListModel.PEER_USER, 9, 52), true);
+      expect(reader.applyLiveOutboxRead(DialogListModel.PEER_USER, 9, 50), true);
+      expect(reader.dialogs.items[0].readOutboxMaxId, 52);
+      expect(reader.latestIncomingMessageIdForPeer(DialogListModel.PEER_USER, 9), 51);
+      expect(reader.applyLiveOutboxRead(DialogListModel.PEER_USER, 9, -1), false);
+      expect(reader.dialogs.items[0].readOutboxMaxId, 52);
     }
   }
 }

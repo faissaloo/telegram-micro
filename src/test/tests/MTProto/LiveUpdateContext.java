@@ -312,6 +312,34 @@ public class LiveUpdateContext {
     }
   }
 
+  public static class ParseWrappedShortOutboxReadPayloadTest extends Test {
+    public String label() {
+      return "Can parse updateShort wrappers carrying outbox read state";
+    }
+
+    public void test() throws TestFailureException {
+      ReaderResultParser parser = new ReaderResultParser(4, 4, 8);
+      ReaderResultParser.LiveMessageEvent event = new ReaderResultParser.LiveMessageEvent();
+      byte[] body = (new Serializer())
+        .append_int(CombinatorIds.update_read_history_outbox)
+        .append_raw_bytes(peerUser(2002L))
+        .append_int(777)
+        .append_int(904)
+        .append_int(1)
+        .append_int(1700000004)
+        .end();
+
+      expect(parser.parseShortUpdateEnvelope(CombinatorIds.update_short, body, event), true);
+      expect(event.kind, ReaderResultParser.LiveMessageEvent.KIND_READ_OUTBOX);
+      expect(event.peerKind, DialogListModel.PEER_USER);
+      expect(event.peerId, 2002L);
+      expect(event.messageId, 777);
+      expect(event.pts, 904);
+      expect(event.ptsCount, 1);
+      expect(event.date, 1700000004);
+    }
+  }
+
   public static class ParseUpdatesVectorPayloadTest extends Test {
     public String label() {
       return "Can parse updates vectors with append and read-state events";
@@ -336,6 +364,18 @@ public class LiveUpdateContext {
             .append_int(0)
             .append_int(911)
             .append_int(1)
+            .end(),
+          (new Serializer())
+            .append_int(CombinatorIds.update_read_history_outbox)
+            .append_raw_bytes(peerUser(1001L))
+            .append_int(899)
+            .append_int(912)
+            .append_int(1)
+            .end(),
+          (new Serializer())
+            .append_int(CombinatorIds.update_read_channel_outbox)
+            .append_long(4001L)
+            .append_int(700)
             .end()
         }))
         .append_raw_bytes(vector(new byte[][] {
@@ -347,14 +387,25 @@ public class LiveUpdateContext {
         .end();
 
       expect(parser.parseUpdateCollection(CombinatorIds.updates, body, batch), true);
-      expect(batch.count, 2);
+      expect(batch.count, 4);
       expect(batch.events[0].kind, ReaderResultParser.LiveMessageEvent.KIND_APPEND);
       expect(batch.events[0].messageId, 901);
       expect(batch.events[0].date, 1700000000);
       expect(batch.events[1].kind, ReaderResultParser.LiveMessageEvent.KIND_READ);
       expect(batch.events[1].peerKind, DialogListModel.PEER_USER);
       expect(batch.events[1].peerId, 1001L);
+      expect(batch.events[1].messageId, 901);
       expect(batch.events[1].unreadCount, 0);
+      expect(batch.events[2].kind, ReaderResultParser.LiveMessageEvent.KIND_READ_OUTBOX);
+      expect(batch.events[2].peerKind, DialogListModel.PEER_USER);
+      expect(batch.events[2].peerId, 1001L);
+      expect(batch.events[2].messageId, 899);
+      expect(batch.events[2].pts, 912);
+      expect(batch.events[2].ptsCount, 1);
+      expect(batch.events[3].kind, ReaderResultParser.LiveMessageEvent.KIND_READ_OUTBOX);
+      expect(batch.events[3].peerKind, DialogListModel.PEER_CHANNEL);
+      expect(batch.events[3].peerId, 4001L);
+      expect(batch.events[3].messageId, 700);
       expect(batch.date, 1700000010);
       expect(batch.seq, 77);
       expect(batch.peers.count, 1);

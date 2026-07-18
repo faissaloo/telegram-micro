@@ -22,10 +22,10 @@ These states are independent. A parser can be unit verified while the end-to-end
 | MTProto authentication | Handshake, nonce/hash checks, DH validation, auth-key/session persistence paths | Maintain hostile transcript vectors; live and device login matrix |
 | Login UI | Phone/code/password state models and MCP automation | Error/retry/expiry UI proof; physical keypad proof |
 | Durable session | Versioned bounded snapshots, corrupt/oversized rejection, RMS tests | Power-loss/full-storage device scenarios and migration policy |
-| Dialog/history read | Bounded models, parsing, cache and update foundations | Expand constructor interoperability conservatively; long-session live/device proof |
-| Message context | Sender, content, media, pending state, and UTC timestamps are bounded and warm-restorable | Add compact delivery/read state without paint-time allocation; prove local-time behavior on-device |
+| Dialog/history read | Bounded models, parsing, cache, monotonic read watermarks, and peer-specific read requests | Prove mark-read behavior live/on-device; expand constructor interoperability conservatively |
+| Message context | Sender, content, media, pending/sent/read state, and UTC timestamps are bounded and warm-restorable | Prove delivery semantics and local-time behavior live/on-device |
 | Text send | Bounded compose/request/reconciliation and recovery foundations | Transport-loss duplicate/retry matrix; live/device proof |
-| Reconnect/catch-up | Session restore, difference/channel-difference and fallback foundations | More gap/too-long/unknown-update traces and device radio-loss proof |
+| Reconnect/catch-up | Session restore, difference/channel-difference, PTS-continuity checks, and fallback foundations | More gap/too-long/unknown-update traces and device radio-loss proof |
 | Failure visibility | Bounded failure log/status surfaces | Make every P0 terminal failure actionable without exposing secrets |
 
 P0 is complete only when the exact release artifact passes the real-device checklist for fresh login and restored-session read/send/recovery. That evidence does not exist merely because emulator lanes pass.

@@ -6,6 +6,7 @@ import mtproto.Serializer;
 import mtproto.recieve.messages.ReaderResultParser;
 import mtproto.send.messages.SendGetDialogs;
 import mtproto.send.messages.SendGetHistory;
+import mtproto.send.messages.SendReadHistory;
 import reader.DialogListModel;
 import reader.PeerDirectory;
 import reader.ReaderStateModel;
@@ -61,13 +62,23 @@ public class ReaderContext {
   }
 
   private static byte[] dialog(byte[] peer, int topMessageId, int unreadCount) {
+    return dialog(peer, topMessageId, 0, 0, unreadCount);
+  }
+
+  private static byte[] dialog(
+    byte[] peer,
+    int topMessageId,
+    int readInboxMaxId,
+    int readOutboxMaxId,
+    int unreadCount
+  ) {
     return (new Serializer())
       .append_int(ReaderResultParser.TG_DIALOG_ID)
       .append_int(0)
       .append_raw_bytes(peer)
       .append_int(topMessageId)
-      .append_int(0)
-      .append_int(0)
+      .append_int(readInboxMaxId)
+      .append_int(readOutboxMaxId)
       .append_int(unreadCount)
       .append_int(0)
       .append_int(0)
@@ -607,6 +618,56 @@ public class ReaderContext {
     }
   }
 
+  public static class BuildReadHistoryRequestTest extends Test {
+    public String label() {
+      return "Can build bounded private and channel read-history requests";
+    }
+
+    public void test() throws TestFailureException {
+      byte[] body = (new SendReadHistory(
+        SendGetDialogs.DialogInputPeer.user(77L, 0x1122334455667788L),
+        91
+      )).message_data.end();
+      int offset = 0;
+
+      expect(Decode.Little.int_decode(body, offset), CombinatorIds.messages_read_history);
+      offset += 4;
+      expect(Decode.Little.int_decode(body, offset), CombinatorIds.input_peer_user);
+      offset += 4;
+      expect(Decode.Little.long_decode(body, offset), 77L);
+      offset += 8;
+      expect(Decode.Little.long_decode(body, offset), 0x1122334455667788L);
+      offset += 8;
+      expect(Decode.Little.int_decode(body, offset), 91);
+      offset += 4;
+      expect(offset, body.length);
+
+      body = (new SendReadHistory(
+        SendGetDialogs.DialogInputPeer.channel(88L, 0x0102030405060708L),
+        92
+      )).message_data.end();
+      offset = 0;
+      expect(Decode.Little.int_decode(body, offset), CombinatorIds.channels_read_history);
+      offset += 4;
+      expect(Decode.Little.int_decode(body, offset), CombinatorIds.input_channel);
+      offset += 4;
+      expect(Decode.Little.long_decode(body, offset), 88L);
+      offset += 8;
+      expect(Decode.Little.long_decode(body, offset), 0x0102030405060708L);
+      offset += 8;
+      expect(Decode.Little.int_decode(body, offset), 92);
+      offset += 4;
+      expect(offset, body.length);
+
+      try {
+        new SendReadHistory(SendGetDialogs.DialogInputPeer.chat(9L), 0);
+        expect(true, false);
+      } catch (IllegalArgumentException expected) {
+        expect(true, true);
+      }
+    }
+  }
+
   public static class ParseDialogsPayloadTest extends Test {
     public String label() {
       return "Can parse messages.dialogs payloads into bounded reader state";
@@ -615,7 +676,7 @@ public class ReaderContext {
     public void test() throws TestFailureException {
       byte[] body = (new Serializer())
         .append_raw_bytes(vector(new byte[][] {
-          userDialog(1001L, 77, 3)
+          dialog(peerUser(1001L), 77, 73, 75, 3)
         }))
         .append_raw_bytes(vector(new byte[][] {
           textUserMessage(77, 1001L, 1001L, "Hello")
@@ -642,10 +703,40 @@ public class ReaderContext {
       expect(reader.dialogs.items[0].hasAccessHash, true);
       expect(reader.dialogs.items[0].accessHash, 0x1122334455667788L);
       expect(reader.dialogs.items[0].topMessageId, 77);
+      expect(reader.dialogs.items[0].readInboxMaxId, 73);
+      expect(reader.dialogs.items[0].readOutboxMaxId, 75);
       expect(reader.dialogs.items[0].title, "Alice");
       expect(reader.dialogs.items[0].preview, "Hello");
       expect(reader.dialogs.items[0].unreadCount, 3);
       expect(reader.peers.count, 1);
+    }
+  }
+
+  public static class RejectNegativeDialogReadWatermarkTest extends Test {
+    public String label() {
+      return "Dialog parsing rejects negative read watermarks before reader mutation";
+    }
+
+    public void test() throws TestFailureException {
+      byte[] body = (new Serializer())
+        .append_raw_bytes(vector(new byte[][] {
+          dialog(peerUser(1001L), 77, -1, 75, 3)
+        }))
+        .append_raw_bytes(vector(new byte[][] {
+          textUserMessage(77, 1001L, 1001L, "Hello")
+        }))
+        .append_raw_bytes(vector(new byte[][] {}))
+        .append_raw_bytes(vector(new byte[][] {
+          user(1001L, 0x1122334455667788L, "Alice")
+        }))
+        .end();
+      ReaderStateModel reader = new ReaderStateModel(4, 4);
+      ReaderResultParser parser = new ReaderResultParser(4, 4, 8);
+
+      reader.beginDialogsLoad();
+      expect(parser.applyDialogs(new RPCResponse(CombinatorIds.messages_dialogs, body), reader), false);
+      expect(reader.dialogs.count, 0);
+      expect(reader.peers.count, 0);
     }
   }
 

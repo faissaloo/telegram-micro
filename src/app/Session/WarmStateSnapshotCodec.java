@@ -10,7 +10,7 @@ import support.Decode;
 
 public final class WarmStateSnapshotCodec {
   public static final int MAGIC = 0x53574d54;
-  public static final int VERSION = 9;
+  public static final int VERSION = 10;
   public static final int MAX_ENCODED_BYTES = 128 * 1024;
   private static final int VERSION_V1 = 1;
   private static final int VERSION_V2 = 2;
@@ -20,6 +20,7 @@ public final class WarmStateSnapshotCodec {
   private static final int VERSION_V6 = 6;
   private static final int VERSION_V7 = 7;
   private static final int VERSION_V8 = 8;
+  private static final int VERSION_V9 = 9;
 
   private WarmStateSnapshotCodec() {
   }
@@ -43,6 +44,9 @@ public final class WarmStateSnapshotCodec {
     for (int i = 0; i < snapshot.dialogCount && i < snapshot.dialogs.length; ++i) {
       WarmStateSnapshot.DialogEntry dialog = snapshot.dialogs[i];
 
+      if (dialog.readInboxMaxId < 0 || dialog.readOutboxMaxId < 0) {
+        return null;
+      }
       out.append_int(dialog.peerKind);
       out.append_long(dialog.peerId);
       out.append_long(dialog.accessHash);
@@ -51,6 +55,8 @@ public final class WarmStateSnapshotCodec {
         ((dialog.hasMedia ? 1 : 0) << 1)
       );
       out.append_int(dialog.topMessageId);
+      out.append_int(dialog.readInboxMaxId);
+      out.append_int(dialog.readOutboxMaxId);
       out.append_int(dialog.unreadCount);
       appendString(out, dialog.title, DialogListModel.TITLE_MAX);
       appendString(out, dialog.preview, DialogListModel.PREVIEW_MAX);
@@ -188,8 +194,11 @@ public final class WarmStateSnapshotCodec {
     if (version == VERSION_V8) {
       return decodeV8(out, data, 8);
     }
-    if (version == VERSION) {
+    if (version == VERSION_V9) {
       return decodeV9(out, data, 8);
+    }
+    if (version == VERSION) {
+      return decodeV10(out, data, 8);
     }
     return false;
   }
@@ -417,6 +426,35 @@ public final class WarmStateSnapshotCodec {
 
   private static boolean decodeV9(WarmStateSnapshot out, byte[] data, int offset) {
     offset = decodeV9Body(out, data, offset);
+    if (offset < 0) {
+      out.clear();
+      return false;
+    }
+    out.version = VERSION_V9;
+
+    out.loginPhoneNumber = readString(data, WarmStateSnapshot.LOGIN_PHONE_MAX, offset);
+    if (out.loginPhoneNumber == null) {
+      out.clear();
+      return false;
+    }
+    offset = stringNextOffset(data, offset);
+    out.loginPhoneCodeHash = readString(data, WarmStateSnapshot.LOGIN_CODE_HASH_MAX, offset);
+    if (out.loginPhoneCodeHash == null) {
+      out.clear();
+      return false;
+    }
+    offset = stringNextOffset(data, offset);
+    if (offset + 8 > data.length) {
+      out.clear();
+      return false;
+    }
+    out.loginCodeSentAtMillis = Decode.Little.long_decode(data, offset);
+    offset += 8;
+    return offset == data.length;
+  }
+
+  private static boolean decodeV10(WarmStateSnapshot out, byte[] data, int offset) {
+    offset = decodeV10Body(out, data, offset);
     if (offset < 0) {
       out.clear();
       return false;
@@ -739,11 +777,15 @@ public final class WarmStateSnapshotCodec {
   }
 
   private static int decodeV8Body(WarmStateSnapshot out, byte[] data, int offset) {
-    return decodeCurrentBody(out, data, offset, VERSION_V8, false);
+    return decodeCurrentBody(out, data, offset, VERSION_V8, false, false);
   }
 
   private static int decodeV9Body(WarmStateSnapshot out, byte[] data, int offset) {
-    return decodeCurrentBody(out, data, offset, VERSION, true);
+    return decodeCurrentBody(out, data, offset, VERSION_V9, true, false);
+  }
+
+  private static int decodeV10Body(WarmStateSnapshot out, byte[] data, int offset) {
+    return decodeCurrentBody(out, data, offset, VERSION, true, true);
   }
 
   private static int decodeCurrentBody(
@@ -751,7 +793,8 @@ public final class WarmStateSnapshotCodec {
     byte[] data,
     int offset,
     int decodedVersion,
-    boolean messageDates
+    boolean messageDates,
+    boolean dialogReadWatermarks
   ) {
     if (offset + 24 > data.length) {
       return -1;
@@ -777,7 +820,9 @@ public final class WarmStateSnapshotCodec {
       return -1;
     }
 
-    offset = decodeDialogs(out, data, offset);
+    offset = dialogReadWatermarks
+      ? decodeDialogsV10(out, data, offset)
+      : decodeDialogs(out, data, offset);
     if (offset < 0) {
       out.clear();
       return -1;
@@ -834,6 +879,49 @@ public final class WarmStateSnapshotCodec {
       offset += 4;
       dialog.unreadCount = Decode.Little.int_decode(data, offset);
       offset += 4;
+      dialog.title = readString(data, DialogListModel.TITLE_MAX, offset);
+      if (dialog.title == null) {
+        return -1;
+      }
+      offset = stringNextOffset(data, offset);
+      dialog.preview = readString(data, DialogListModel.PREVIEW_MAX, offset);
+      if (dialog.preview == null) {
+        return -1;
+      }
+      offset = stringNextOffset(data, offset);
+    }
+    return offset;
+  }
+
+  private static int decodeDialogsV10(WarmStateSnapshot out, byte[] data, int offset) {
+    for (int i = 0; i < out.dialogCount; ++i) {
+      WarmStateSnapshot.DialogEntry dialog = out.dialogs[i];
+      int flags;
+
+      if (offset + 40 > data.length) {
+        return -1;
+      }
+      dialog.peerKind = Decode.Little.int_decode(data, offset);
+      offset += 4;
+      dialog.peerId = Decode.Little.long_decode(data, offset);
+      offset += 8;
+      dialog.accessHash = Decode.Little.long_decode(data, offset);
+      offset += 8;
+      flags = Decode.Little.int_decode(data, offset);
+      offset += 4;
+      dialog.hasAccessHash = (flags & 1) != 0;
+      dialog.hasMedia = (flags & 2) != 0;
+      dialog.topMessageId = Decode.Little.int_decode(data, offset);
+      offset += 4;
+      dialog.readInboxMaxId = Decode.Little.int_decode(data, offset);
+      offset += 4;
+      dialog.readOutboxMaxId = Decode.Little.int_decode(data, offset);
+      offset += 4;
+      dialog.unreadCount = Decode.Little.int_decode(data, offset);
+      offset += 4;
+      if (dialog.readInboxMaxId < 0 || dialog.readOutboxMaxId < 0) {
+        return -1;
+      }
       dialog.title = readString(data, DialogListModel.TITLE_MAX, offset);
       if (dialog.title == null) {
         return -1;

@@ -16,6 +16,8 @@ public class DialogListModel {
     public long accessHash = 0;
     public boolean hasAccessHash = false;
     public int topMessageId = 0;
+    public int readInboxMaxId = 0;
+    public int readOutboxMaxId = 0;
     public String title = "";
     public String preview = "";
     public int unreadCount = 0;
@@ -32,11 +34,44 @@ public class DialogListModel {
       int unreadCount,
       boolean hasMedia
     ) {
+      set(
+        peerKind,
+        peerId,
+        accessHash,
+        hasAccessHash,
+        topMessageId,
+        0,
+        0,
+        title,
+        preview,
+        unreadCount,
+        hasMedia
+      );
+    }
+
+    public void set(
+      int peerKind,
+      long peerId,
+      long accessHash,
+      boolean hasAccessHash,
+      int topMessageId,
+      int readInboxMaxId,
+      int readOutboxMaxId,
+      String title,
+      String preview,
+      int unreadCount,
+      boolean hasMedia
+    ) {
+      if (readInboxMaxId < 0 || readOutboxMaxId < 0) {
+        throw new IllegalArgumentException("Dialog read watermarks must not be negative.");
+      }
       this.peerKind = peerKind;
       this.peerId = peerId;
       this.accessHash = accessHash;
       this.hasAccessHash = hasAccessHash;
       this.topMessageId = topMessageId;
+      this.readInboxMaxId = readInboxMaxId;
+      this.readOutboxMaxId = readOutboxMaxId;
       this.title = DialogListModel.limit(title, TITLE_MAX);
       this.preview = DialogListModel.limit(preview, PREVIEW_MAX);
       this.unreadCount = unreadCount;
@@ -49,6 +84,8 @@ public class DialogListModel {
       accessHash = 0;
       hasAccessHash = false;
       topMessageId = 0;
+      readInboxMaxId = 0;
+      readOutboxMaxId = 0;
       title = "";
       preview = "";
       unreadCount = 0;
@@ -98,11 +135,51 @@ public class DialogListModel {
     int unreadCount,
     boolean hasMedia
   ) {
-    if (count >= items.length) {
+    return append(
+      peerKind,
+      peerId,
+      accessHash,
+      hasAccessHash,
+      topMessageId,
+      0,
+      0,
+      title,
+      preview,
+      unreadCount,
+      hasMedia
+    );
+  }
+
+  public boolean append(
+    int peerKind,
+    long peerId,
+    long accessHash,
+    boolean hasAccessHash,
+    int topMessageId,
+    int readInboxMaxId,
+    int readOutboxMaxId,
+    String title,
+    String preview,
+    int unreadCount,
+    boolean hasMedia
+  ) {
+    if (count >= items.length || readInboxMaxId < 0 || readOutboxMaxId < 0) {
       return false;
     }
 
-    items[count].set(peerKind, peerId, accessHash, hasAccessHash, topMessageId, title, preview, unreadCount, hasMedia);
+    items[count].set(
+      peerKind,
+      peerId,
+      accessHash,
+      hasAccessHash,
+      topMessageId,
+      readInboxMaxId,
+      readOutboxMaxId,
+      title,
+      preview,
+      unreadCount,
+      hasMedia
+    );
     count += 1;
     if (selectedIndex >= count) {
       selectedIndex = count - 1;

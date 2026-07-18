@@ -237,6 +237,34 @@ public class SyncContext {
     }
   }
 
+  public static class SyncStateValidatesPtsAcknowledgementContinuityTest extends Test {
+    public String label() {
+      return "Sync state accepts contiguous PTS acknowledgements and detects gaps";
+    }
+
+    public void test() throws TestFailureException {
+      SyncState contiguous = new SyncState();
+      SyncState gap = new SyncState();
+
+      contiguous.applyUpdatesState(new RecieveUpdatesState(100, 20, 30, 40, 2));
+      expect(contiguous.notePtsAcknowledgement(102, 2, 0), true);
+      expect(contiguous.pts, 102);
+      expect(contiguous.date, 30);
+      expect(contiguous.needsDifference, false);
+      expect(contiguous.notePtsAcknowledgement(101, 1, 0), true);
+      expect(contiguous.pts, 102);
+
+      gap.applyUpdatesState(new RecieveUpdatesState(100, 20, 30, 40, 2));
+      expect(gap.notePtsAcknowledgement(105, 2, 0), false);
+      expect(gap.pts, 100);
+      expect(gap.needsDifference, true);
+      expect(gap.notePtsAcknowledgement(102, 2, 0), false);
+      expect(gap.pts, 100);
+      expect(gap.notePtsAcknowledgement(1, 1, 0), false);
+      expect(gap.pts, 100);
+    }
+  }
+
   public static class ChannelSyncStateBuildsForcedBootstrapRequestTest extends Test {
     public String label() {
       return "Channel sync state can force a bounded bootstrap request";
@@ -258,6 +286,29 @@ public class SyncContext {
       expect(args.force, false);
       expect(args.pts, 456);
       expect(args.limit, 12);
+    }
+  }
+
+  public static class ChannelSyncStateValidatesPtsAcknowledgementContinuityTest extends Test {
+    public String label() {
+      return "Channel sync state keeps PTS acknowledgement gaps pending";
+    }
+
+    public void test() throws TestFailureException {
+      ChannelSyncState contiguous = new ChannelSyncState(4);
+      ChannelSyncState gap = new ChannelSyncState(4);
+
+      expect(contiguous.seedFromDialog(777L, 100), true);
+      expect(contiguous.noteAcknowledgement(777L, 102, 2), true);
+      expect(contiguous.find(777L).pts, 102);
+      expect(contiguous.find(777L).needsDifference, false);
+
+      expect(gap.seedFromDialog(888L, 100), true);
+      expect(gap.noteAcknowledgement(888L, 105, 2), false);
+      expect(gap.find(888L).pts, 100);
+      expect(gap.find(888L).needsDifference, true);
+      expect(gap.noteAcknowledgement(888L, 102, 2), false);
+      expect(gap.find(888L).pts, 100);
     }
   }
 }

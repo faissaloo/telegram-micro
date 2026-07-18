@@ -131,7 +131,7 @@ public final class SyncState {
       return;
     }
 
-    noteShortUpdate(sent.pts, sent.date);
+    notePtsAcknowledgement(sent.pts, sent.ptsCount, sent.date);
   }
 
   public void noteShortUpdate(int newPts, int newDate) {
@@ -141,6 +141,40 @@ public final class SyncState {
     needsDifference = false;
     differenceTooLong = false;
     ensureDefaultHints();
+  }
+
+  /**
+   * Applies a PTS-bearing acknowledgement only when it is contiguous with the
+   * last known state. Older duplicate acknowledgements are harmless; a gap is
+   * left unapplied and schedules updates.getDifference instead.
+   */
+  public boolean notePtsAcknowledgement(int newPts, int ptsCount, int newDate) {
+    if (ptsCount < 0 || newPts <= ptsCount) {
+      needsDifference = true;
+      return false;
+    }
+    if (needsDifference) {
+      return false;
+    }
+    if (hasState) {
+      if (newPts <= pts) {
+        return true;
+      }
+      if (newPts - ptsCount != pts) {
+        needsDifference = true;
+        return false;
+      }
+    }
+
+    pts = newPts;
+    if (newDate > 0) {
+      date = newDate;
+    }
+    hasState = true;
+    needsDifference = false;
+    differenceTooLong = false;
+    ensureDefaultHints();
+    return true;
   }
 
   public boolean canBuildDifferenceQuery() {

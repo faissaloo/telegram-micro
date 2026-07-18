@@ -44,6 +44,7 @@ import mtproto.send.messages.SendDeleteChannelMessages;
 import mtproto.send.messages.SendDeleteMessages;
 import mtproto.send.messages.SendGetFullChat;
 import mtproto.send.messages.SendGetHistory;
+import mtproto.send.messages.SendReadHistory;
 import mtproto.send.messages.SendRequestEncryption;
 import mtproto.send.messages.SendSendMessage;
 import mtproto.send.upload.SendUploadGetFile;
@@ -105,6 +106,8 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
   private static final int PEER_ACTION_LEAVE = 2;
   private static final int PEER_ACTION_SECRET = 3;
   private static final int PEER_ACTION_SECRET_DISCARD = 4;
+  private static final String READ_ACK_WAIT_DETAIL =
+    "Wait for the read acknowledgement, then retry.";
   private int pendingSelectedPeerKind = DialogListModel.PEER_UNKNOWN;
   private long pendingSelectedPeerId = 0;
   private int pendingHistoryPeerKind = DialogListModel.PEER_UNKNOWN;
@@ -112,6 +115,11 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
   private int pendingDeletePeerKind = DialogListModel.PEER_UNKNOWN;
   private long pendingDeletePeerId = 0;
   private int pendingDeleteMessageId = 0;
+  private int pendingReadPeerKind = DialogListModel.PEER_UNKNOWN;
+  private long pendingReadPeerId = 0;
+  private int pendingReadMaxId = 0;
+  private int pendingReadPreviousInboxMaxId = 0;
+  private int pendingReadPreviousUnreadCount = 0;
   private int pendingSendPeerKind = DialogListModel.PEER_UNKNOWN;
   private long pendingSendPeerId = 0;
   private long pendingSendRandomId = 0;
@@ -283,6 +291,7 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     clearPendingPeerInfo();
     clearPendingPeerAction();
     clearPendingDeleteState();
+    clearPendingReadState();
     pendingSelectedPeerKind = DialogListModel.PEER_UNKNOWN;
     pendingSelectedPeerId = 0;
     pendingChannelDifferencePeerId = 0;
@@ -309,6 +318,34 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     pendingDeletePeerKind = DialogListModel.PEER_UNKNOWN;
     pendingDeletePeerId = 0;
     pendingDeleteMessageId = 0;
+  }
+
+  private void clearPendingReadState() {
+    pendingReadPeerKind = DialogListModel.PEER_UNKNOWN;
+    pendingReadPeerId = 0;
+    pendingReadMaxId = 0;
+    pendingReadPreviousInboxMaxId = 0;
+    pendingReadPreviousUnreadCount = 0;
+  }
+
+  private boolean readRequestInFlight() {
+    return pendingReadPeerKind != DialogListModel.PEER_UNKNOWN && pendingReadMaxId > 0;
+  }
+
+  private boolean hasRpcConflictForVisibleRead() {
+    return syncStateRequestInFlight ||
+      differenceRequestInFlight ||
+      channelDifferenceRequestInFlight ||
+      (syncState != null && syncState.needsDifference) ||
+      pendingHistoryPeerKind != DialogListModel.PEER_UNKNOWN ||
+      (appShellModel != null &&
+        (appShellModel.reader.loadingDialogs || appShellModel.reader.loadingHistory)) ||
+      pendingDeleteMessageId != 0 ||
+      pendingSendPeerKind != DialogListModel.PEER_UNKNOWN ||
+      pendingDiscoveryQuery.length() > 0 ||
+      pendingPeerInfoKind != DialogListModel.PEER_UNKNOWN ||
+      pendingPeerActionType != PEER_ACTION_NONE ||
+      pendingMediaMessageId != 0;
   }
 
   private void clearPendingSecretAction() {
@@ -430,6 +467,8 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
       syncShellRuntimeState();
     }
 
+    // A reconnecting dialog refresh reconciles an ambiguously acknowledged read RPC.
+    clearPendingReadState();
     persistWarmState();
     reconnectAuthorizedPending = true;
     resumeOutboundAfterDialogs = appShellModel != null && appShellModel.hasRecoverableOutboundSend();
@@ -712,6 +751,10 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
         return;
       }
       if (midlet.handleOutboundRpcError(rpc_error.error_code, error_message)) {
+        connection.clearPendingRetryRequest();
+        return;
+      }
+      if (midlet.handleReadHistoryRpcError(rpc_error.error_code, error_message)) {
         connection.clearPendingRetryRequest();
         return;
       }
@@ -1590,6 +1633,14 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
       clearPendingDiscoverySearch();
       return;
     }
+    if (readRequestInFlight()) {
+      appShellModel.discovery.detail = READ_ACK_WAIT_DETAIL;
+      appShellModel.activeDetail = READ_ACK_WAIT_DETAIL;
+      if (appShellScreen != null) {
+        appShellScreen.showDiscovery();
+      }
+      return;
+    }
 
     pendingDiscoveryQuery = trimmed;
     appShellModel.discovery.detail = "Searching Telegram for " + trimmed + "...";
@@ -1606,6 +1657,11 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
 
     if (appShellModel == null || appShellScreen == null || appShellModel.peer.peerId == 0) {
       clearPendingPeerInfo();
+      return;
+    }
+    if (readRequestInFlight()) {
+      appShellModel.notePeerError(READ_ACK_WAIT_DETAIL);
+      appShellScreen.showPeer();
       return;
     }
 
@@ -1935,6 +1991,10 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     SecretChatDirectory.Item existing;
     SecretChatResultParser.Result result;
 
+    if (pendingReadPeerKind == DialogListModel.PEER_CHANNEL && pendingReadMaxId > 0) {
+      applyReadHistoryBoolean(response);
+      return;
+    }
     if (appShellModel == null ||
         appShellScreen == null ||
         pendingPeerActionType != PEER_ACTION_SECRET_DISCARD) {
@@ -1970,9 +2030,14 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     int peerKind = pendingDeletePeerKind;
     long peerId = pendingDeletePeerId;
     int messageId = pendingDeleteMessageId;
+    boolean ptsContinuous = true;
     boolean removed;
     String title;
 
+    if (pendingReadPeerKind != DialogListModel.PEER_UNKNOWN && pendingReadMaxId > 0) {
+      applyReadHistoryAffected(response);
+      return;
+    }
     if (appShellModel == null || appShellScreen == null || messageId == 0) {
       return;
     }
@@ -1989,19 +2054,151 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     removed = appShellModel.reader.deleteMessageForPeer(peerKind, peerId, messageId);
     clearPendingDeleteState();
     ensureSyncState();
-    if (affected.pts != 0) {
-      syncState.noteShortUpdate(affected.pts, syncState.date);
-      noteChannelLiveUpdate(peerKind, peerId, affected.pts);
+    if (peerKind == DialogListModel.PEER_CHANNEL) {
+      ptsContinuous = appShellModel.reader.channelSync.noteAcknowledgement(
+        peerId,
+        affected.pts,
+        affected.ptsCount
+      );
+    } else if (affected.pts != 0 || affected.ptsCount != 0) {
+      ptsContinuous = syncState.notePtsAcknowledgement(
+        affected.pts,
+        affected.ptsCount,
+        syncState.date
+      );
     }
     title = appShellModel.reader.peers.titleOrFallback(peerKind, peerId);
     appShellModel.updateReaderSummary();
     appShellModel.recomputeWorkingSet();
-    appShellModel.activeDetail = removed
-      ? "Deleted message from " + title + "."
-      : "Telegram deleted the message; local cache was already clear.";
+    appShellModel.activeDetail = !ptsContinuous
+      ? "Deleted message from " + title + "; catching up an update gap."
+      : (removed
+          ? "Deleted message from " + title + "."
+          : "Telegram deleted the message; local cache was already clear.");
     syncShellRuntimeState();
     persistWarmState();
     appShellScreen.showHistory();
+    if (!ptsContinuous) {
+      if (peerKind == DialogListModel.PEER_CHANNEL) {
+        requestChannelDifferenceFor(
+          findDialog(peerKind, peerId),
+          "Catching up channel updates after deleting a message..."
+        );
+      } else {
+        requestUpdatesDifference("Catching up Telegram updates after deleting a message...");
+      }
+    } else {
+      requestVisibleHistoryRead();
+    }
+  }
+
+  private void applyReadHistoryAffected(RPCResponse response) {
+    RecieveAffectedMessages affected;
+
+    try {
+      affected = RecieveAffectedMessages.from_rpc_response(response);
+    } catch (IllegalArgumentException e) {
+      rollbackPendingRead("Read acknowledgement parse failed: " + e.getMessage());
+      return;
+    }
+    finishPendingRead(affected.pts, affected.ptsCount);
+  }
+
+  private void applyReadHistoryBoolean(RPCResponse response) {
+    if (response == null || response.type != CombinatorIds.bool_true) {
+      rollbackPendingRead("Telegram did not acknowledge the read request.");
+      return;
+    }
+    finishPendingRead(0, 0);
+  }
+
+  private void finishPendingRead(int pts, int ptsCount) {
+    int peerKind = pendingReadPeerKind;
+    long peerId = pendingReadPeerId;
+    int maxId = pendingReadMaxId;
+    boolean ptsContinuous = true;
+    String title;
+
+    if (appShellModel == null || peerKind == DialogListModel.PEER_UNKNOWN || peerId == 0 || maxId <= 0) {
+      clearPendingReadState();
+      return;
+    }
+
+    appShellModel.reader.applyLiveInboxRead(peerKind, peerId, maxId, 0);
+    title = appShellModel.reader.peers.titleOrFallback(peerKind, peerId);
+    clearPendingReadState();
+    ensureSyncState();
+    if (pts != 0 || ptsCount != 0) {
+      ptsContinuous = syncState.notePtsAcknowledgement(pts, ptsCount, syncState.date);
+      noteChannelLiveUpdate(peerKind, peerId, pts);
+    }
+    appShellModel.updateReaderSummary();
+    appShellModel.activeDetail = ptsContinuous
+      ? "Marked visible history read for " + title + "."
+      : "Marked history read for " + title + "; catching up an update gap.";
+    syncShellRuntimeState();
+    persistWarmState();
+    System.out.println("HISTORY READ: " + title + " #" + Integer.toString(maxId));
+    if (appShellScreen != null) {
+      appShellScreen.syncVisibleState();
+      appShellScreen.showCurrent();
+    }
+    resumeAfterPendingRead(true);
+  }
+
+  private void rollbackPendingRead(String detail) {
+    DialogListModel.Item dialog = findDialog(pendingReadPeerKind, pendingReadPeerId);
+
+    if (dialog != null) {
+      if (dialog.readInboxMaxId <= pendingReadMaxId) {
+        dialog.readInboxMaxId = pendingReadPreviousInboxMaxId;
+        dialog.unreadCount = pendingReadPreviousUnreadCount;
+      }
+    }
+    clearPendingReadState();
+    if (appShellModel != null) {
+      appShellModel.updateReaderSummary();
+      appShellModel.activeDetail = detail != null ? detail : "Unable to mark visible history read.";
+      persistWarmState();
+    }
+    if (appShellScreen != null) {
+      appShellScreen.syncVisibleState();
+      appShellScreen.showCurrent();
+    }
+    resumeAfterPendingRead(false);
+  }
+
+  private void resumeAfterPendingRead(boolean retryVisibleRead) {
+    DialogListModel.Item selected;
+    ChannelSyncState.Entry channelState;
+
+    if (connection == null || appShellModel == null || !appShellModel.authorized) {
+      return;
+    }
+    if (syncState != null && syncState.needsDifference) {
+      requestUpdatesDifference("Catching up Telegram updates after marking history read...");
+      return;
+    }
+
+    selected = selectedDialogForPeer(
+      appShellModel.reader.historyPeerKind,
+      appShellModel.reader.historyPeerId
+    );
+    if (selected != null && selected.peerKind == DialogListModel.PEER_CHANNEL) {
+      channelState = appShellModel.reader.channelSync.find(selected.peerId);
+      if (channelState != null && channelState.needsDifference) {
+        requestChannelDifferenceFor(selected, "Continuing channel catch-up after marking history read...");
+        return;
+      }
+    }
+
+    if (retryVisibleRead) {
+      requestVisibleHistoryRead();
+      if (readRequestInFlight()) {
+        return;
+      }
+    }
+    maybeStartQueuedMediaDownload();
   }
 
   private void applyDialogs(RPCResponse response) {
@@ -2081,6 +2278,8 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
         selectedDialogForPeer(appShellModel.reader.historyPeerKind, appShellModel.reader.historyPeerId),
         "Syncing selected channel..."
       );
+    } else {
+      requestVisibleHistoryRead();
     }
     if (routeAfterHistory != 0 && routeAfterHistory != AppShellModel.SCREEN_HISTORY) {
       appShellModel.router.init(routeAfterHistory);
@@ -2129,6 +2328,11 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     persistWarmState();
     appShellScreen.showHistory();
     clearPendingSendState();
+    if (syncState.needsDifference) {
+      requestUpdatesDifference("Catching up Telegram updates after sending a message...");
+    } else {
+      requestVisibleHistoryRead();
+    }
   }
 
   private boolean applyPendingOutboundMessageId(ReaderResultParser.LiveMessageEvent event) {
@@ -2237,7 +2441,7 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     if (connection == null || appShellModel == null || !appShellModel.authorized) {
       return;
     }
-    if (syncStateRequestInFlight) {
+    if (readRequestInFlight() || syncStateRequestInFlight) {
       return;
     }
 
@@ -2253,7 +2457,7 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     if (connection == null || appShellModel == null || !appShellModel.authorized) {
       return;
     }
-    if (differenceRequestInFlight || syncStateRequestInFlight) {
+    if (readRequestInFlight() || differenceRequestInFlight || syncStateRequestInFlight) {
       return;
     }
 
@@ -2283,7 +2487,7 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     if (selected.peerKind != DialogListModel.PEER_CHANNEL || selected.peerId == 0) {
       return;
     }
-    if (channelDifferenceRequestInFlight) {
+    if (readRequestInFlight() || channelDifferenceRequestInFlight) {
       return;
     }
 
@@ -2409,7 +2613,8 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
         }
         if (pass == 0) {
           if (event.kind != ReaderResultParser.LiveMessageEvent.KIND_DELETE &&
-              event.kind != ReaderResultParser.LiveMessageEvent.KIND_READ) {
+              event.kind != ReaderResultParser.LiveMessageEvent.KIND_READ &&
+              event.kind != ReaderResultParser.LiveMessageEvent.KIND_READ_OUTBOX) {
             continue;
           }
         } else {
@@ -2425,10 +2630,17 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
             ? appShellModel.reader.deleteMessageForPeer(event.peerKind, event.peerId, event.messageId)
             : appShellModel.reader.deleteMessageGlobally(event.messageId) > 0;
         } else if (event.kind == ReaderResultParser.LiveMessageEvent.KIND_READ) {
-          applied = appShellModel.reader.applyLiveUnreadCount(
+          applied = appShellModel.reader.applyLiveInboxRead(
             event.peerKind,
             event.peerId,
+            event.messageId,
             isViewingPeer(event.peerKind, event.peerId) ? 0 : event.unreadCount
+          );
+        } else if (event.kind == ReaderResultParser.LiveMessageEvent.KIND_READ_OUTBOX) {
+          applied = appShellModel.reader.applyLiveOutboxRead(
+            event.peerKind,
+            event.peerId,
+            event.messageId
           );
         } else if (event.kind == ReaderResultParser.LiveMessageEvent.KIND_APPEND) {
           unreadDelta = (!event.outgoing && !isViewingPeer(event.peerKind, event.peerId)) ? 1 : 0;
@@ -2520,6 +2732,7 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
       if (appShellModel != null) {
         appShellModel.activeDetail = "Updates are in sync.";
       }
+      requestVisibleHistoryRead();
       return;
     }
 
@@ -2541,6 +2754,8 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
       }
       if (difference.type == RecieveUpdatesDifference.TYPE_SLICE) {
         requestUpdatesDifference("Applying next Telegram catch-up slice...");
+      } else {
+        requestVisibleHistoryRead();
       }
       return;
     }
@@ -2598,6 +2813,7 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
       title = appShellModel.reader.peers.titleOrFallback(DialogListModel.PEER_CHANNEL, difference.peerId);
       appShellModel.activeDetail = "Channel sync is current for " + title + ".";
       System.out.println("CHANNEL DIFF: empty pts=" + Integer.toString(difference.pts));
+      requestVisibleHistoryRead();
       return;
     }
 
@@ -2632,7 +2848,8 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
         }
         if (pass == 0) {
           if (event.kind != ReaderResultParser.LiveMessageEvent.KIND_DELETE &&
-              event.kind != ReaderResultParser.LiveMessageEvent.KIND_READ) {
+              event.kind != ReaderResultParser.LiveMessageEvent.KIND_READ &&
+              event.kind != ReaderResultParser.LiveMessageEvent.KIND_READ_OUTBOX) {
             continue;
           }
         } else {
@@ -2648,10 +2865,17 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
             ? appShellModel.reader.deleteMessageForPeer(event.peerKind, event.peerId, event.messageId)
             : appShellModel.reader.deleteMessageGlobally(event.messageId) > 0;
         } else if (event.kind == ReaderResultParser.LiveMessageEvent.KIND_READ) {
-          applied = appShellModel.reader.applyLiveUnreadCount(
+          applied = appShellModel.reader.applyLiveInboxRead(
             event.peerKind,
             event.peerId,
+            event.messageId,
             isViewingPeer(event.peerKind, event.peerId) ? 0 : event.unreadCount
+          );
+        } else if (event.kind == ReaderResultParser.LiveMessageEvent.KIND_READ_OUTBOX) {
+          applied = appShellModel.reader.applyLiveOutboxRead(
+            event.peerKind,
+            event.peerId,
+            event.messageId
           );
         } else if (event.kind == ReaderResultParser.LiveMessageEvent.KIND_APPEND) {
           unreadDelta = (!event.outgoing && !isViewingPeer(event.peerKind, event.peerId)) ? 1 : 0;
@@ -2731,6 +2955,8 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
         selectedDialogForPeer(DialogListModel.PEER_CHANNEL, difference.peerId),
         "Applying next channel catch-up slice..."
       );
+    } else {
+      requestVisibleHistoryRead();
     }
   }
 
@@ -2801,6 +3027,7 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
         appShellScreen.syncVisibleState();
         appShellScreen.showCurrent();
       }
+      requestVisibleHistoryRead();
       return true;
     }
 
@@ -2881,10 +3108,17 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
             ? appShellModel.reader.deleteMessageForPeer(event.peerKind, event.peerId, event.messageId)
             : appShellModel.reader.deleteMessageGlobally(event.messageId) > 0;
         } else if (event.kind == ReaderResultParser.LiveMessageEvent.KIND_READ) {
-          applied = appShellModel.reader.applyLiveUnreadCount(
+          applied = appShellModel.reader.applyLiveInboxRead(
             event.peerKind,
             event.peerId,
+            event.messageId,
             isViewingPeer(event.peerKind, event.peerId) ? 0 : event.unreadCount
+          );
+        } else if (event.kind == ReaderResultParser.LiveMessageEvent.KIND_READ_OUTBOX) {
+          applied = appShellModel.reader.applyLiveOutboxRead(
+            event.peerKind,
+            event.peerId,
+            event.messageId
           );
         }
 
@@ -2921,6 +3155,7 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
         appShellScreen.syncVisibleState();
         appShellScreen.showCurrent();
       }
+      requestVisibleHistoryRead();
       return true;
     }
 
@@ -2984,6 +3219,25 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
         wrapped.mediaRef,
         wrapped.date
       );
+    } else if (wrapped.kind == ReaderResultParser.LiveMessageEvent.KIND_DELETE) {
+      applied = wrapped.peerKind != DialogListModel.PEER_UNKNOWN && wrapped.peerId != 0
+        ? appShellModel.reader.deleteMessageForPeer(wrapped.peerKind, wrapped.peerId, wrapped.messageId)
+        : appShellModel.reader.deleteMessageGlobally(wrapped.messageId) > 0;
+    } else if (wrapped.kind == ReaderResultParser.LiveMessageEvent.KIND_READ) {
+      applied = appShellModel.reader.applyLiveInboxRead(
+        wrapped.peerKind,
+        wrapped.peerId,
+        wrapped.messageId,
+        isViewingPeer(wrapped.peerKind, wrapped.peerId) ? 0 : wrapped.unreadCount
+      );
+    } else if (wrapped.kind == ReaderResultParser.LiveMessageEvent.KIND_READ_OUTBOX) {
+      applied = appShellModel.reader.applyLiveOutboxRead(
+        wrapped.peerKind,
+        wrapped.peerId,
+        wrapped.messageId
+      );
+    } else if (wrapped.kind == ReaderResultParser.LiveMessageEvent.KIND_MESSAGE_ID) {
+      applied = applyPendingOutboundMessageId(wrapped);
     } else {
       return false;
     }
@@ -2992,13 +3246,24 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     }
 
     ensureSyncState();
-    syncState.noteShortUpdate(wrapped.pts, wrapped.date);
+    syncState.noteShortUpdate(
+      wrapped.pts != 0 ? wrapped.pts : syncState.pts,
+      wrapped.date != 0 ? wrapped.date : syncState.date
+    );
     noteChannelLiveUpdate(wrapped.peerKind, wrapped.peerId, wrapped.pts);
     title = appShellModel.reader.peers.titleOrFallback(wrapped.peerKind, wrapped.peerId);
     appShellModel.updateReaderSummary();
     appShellModel.recomputeWorkingSet();
     if (wrapped.kind == ReaderResultParser.LiveMessageEvent.KIND_EDIT) {
       appShellModel.activeDetail = "Live edit in " + title + ".";
+    } else if (wrapped.kind == ReaderResultParser.LiveMessageEvent.KIND_READ_OUTBOX) {
+      appShellModel.activeDetail = "Read state advanced in " + title + ".";
+    } else if (wrapped.kind == ReaderResultParser.LiveMessageEvent.KIND_READ) {
+      appShellModel.activeDetail = "Unread state updated for " + title + ".";
+    } else if (wrapped.kind == ReaderResultParser.LiveMessageEvent.KIND_DELETE) {
+      appShellModel.activeDetail = "Live delete in " + title + ".";
+    } else if (wrapped.kind == ReaderResultParser.LiveMessageEvent.KIND_MESSAGE_ID) {
+      appShellModel.activeDetail = "Telegram acknowledged the outbound message.";
     } else {
       appShellModel.activeDetail = wrapped.outgoing
         ? "Live send delivered to " + title + "."
@@ -3011,6 +3276,7 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
       appShellScreen.syncVisibleState();
       appShellScreen.showCurrent();
     }
+    requestVisibleHistoryRead();
     return true;
   }
 
@@ -3160,6 +3426,16 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     return true;
   }
 
+  private boolean handleReadHistoryRpcError(int errorCode, String errorMessage) {
+    if (pendingReadPeerKind == DialogListModel.PEER_UNKNOWN || pendingReadMaxId == 0) {
+      return false;
+    }
+
+    rollbackPendingRead("Mark read failed: RPC " +
+      Integer.toString(errorCode) + ": " + errorMessage);
+    return true;
+  }
+
   private boolean handleMediaRpcError(int errorCode, String errorMessage) {
     if (appShellModel == null || appShellScreen == null || pendingMediaMessageId == 0) {
       return false;
@@ -3173,6 +3449,10 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     MediaPlanQueue.Entry entry;
 
     if (connection == null || appShellModel == null || pendingMediaMessageId != 0) {
+      return;
+    }
+    if (readRequestInFlight()) {
+      appShellModel.activeDetail = READ_ACK_WAIT_DETAIL;
       return;
     }
     entry = appShellModel.mediaQueue.nextQueued();
@@ -3251,7 +3531,10 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     appShellModel.activeDetail = detail;
     clearPendingMediaDownload();
     appShellScreen.showCurrent();
-    maybeStartQueuedMediaDownload();
+    requestVisibleHistoryRead();
+    if (!readRequestInFlight()) {
+      maybeStartQueuedMediaDownload();
+    }
   }
 
   private void clearPendingMediaDownload() {
@@ -3339,11 +3622,19 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     appShellModel.activeDetail = "Saved " + Integer.toString(pendingMediaBufferLength) + " bytes into the bounded media cache.";
     clearPendingMediaDownload();
     appShellScreen.showCurrent();
-    maybeStartQueuedMediaDownload();
+    requestVisibleHistoryRead();
+    if (!readRequestInFlight()) {
+      maybeStartQueuedMediaDownload();
+    }
   }
 
   private void requestDialogs() {
     if (connection == null || appShellModel == null) {
+      return;
+    }
+    if (readRequestInFlight()) {
+      appShellModel.activeDetail = READ_ACK_WAIT_DETAIL;
+      appShellScreen.showCurrent();
       return;
     }
     rememberSelectedDialogForRefresh();
@@ -3354,6 +3645,10 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
 
   private void requestDialogsInBackground(String detail) {
     if (connection == null || appShellModel == null) {
+      return;
+    }
+    if (readRequestInFlight()) {
+      appShellModel.activeDetail = READ_ACK_WAIT_DETAIL;
       return;
     }
     rememberSelectedDialogForRefresh();
@@ -3368,6 +3663,11 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     SendGetDialogs.DialogInputPeer peer;
 
     if (connection == null || appShellModel == null || selected == null) {
+      return;
+    }
+    if (readRequestInFlight()) {
+      appShellModel.activeDetail = READ_ACK_WAIT_DETAIL;
+      appShellScreen.showCurrent();
       return;
     }
 
@@ -3386,6 +3686,60 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     (new SendGetHistory(peer, appShellModel.reader.history.capacity())).send(connection);
   }
 
+  private void requestVisibleHistoryRead() {
+    DialogListModel.Item selected;
+    ChannelSyncState.Entry channelState;
+    SendGetDialogs.DialogInputPeer peer;
+    int maxMessageId;
+
+    if (connection == null || appShellModel == null || !appShellModel.authorized ||
+        readRequestInFlight() || hasRpcConflictForVisibleRead()) {
+      return;
+    }
+    selected = selectedDialogForPeer(
+      appShellModel.reader.historyPeerKind,
+      appShellModel.reader.historyPeerId
+    );
+    if (selected == null || !isViewingPeer(selected.peerKind, selected.peerId)) {
+      return;
+    }
+    if (selected.peerKind == DialogListModel.PEER_CHANNEL) {
+      channelState = appShellModel.reader.channelSync.find(selected.peerId);
+      if (channelState != null && channelState.needsDifference) {
+        return;
+      }
+    }
+    maxMessageId = appShellModel.reader.latestIncomingMessageIdForPeer(
+      selected.peerKind,
+      selected.peerId
+    );
+    if (maxMessageId <= 0 ||
+        (selected.readInboxMaxId >= maxMessageId && selected.unreadCount <= 0)) {
+      return;
+    }
+
+    try {
+      peer = toInputPeer(selected);
+    } catch (IllegalArgumentException e) {
+      appShellModel.activeDetail = "Unable to mark history read: " + e.getMessage();
+      return;
+    }
+
+    pendingReadPeerKind = selected.peerKind;
+    pendingReadPeerId = selected.peerId;
+    pendingReadMaxId = maxMessageId;
+    pendingReadPreviousInboxMaxId = selected.readInboxMaxId;
+    pendingReadPreviousUnreadCount = selected.unreadCount;
+    appShellModel.reader.applyLiveInboxRead(selected.peerKind, selected.peerId, maxMessageId, 0);
+    persistWarmState();
+
+    try {
+      (new SendReadHistory(peer, maxMessageId)).send(connection);
+    } catch (IllegalArgumentException e) {
+      rollbackPendingRead("Unable to mark history read: " + e.getMessage());
+    }
+  }
+
   private void requestSendCurrentCompose(String text) {
     SendGetDialogs.DialogInputPeer fromPeer = null;
     SendGetDialogs.DialogInputPeer peer;
@@ -3395,6 +3749,11 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     long randomId;
 
     if (connection == null || appShellModel == null) {
+      return;
+    }
+    if (readRequestInFlight()) {
+      appShellModel.onComposeFailed(0, READ_ACK_WAIT_DETAIL);
+      appShellScreen.showCompose();
       return;
     }
 
@@ -3657,6 +4016,11 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
       appShellScreen.showHistory();
       return;
     }
+    if (pendingReadMaxId != 0) {
+      appShellModel.activeDetail = "Wait for the read acknowledgement before deleting.";
+      appShellScreen.showHistory();
+      return;
+    }
 
     pendingDeletePeerKind = dialog.peerKind;
     pendingDeletePeerId = dialog.peerId;
@@ -3735,6 +4099,11 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     if (connection == null || appShellModel == null || appShellScreen == null) {
       return;
     }
+    if (readRequestInFlight()) {
+      appShellModel.notePeerError(READ_ACK_WAIT_DETAIL);
+      appShellScreen.showPeer();
+      return;
+    }
     if (appShellModel.peer.peerKind != DialogListModel.PEER_CHANNEL || appShellModel.peer.peerId == 0) {
       appShellModel.notePeerError("Select a channel before joining.");
       appShellScreen.showPeer();
@@ -3759,6 +4128,11 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     long accessHash;
 
     if (connection == null || appShellModel == null || appShellScreen == null) {
+      return;
+    }
+    if (readRequestInFlight()) {
+      appShellModel.notePeerError(READ_ACK_WAIT_DETAIL);
+      appShellScreen.showPeer();
       return;
     }
     if (appShellModel.peer.peerKind != DialogListModel.PEER_CHANNEL || appShellModel.peer.peerId == 0) {
@@ -3788,6 +4162,11 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     byte[] ga;
 
     if (appShellModel == null || appShellScreen == null) {
+      return;
+    }
+    if (readRequestInFlight()) {
+      appShellModel.notePeerError(READ_ACK_WAIT_DETAIL);
+      appShellScreen.showPeer();
       return;
     }
     if (appShellModel.peer.peerKind != DialogListModel.PEER_USER || appShellModel.peer.peerId == 0) {
@@ -3848,6 +4227,11 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     if (appShellModel == null || appShellScreen == null) {
       return;
     }
+    if (readRequestInFlight()) {
+      appShellModel.notePeerError(READ_ACK_WAIT_DETAIL);
+      appShellScreen.showPeer();
+      return;
+    }
     if (appShellModel.peer.peerKind != DialogListModel.PEER_USER || appShellModel.peer.peerId == 0) {
       appShellModel.notePeerError("Select a user before accepting a secret chat.");
       appShellScreen.showPeer();
@@ -3905,6 +4289,11 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     SecretChatDirectory.Item secretChat;
 
     if (appShellModel == null || appShellScreen == null) {
+      return;
+    }
+    if (readRequestInFlight()) {
+      appShellModel.notePeerError(READ_ACK_WAIT_DETAIL);
+      appShellScreen.showPeer();
       return;
     }
     if (appShellModel.peer.peerKind != DialogListModel.PEER_USER || appShellModel.peer.peerId == 0) {

@@ -103,6 +103,7 @@ public class CombinatorIds {
   public static int messages_send_message = 0xfe05dc9a;
   public static int messages_forward_messages = 0x13704a7c;
   public static int messages_delete_messages = 0xe58e95d2;
+  public static int messages_read_history = 0xe306d3a;
   public static int messages_get_dialogs = 0xa0f4cb4f;
   public static int messages_get_history = 0x4423e6c5;
   public static int messages_get_full_chat = 0xaeb00b34;
@@ -132,6 +133,7 @@ public class CombinatorIds {
   public static int channels_join_channel = 0x24b524c5;
   public static int channels_leave_channel = 0xf836aa95;
   public static int channels_delete_messages = 0x84c1fd4e;
+  public static int channels_read_history = 0xcc104937;
   public static int encrypted_chat_waiting = 0x66b25953;
   public static int encrypted_chat_requested = 0x48f1d94c;
   public static int encrypted_chat = 0x61f0d4c7;

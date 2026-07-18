@@ -150,6 +150,35 @@ public final class ChannelSyncState {
     return true;
   }
 
+  public boolean noteAcknowledgement(long peerId, int newPts, int ptsCount) {
+    Entry entry = upsert(peerId);
+
+    if (entry == null) {
+      return false;
+    }
+    if (ptsCount < 0 || newPts <= ptsCount) {
+      entry.needsDifference = true;
+      return false;
+    }
+    if (entry.needsDifference) {
+      return false;
+    }
+    if (entry.hasState) {
+      if (newPts <= entry.pts) {
+        return true;
+      }
+      if (newPts - ptsCount != entry.pts) {
+        entry.needsDifference = true;
+        return false;
+      }
+    }
+
+    entry.pts = newPts;
+    entry.hasState = true;
+    entry.needsDifference = false;
+    return true;
+  }
+
   public boolean markDirty(long peerId) {
     Entry entry = upsert(peerId);
 

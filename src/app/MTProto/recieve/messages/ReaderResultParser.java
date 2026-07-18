@@ -256,6 +256,7 @@ public final class ReaderResultParser {
     public static final int KIND_DELETE = 3;
     public static final int KIND_READ = 4;
     public static final int KIND_MESSAGE_ID = 5;
+    public static final int KIND_READ_OUTBOX = 6;
 
     public int kind = KIND_NONE;
     public int peerKind = DialogListModel.PEER_UNKNOWN;
@@ -441,6 +442,7 @@ public final class ReaderResultParser {
     TLReader reader;
     int innerType;
     MessageScratch message;
+    boolean messageUpdate;
 
     if (out == null) {
       lastError = "Live update target is missing.";
@@ -461,12 +463,27 @@ public final class ReaderResultParser {
       reader = new TLReader(body);
       innerType = reader.readInt();
 
-      if (innerType != CombinatorIds.update_new_message &&
-          innerType != CombinatorIds.update_new_channel_message &&
-          innerType != CombinatorIds.update_edit_message &&
-          innerType != CombinatorIds.update_edit_channel_message) {
+      messageUpdate = innerType == CombinatorIds.update_new_message ||
+        innerType == CombinatorIds.update_new_channel_message ||
+        innerType == CombinatorIds.update_edit_message ||
+        innerType == CombinatorIds.update_edit_channel_message;
+      if (!messageUpdate &&
+          innerType != CombinatorIds.update_read_history_inbox &&
+          innerType != CombinatorIds.update_read_history_outbox &&
+          innerType != CombinatorIds.update_read_channel_inbox &&
+          innerType != CombinatorIds.update_read_channel_outbox) {
         lastError = "Unsupported wrapped update type: 0x" + Integer.toHexString(innerType);
         return false;
+      }
+
+      if (!messageUpdate) {
+        parseWrappedReadUpdate(reader, innerType, out);
+        out.date = reader.readInt();
+        if (!reader.atEnd()) {
+          throw new IllegalArgumentException("Wrapped read update did not fully parse.");
+        }
+        lastError = "";
+        return true;
       }
 
       parsedMessageScratch.clear();
@@ -499,6 +516,67 @@ public final class ReaderResultParser {
     } catch (IllegalArgumentException e) {
       lastError = e.getMessage();
       return false;
+    }
+  }
+
+  private void parseWrappedReadUpdate(TLReader reader, int innerType, LiveMessageEvent out) {
+    PeerRef peer = parsedMessageScratch.peer;
+    int flags;
+
+    peer.clear();
+    if (innerType == CombinatorIds.update_read_history_inbox) {
+      flags = reader.readInt();
+      if ((flags & (1 << 0)) != 0) {
+        reader.readInt();
+      }
+      parsePeerRef(reader, peer);
+      if ((flags & (1 << 1)) != 0) {
+        reader.readInt();
+      }
+      out.kind = LiveMessageEvent.KIND_READ;
+      out.peerKind = peer.peerKind;
+      out.peerId = peer.peerId;
+      out.messageId = reader.readInt();
+      out.unreadCount = reader.readInt();
+      out.pts = reader.readInt();
+      out.ptsCount = reader.readInt();
+      if (out.messageId < 0 || out.unreadCount < 0) {
+        throw new IllegalArgumentException("Wrapped inbox read update has invalid counters.");
+      }
+      return;
+    }
+    if (innerType == CombinatorIds.update_read_history_outbox) {
+      parsePeerRef(reader, peer);
+      out.kind = LiveMessageEvent.KIND_READ_OUTBOX;
+      out.peerKind = peer.peerKind;
+      out.peerId = peer.peerId;
+      out.messageId = reader.readInt();
+      out.pts = reader.readInt();
+      out.ptsCount = reader.readInt();
+      if (out.messageId < 0) {
+        throw new IllegalArgumentException("Wrapped outbox read update has a negative max id.");
+      }
+      return;
+    }
+
+    flags = innerType == CombinatorIds.update_read_channel_inbox
+      ? reader.readInt()
+      : 0;
+    if ((flags & (1 << 0)) != 0) {
+      reader.readInt();
+    }
+    out.kind = innerType == CombinatorIds.update_read_channel_inbox
+      ? LiveMessageEvent.KIND_READ
+      : LiveMessageEvent.KIND_READ_OUTBOX;
+    out.peerKind = DialogListModel.PEER_CHANNEL;
+    out.peerId = reader.readLong();
+    out.messageId = reader.readInt();
+    if (innerType == CombinatorIds.update_read_channel_inbox) {
+      out.unreadCount = reader.readInt();
+      out.pts = reader.readInt();
+    }
+    if (out.peerId == 0 || out.messageId < 0 || out.unreadCount < 0) {
+      throw new IllegalArgumentException("Wrapped channel read update has invalid counters.");
     }
   }
 
@@ -1045,6 +1123,8 @@ public final class ReaderResultParser {
             accessHash,
             hasAccessHash,
             dialog.topMessageId,
+            dialog.readInboxMaxId,
+            dialog.readOutboxMaxId,
             title,
             preview,
             dialog.unreadCount,
@@ -1340,6 +1420,9 @@ public final class ReaderResultParser {
       event.peerId = peer.peerId;
       event.messageId = maxId;
       event.unreadCount = reader.readInt();
+      if (event.messageId < 0 || event.unreadCount < 0) {
+        throw new IllegalArgumentException("Inbox read update has invalid counters.");
+      }
       event.pts = reader.readInt();
       event.ptsCount = reader.readInt();
       return;
@@ -1356,6 +1439,9 @@ public final class ReaderResultParser {
       event.peerId = reader.readLong();
       event.messageId = reader.readInt();
       event.unreadCount = reader.readInt();
+      if (event.peerId == 0 || event.messageId < 0 || event.unreadCount < 0) {
+        throw new IllegalArgumentException("Channel inbox read update has invalid counters.");
+      }
       event.pts = reader.readInt();
       event.ptsCount = 0;
       return;
@@ -1364,15 +1450,28 @@ public final class ReaderResultParser {
     if (constructor == CombinatorIds.update_read_history_outbox) {
       peer = new PeerRef();
       parsePeerRef(reader, peer);
-      reader.readInt();
-      reader.readInt();
-      reader.readInt();
+      event = requireLiveEvent(out);
+      event.kind = LiveMessageEvent.KIND_READ_OUTBOX;
+      event.peerKind = peer.peerKind;
+      event.peerId = peer.peerId;
+      event.messageId = reader.readInt();
+      if (event.messageId < 0) {
+        throw new IllegalArgumentException("Outbox read update has a negative max id.");
+      }
+      event.pts = reader.readInt();
+      event.ptsCount = reader.readInt();
       return;
     }
 
     if (constructor == CombinatorIds.update_read_channel_outbox) {
-      reader.readLong();
-      reader.readInt();
+      event = requireLiveEvent(out);
+      event.kind = LiveMessageEvent.KIND_READ_OUTBOX;
+      event.peerKind = DialogListModel.PEER_CHANNEL;
+      event.peerId = reader.readLong();
+      event.messageId = reader.readInt();
+      if (event.peerId == 0 || event.messageId < 0) {
+        throw new IllegalArgumentException("Channel outbox read update has invalid identity.");
+      }
       return;
     }
 
@@ -1507,9 +1606,12 @@ public final class ReaderResultParser {
     flags = reader.readInt();
     parsePeerRef(reader, out.peer);
     out.topMessageId = reader.readInt();
-    reader.readInt();
-    reader.readInt();
+    out.readInboxMaxId = reader.readInt();
+    out.readOutboxMaxId = reader.readInt();
     out.unreadCount = reader.readInt();
+    if (out.readInboxMaxId < 0 || out.readOutboxMaxId < 0 || out.unreadCount < 0) {
+      throw new IllegalArgumentException("Dialog read counters must not be negative.");
+    }
     reader.readInt();
     reader.readInt();
     skipPeerNotifySettings(reader);
@@ -4209,12 +4311,16 @@ public final class ReaderResultParser {
   private static final class DialogScratch {
     final PeerRef peer = new PeerRef();
     int topMessageId = 0;
+    int readInboxMaxId = 0;
+    int readOutboxMaxId = 0;
     int unreadCount = 0;
     int pts = 0;
 
     void clear() {
       peer.clear();
       topMessageId = 0;
+      readInboxMaxId = 0;
+      readOutboxMaxId = 0;
       unreadCount = 0;
       pts = 0;
     }
@@ -4222,6 +4328,8 @@ public final class ReaderResultParser {
     void copyFrom(DialogScratch other) {
       peer.copyFrom(other.peer);
       topMessageId = other.topMessageId;
+      readInboxMaxId = other.readInboxMaxId;
+      readOutboxMaxId = other.readOutboxMaxId;
       unreadCount = other.unreadCount;
       pts = other.pts;
     }

@@ -21,7 +21,7 @@ STATE_DIR="${WORK_DIR}/state"
 LOG_FILE="${ARTIFACT_DIR}/emulator.log"
 SNAPSHOT_FILE="${WORK_DIR}/snapshot.json"
 SCREENSHOT_RESPONSE_FILE="${WORK_DIR}/screenshot.json"
-SCREENSHOT_FILE="${ARTIFACT_DIR}/history-timestamps.png"
+SCREENSHOT_FILE="${ARTIFACT_DIR}/history-message-state.png"
 RUNNER_PID=''
 
 cleanup() {
@@ -53,7 +53,7 @@ for _ in 1 2 3 4 5 6 7 8 9 10; do
   fi
   sleep 1
 done
-if ! grep -q 'HISTORY FIXTURE READY: timestamps 22:13Z through 22:15Z.' "${LOG_FILE}"; then
+if ! grep -q 'HISTORY FIXTURE READY: timestamps 22:13Z through 22:15Z; read then sent.' "${LOG_FILE}"; then
   printf 'The deterministic history fixture was not observed. See %s.\n' "${LOG_FILE}" >&2
   exit 1
 fi
@@ -82,5 +82,5 @@ if ! mcp_assert_png_has_content "${SCREENSHOT_FILE}"; then
   exit 1
 fi
 
-printf 'Offline history timestamp UI smoke passed.\n'
+printf 'Offline history timestamp and delivery-state UI smoke passed.\n'
 printf 'screenshot=%s\nlog=%s\n' "${SCREENSHOT_FILE}" "${LOG_FILE}"

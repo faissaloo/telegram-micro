@@ -54,8 +54,8 @@ Prefer work with high everyday frequency, recovery or compliance value, existing
 | Message timestamps | `foundation` | Server epoch seconds survive history/live/send/warm-state paths and render as allocation-free `HH:MMZ`; local-zone/device proof remains. |
 | Text send | `foundation` | P0; ambiguous-ack/restart idempotence remains. |
 | Pending/sent state | `foundation` | P0; keep immediate visible feedback and recoverable failure. |
-| Delivery/read checkmarks | absent | `next`; compact state only, no per-recipient expansion. |
-| Mark history read | absent | `next`; needed for correct unread semantics and service behavior. |
+| Delivery/read state | `foundation` | Two monotonic integers per retained dialog (96 fixed bytes at capacity 12) drive compact `sent`/`read` labels; live/device semantics remain unproven. |
+| Mark history read | `foundation` | Viewed bounded history emits serialized peer-appropriate read requests with optimistic rollback; PTS acknowledgements detect gaps before catch-up, while live/device proof remains. |
 | Replies | `foundation` outbound context | P0/P1; render a bounded reply preview in history later. |
 | Forward messages | `foundation` | P0/P1; honor protected-content failures explicitly. |
 | Delete messages | `foundation` | P0/P1; add destructive confirmation and revoke-scope clarity. |
@@ -148,8 +148,8 @@ Prefer work with high everyday frequency, recovery or compliance value, existing
 
 | Telegram surface | Current client state | J2ME disposition |
 | --- | --- | --- |
-| `updates.getState/getDifference` | `foundation` | P0; expand fixture corpus and gap recovery. |
-| Channel difference | `foundation` | P0/P1; bounded slice and too-long fallback hardening. |
+| `updates.getState/getDifference` | `foundation` | P0; read/send/delete acknowledgements now preserve PTS gaps for catch-up; expand the fixture corpus. |
+| Channel difference | `foundation` | P0/P1; channel mutation acknowledgements preserve PTS gaps; continue bounded slice and too-long fallback hardening. |
 | Live new/edit/delete updates | `partial` | P0/P1; preserve temporal/read state and unknown-update recovery. |
 | Reconnect/session resume | `foundation` | P0; radio-loss/device soak remains. |
 | Message-ID reconciliation | `foundation` | P0; restart/ambiguous acknowledgement matrix remains. |
@@ -193,12 +193,11 @@ Prefer work with high everyday frequency, recovery or compliance value, existing
 
 ## Current ordered implementation queue
 
-1. Add bounded mark-read/read-state semantics and compact delivery indicators.
-2. Harden ambiguous send acknowledgement and restart idempotence.
-3. Add server-backed in-chat text search with a small result page.
-4. Model protected-content restrictions before offering forward/save actions.
-5. Add bounded DC auth export/import, then cross-DC media download.
-6. Add a small constructor/fixture corpus and long-session capacity soak.
-7. Investigate sponsored-message requirements before stronger channel claims.
+1. Harden ambiguous send acknowledgement and restart idempotence.
+2. Add server-backed in-chat text search with a small result page.
+3. Model protected-content restrictions before offering forward/save actions.
+4. Add bounded DC auth export/import, then cross-DC media download.
+5. Add a small constructor/fixture corpus and long-session capacity soak.
+6. Investigate sponsored-message requirements before stronger channel claims.
 
 Reorder this queue only when local references, a live interoperability failure, device evidence, or user research demonstrates higher core value.

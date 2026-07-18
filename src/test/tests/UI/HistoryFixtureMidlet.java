@@ -24,6 +24,7 @@ public final class HistoryFixtureMidlet extends MIDlet {
         false
       );
       model.finishLocalDialogsLoad();
+      model.reader.applyLiveOutboxRead(DialogListModel.PEER_USER, 1001L, 91);
       model.beginHistoryLoadForSelected();
       model.appendHistoryMessage(
         90, "Bob", "Meet at platform three.", false, false, false,
@@ -34,7 +35,7 @@ public final class HistoryFixtureMidlet extends MIDlet {
         "", "", null, 1700000060
       );
       model.appendHistoryMessage(
-        92, "Bob", "I will wait by the clock.", false, false, false,
+        92, "YOU", "See you by the clock.", true, false, false,
         "", "", null, 1700000120
       );
       model.finishHistoryLoad();
@@ -42,7 +43,7 @@ public final class HistoryFixtureMidlet extends MIDlet {
     }
 
     Display.getDisplay(this).setCurrent(canvas);
-    System.out.println("HISTORY FIXTURE READY: timestamps 22:13Z through 22:15Z.");
+    System.out.println("HISTORY FIXTURE READY: timestamps 22:13Z through 22:15Z; read then sent.");
   }
 
   public void pauseApp() {

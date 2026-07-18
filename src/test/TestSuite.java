@@ -31,13 +31,16 @@ public class TestSuite {
     TestRunner.register(new SyncContext.ParseUpdatesDifferenceSlicePayloadTest());
     TestRunner.register(new SyncContext.SyncStateBuildsDifferenceQueriesFromStateTest());
     TestRunner.register(new SyncContext.SyncStateMarksDifferenceTooLongTest());
+    TestRunner.register(new SyncContext.SyncStateValidatesPtsAcknowledgementContinuityTest());
     TestRunner.register(new SyncContext.ChannelSyncStateBuildsForcedBootstrapRequestTest());
+    TestRunner.register(new SyncContext.ChannelSyncStateValidatesPtsAcknowledgementContinuityTest());
     TestRunner.register(new LiveUpdateContext.ParseShortPrivateUpdatePayloadTest());
     TestRunner.register(new LiveUpdateContext.RejectNegativeShortUpdateDateTest());
     TestRunner.register(new LiveUpdateContext.ParseShortChatUpdatePayloadTest());
     TestRunner.register(new LiveUpdateContext.SyncStateTracksAppliedShortUpdatesTest());
     TestRunner.register(new LiveUpdateContext.ParseWrappedShortNewMessagePayloadTest());
     TestRunner.register(new LiveUpdateContext.ParseWrappedShortEditMessagePayloadTest());
+    TestRunner.register(new LiveUpdateContext.ParseWrappedShortOutboxReadPayloadTest());
     TestRunner.register(new LiveUpdateContext.ParseUpdatesVectorPayloadTest());
     TestRunner.register(new LiveUpdateContext.ParseUpdatesVectorMessageIdPayloadTest());
     TestRunner.register(new LiveUpdateContext.ParseUpdatesCombinedDeletePayloadTest());
@@ -53,6 +56,7 @@ public class TestSuite {
     TestRunner.register(new SecretChatContext.ParseWrappedShortSecretUpdateTest());
     TestRunner.register(new ReaderContext.BuildGetDialogsRequestTest());
     TestRunner.register(new ReaderContext.BuildGetHistoryRequestTest());
+    TestRunner.register(new ReaderContext.BuildReadHistoryRequestTest());
     TestRunner.register(new OutboundContext.BuildSendMessageRequestTest());
     TestRunner.register(new OutboundContext.BuildReplySendMessageRequestTest());
     TestRunner.register(new OutboundContext.BuildForwardMessagesRequestTest());
@@ -71,6 +75,7 @@ public class TestSuite {
     TestRunner.register(new OutboundContext.BuildContactsSearchRequestTest());
     TestRunner.register(new OutboundContext.BuildGetFullUserRequestTest());
     TestRunner.register(new ReaderContext.ParseDialogsPayloadTest());
+    TestRunner.register(new ReaderContext.RejectNegativeDialogReadWatermarkTest());
     TestRunner.register(new ReaderContext.ParseDialogsPayloadWithCurrentDraftTest());
     TestRunner.register(new ReaderContext.ParseDialogsSliceChannelPayloadTest());
     TestRunner.register(new ReaderContext.ParseHistoryPayloadTest());
@@ -129,12 +134,15 @@ public class TestSuite {
     TestRunner.register(new WarmStateContext.ForwardComposeContextRoundTripTest());
     TestRunner.register(new WarmStateContext.LegacyWarmStateDecodeRemainsSupportedTest());
     TestRunner.register(new WarmStateContext.PreviousWarmStateVersionDefaultsMessageDateTest());
+    TestRunner.register(new WarmStateContext.Version9WarmStateDefaultsReadWatermarksTest());
     TestRunner.register(new WarmStateContext.TruncatedCurrentWarmStateIsRejectedTest());
     TestRunner.register(new WarmStateContext.CorruptCurrentWarmStateDateIsRejectedTest());
+    TestRunner.register(new WarmStateContext.CorruptCurrentDialogReadWatermarkIsRejectedTest());
     TestRunner.register(new WarmStateContext.MediaWarmStateRoundTripTest());
     TestRunner.register(new WarmStateContext.WarmStateStoreRoundTripTest());
     TestRunner.register(new WarmStateContext.OversizedWarmStateIsRejectedTest());
     TestRunner.register(new WarmStateContext.NegativeMessageDateIsNotEncodedTest());
+    TestRunner.register(new WarmStateContext.NegativeDialogReadWatermarkIsNotEncodedTest());
     TestRunner.register(new WarmStateContext.SecretChatPendingKeyIsBoundedTest());
     TestRunner.register(new FailureLogContext.PushTracksLatestEntryTest());
     TestRunner.register(new FailureLogContext.RingRetainsNewestEntriesTest());

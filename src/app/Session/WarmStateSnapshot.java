@@ -9,7 +9,7 @@ import reader.ReaderStateModel;
 import reader.SecretChatDirectory;
 
 public final class WarmStateSnapshot {
-  public static final int VERSION = 9;
+  public static final int VERSION = 10;
   public static final int COMPOSE_ERROR_MAX = 96;
   public static final int COMPOSE_CONTEXT_LABEL_MAX = ComposeStateModel.CONTEXT_LABEL_MAX;
   public static final int COMPOSE_CONTEXT_PREVIEW_MAX = ComposeStateModel.CONTEXT_PREVIEW_MAX;
@@ -42,6 +42,8 @@ public final class WarmStateSnapshot {
     public long accessHash = 0;
     public boolean hasAccessHash = false;
     public int topMessageId = 0;
+    public int readInboxMaxId = 0;
+    public int readOutboxMaxId = 0;
     public String title = "";
     public String preview = "";
     public int unreadCount = 0;
@@ -53,6 +55,8 @@ public final class WarmStateSnapshot {
       accessHash = 0;
       hasAccessHash = false;
       topMessageId = 0;
+      readInboxMaxId = 0;
+      readOutboxMaxId = 0;
       title = "";
       preview = "";
       unreadCount = 0;

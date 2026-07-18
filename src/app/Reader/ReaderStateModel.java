@@ -155,7 +155,47 @@ public class ReaderStateModel {
     int unreadCount,
     boolean hasMedia
   ) {
-    return dialogs.append(peerKind, peerId, accessHash, hasAccessHash, topMessageId, title, preview, unreadCount, hasMedia);
+    return appendDialog(
+      peerKind,
+      peerId,
+      accessHash,
+      hasAccessHash,
+      topMessageId,
+      0,
+      0,
+      title,
+      preview,
+      unreadCount,
+      hasMedia
+    );
+  }
+
+  public boolean appendDialog(
+    int peerKind,
+    long peerId,
+    long accessHash,
+    boolean hasAccessHash,
+    int topMessageId,
+    int readInboxMaxId,
+    int readOutboxMaxId,
+    String title,
+    String preview,
+    int unreadCount,
+    boolean hasMedia
+  ) {
+    return dialogs.append(
+      peerKind,
+      peerId,
+      accessHash,
+      hasAccessHash,
+      topMessageId,
+      readInboxMaxId,
+      readOutboxMaxId,
+      title,
+      preview,
+      unreadCount,
+      hasMedia
+    );
   }
 
   public boolean appendHistoryMessage(String sender, String text, boolean outgoing, boolean pending) {
@@ -828,9 +868,13 @@ public class ReaderStateModel {
   }
 
   public boolean applyLiveUnreadCount(int peerKind, long peerId, int unreadCount) {
+    return applyLiveInboxRead(peerKind, peerId, 0, unreadCount);
+  }
+
+  public boolean applyLiveInboxRead(int peerKind, long peerId, int maxMessageId, int unreadCount) {
     int dialogIndex;
 
-    if (peerKind == DialogListModel.PEER_UNKNOWN || peerId == 0) {
+    if (peerKind == DialogListModel.PEER_UNKNOWN || peerId == 0 || maxMessageId < 0) {
       return false;
     }
 
@@ -839,8 +883,47 @@ public class ReaderStateModel {
       return false;
     }
 
+    if (maxMessageId > 0 && maxMessageId < dialogs.items[dialogIndex].readInboxMaxId) {
+      return true;
+    }
+    if (maxMessageId > dialogs.items[dialogIndex].readInboxMaxId) {
+      dialogs.items[dialogIndex].readInboxMaxId = maxMessageId;
+    }
     dialogs.items[dialogIndex].unreadCount = unreadCount > 0 ? unreadCount : 0;
     return true;
+  }
+
+  public boolean applyLiveOutboxRead(int peerKind, long peerId, int maxMessageId) {
+    int dialogIndex;
+
+    if (peerKind == DialogListModel.PEER_UNKNOWN || peerId == 0 || maxMessageId < 0) {
+      return false;
+    }
+
+    dialogIndex = dialogs.indexOfPeer(peerKind, peerId);
+    if (dialogIndex < 0) {
+      return false;
+    }
+
+    if (maxMessageId > dialogs.items[dialogIndex].readOutboxMaxId) {
+      dialogs.items[dialogIndex].readOutboxMaxId = maxMessageId;
+    }
+    return true;
+  }
+
+  public int latestIncomingMessageIdForPeer(int peerKind, long peerId) {
+    HistorySlot slot = findHistorySlot(peerKind, peerId);
+    int latest = 0;
+
+    if (slot == null) {
+      return 0;
+    }
+    for (int i = 0; i < slot.messages.count; ++i) {
+      if (!slot.messages.items[i].outgoing && slot.messages.items[i].messageId > latest) {
+        latest = slot.messages.items[i].messageId;
+      }
+    }
+    return latest;
   }
 
   public boolean markLatestPendingOutboundSent(int peerKind, long peerId, int messageId) {
@@ -1198,6 +1281,8 @@ public class ReaderStateModel {
       target.accessHash = source.accessHash;
       target.hasAccessHash = source.hasAccessHash;
       target.topMessageId = source.topMessageId;
+      target.readInboxMaxId = source.readInboxMaxId;
+      target.readOutboxMaxId = source.readOutboxMaxId;
       target.title = source.title;
       target.preview = source.preview;
       target.unreadCount = source.unreadCount;
@@ -1304,6 +1389,8 @@ public class ReaderStateModel {
         source.accessHash,
         source.hasAccessHash,
         source.topMessageId,
+        source.readInboxMaxId,
+        source.readOutboxMaxId,
         source.title,
         source.preview,
         source.unreadCount,

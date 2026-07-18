@@ -4,6 +4,7 @@ import javax.microedition.lcdui.Canvas;
 import javax.microedition.lcdui.Font;
 import javax.microedition.lcdui.Graphics;
 
+import reader.DialogListModel;
 import reader.MessageListModel;
 
 final class HistoryCanvas extends Canvas {
@@ -142,6 +143,7 @@ final class HistoryCanvas extends Canvas {
     int maxBubbleWidth = metrics.contentWidth - 20;
     int lineCount = ShellTextWrap.wrap(item.text, bodyFont, maxBubbleWidth - (bubblePadding * 2), wrapStarts, wrapLengths);
     String mediaSummary = item.mediaSummary();
+    String messageStatus = messageStatus(item);
     int mediaLineCount = item.hasMedia && mediaSummary.length() > 0
       ? ShellTextWrap.wrap(mediaSummary, metaFont, maxBubbleWidth - (bubblePadding * 2), mediaWrapStarts, mediaWrapLengths)
       : 0;
@@ -192,8 +194,8 @@ final class HistoryCanvas extends Canvas {
       textY += metaFont.getHeight();
     }
     g.setColor(item.pending ? 0x845900 : (selected ? ShellTheme.SELECT_TEXT : ShellTheme.TEXT_SOFT));
-    if (item.pending) {
-      g.drawString("pending", textX, textY + 2, Graphics.TOP | Graphics.LEFT);
+    if (messageStatus.length() > 0) {
+      g.drawString(messageStatus, textX, textY + 2, Graphics.TOP | Graphics.LEFT);
     }
     timeLength = MessageTime.formatUtc(item.dateSeconds, timeChars);
     if (timeLength > 0) {
@@ -222,6 +224,26 @@ final class HistoryCanvas extends Canvas {
     return width;
   }
 
+  private String messageStatus(MessageListModel.Item item) {
+    DialogListModel.Item dialog;
+
+    if (item.pending) {
+      return "pending";
+    }
+    if (!item.outgoing || item.messageId <= 0) {
+      return "";
+    }
+
+    dialog = model.reader.selectedDialog();
+    if (dialog != null &&
+        dialog.peerKind == model.reader.historyPeerKind &&
+        dialog.peerId == model.reader.historyPeerId &&
+        dialog.readOutboxMaxId >= item.messageId) {
+      return "read";
+    }
+    return "sent";
+  }
+
   private void ensureLayout() {
     Font senderFont = metrics.titleFont;
     Font bodyFont = metrics.bodyFont;
@@ -235,6 +257,7 @@ final class HistoryCanvas extends Canvas {
 
     for (int i = 0; i < model.reader.history.count && i < messageTop.length; ++i) {
       MessageListModel.Item item = model.reader.history.items[i];
+      String messageStatus = messageStatus(item);
       int lineCount = ShellTextWrap.wrap(item.text, bodyFont, maxBubbleWidth - 12, wrapStarts, wrapLengths);
       String mediaSummary = item.mediaSummary();
       int mediaLineCount = item.hasMedia && mediaSummary.length() > 0
@@ -245,12 +268,12 @@ final class HistoryCanvas extends Canvas {
       int mediaWidth = mediaLineCount > 0
         ? ShellTextWrap.widestLine(mediaSummary, metaFont, mediaWrapStarts, mediaWrapLengths, mediaLineCount)
         : 0;
-      int pendingWidth = item.pending ? metaFont.stringWidth("pending") : 0;
+      int messageStatusWidth = messageStatus.length() > 0 ? metaFont.stringWidth(messageStatus) : 0;
       int timeWidth = item.dateSeconds > 0 ? metaFont.stringWidth("00:00Z") : 0;
-      int statusWidth = pendingWidth;
+      int statusWidth = messageStatusWidth;
       int metaWidth;
 
-      if (pendingWidth > 0 && timeWidth > 0) {
+      if (messageStatusWidth > 0 && timeWidth > 0) {
         statusWidth += 8 + timeWidth;
       } else if (timeWidth > statusWidth) {
         statusWidth = timeWidth;
@@ -276,7 +299,7 @@ final class HistoryCanvas extends Canvas {
       messageHeight[i] = 10 + senderFont.getHeight() +
         (lineCount * bodyFont.getHeight()) +
         (mediaLineCount * metaFont.getHeight()) +
-        ((item.pending || item.dateSeconds > 0) ? metaFont.getHeight() : 0) + 8;
+        ((messageStatus.length() > 0 || item.dateSeconds > 0) ? metaFont.getHeight() : 0) + 8;
       y += messageHeight[i] + 6;
     }
     contentHeight = y;

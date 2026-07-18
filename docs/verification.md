@@ -14,11 +14,12 @@ TelegramMicro separates deterministic offline proof from production-account and 
 | `./scripts/verify.sh --full` | Standard offline pre-push gate | UI, production Telegram, physical Nokia |
 | `./scripts/verify.sh --full --ui` | Standard gate plus clean-state first-install/entropy and deterministic history UI captures | Login interoperability or real device |
 
-`verify-ui.sh` and `verify-history-ui.sh` require a real display for the pinned GTK2 ScritchUI backend, even though the app runs through the hosted VM. They fail before starting the emulator when Linux has no `DISPLAY`; do not replace this evidence lane with a virtual X server. The first-install lane requires the entropy marker and rejects evidence if bootstrap/reconnect starts before it. The history lane runs a test-JAR-only, account-free model fixture through the production canvas. Both write ignored artifacts under `artifacts/ui-smoke` and clean only their isolated temporary state.
+`verify-ui.sh` and `verify-history-ui.sh` require a real display for the pinned GTK2 ScritchUI backend, even though the app runs through the hosted VM. They fail before starting the emulator when Linux has no `DISPLAY`; do not replace this evidence lane with a virtual X server. The first-install lane requires the entropy marker and rejects evidence if bootstrap/reconnect starts before it. The history lane runs a test-JAR-only, account-free model fixture through the production canvas and proves timestamp plus `read`/`sent` layout states. Both write ignored artifacts under `artifacts/ui-smoke` and clean only their isolated temporary state.
 
 ## Change-to-proof matrix
 
 - Parser/TL/transport changes need malformed, truncated, oversized, and unknown-shape regressions where applicable.
+- PTS-bearing mutation acknowledgements need contiguous, duplicate/stale, and gap cases for both cloud and channel state.
 - Authentication/crypto changes need local reference comparison, transcript/nonce failure tests, and the full offline gate.
 - Durable-state changes need current round-trip, legacy compatibility when promised, and corrupt/truncated/oversized rejection.
 - UI/startup changes need direct MCP inspection in addition to model tests.

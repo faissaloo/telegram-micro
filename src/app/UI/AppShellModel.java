@@ -13,6 +13,7 @@ import session.FailureLog;
 import session.OutboundRecoveryState;
 import session.ResumeState;
 import session.WarmStateSnapshot;
+import search.MessageSearchStateModel;
 import support.WorkingSet;
 import sync.SyncState;
 
@@ -24,6 +25,7 @@ public class AppShellModel {
   public static final int SCREEN_DISCOVERY = 5;
   public static final int SCREEN_PEER = 6;
   public static final int SCREEN_MEDIA = 7;
+  public static final int SCREEN_MESSAGE_SEARCH = 8;
 
   public static final int TARGET_RAM_BUDGET_BYTES = 256 * 1024;
   public static final int TARGET_RESERVED_BYTES = 80 * 1024;
@@ -36,6 +38,7 @@ public class AppShellModel {
   public final ReaderStateModel reader = new ReaderStateModel();
   public final ComposeStateModel compose = new ComposeStateModel();
   public final DiscoveryStateModel discovery = new DiscoveryStateModel();
+  public final MessageSearchStateModel messageSearch = new MessageSearchStateModel();
   public final PeerActionStateModel peer = new PeerActionStateModel();
   public final MediaPlanQueue mediaQueue = new MediaPlanQueue();
   public final OutboundRecoveryState outbound = new OutboundRecoveryState();
@@ -98,6 +101,7 @@ public class AppShellModel {
     router.navigate(SCREEN_DIALOGS);
     reader.clearAll();
     discovery.clear();
+    messageSearch.clear();
     peer.clear();
     mediaQueue.clear();
     compose.bindPeer(DialogListModel.PEER_UNKNOWN, 0, "No dialog selected");
@@ -131,6 +135,7 @@ public class AppShellModel {
     router.navigate(SCREEN_STATUS);
     reader.clearAll();
     discovery.clear();
+    messageSearch.clear();
     peer.clear();
     mediaQueue.clear();
     compose.bindPeer(DialogListModel.PEER_UNKNOWN, 0, "No dialog selected");
@@ -150,6 +155,7 @@ public class AppShellModel {
     router.navigate(SCREEN_STATUS);
     reader.clearAll();
     discovery.clear();
+    messageSearch.clear();
     peer.clear();
     mediaQueue.clear();
     compose.bindPeer(DialogListModel.PEER_UNKNOWN, 0, "No dialog selected");
@@ -503,6 +509,10 @@ public class AppShellModel {
 
   public void navigateMedia() {
     router.navigate(SCREEN_MEDIA);
+  }
+
+  public void navigateMessageSearch() {
+    router.navigate(SCREEN_MESSAGE_SEARCH);
   }
 
   public void goBack() {
@@ -868,6 +878,68 @@ public class AppShellModel {
 
   public DiscoveryStateModel.Result selectedDiscoveryResult() {
     return discovery.selected();
+  }
+
+  public boolean openMessageSearch() {
+    DialogListModel.Item selected = reader.selectedDialog();
+
+    if (selected == null || !messageSearch.bindPeer(
+        selected.peerKind,
+        selected.peerId,
+        selected.title)) {
+      activeDetail = "Open a dialog before searching its messages.";
+      return false;
+    }
+    router.navigate(SCREEN_MESSAGE_SEARCH);
+    activeDetail = messageSearch.detail;
+    recomputeWorkingSet();
+    return true;
+  }
+
+  public boolean beginMessageSearch(String query) {
+    DialogListModel.Item selected = reader.selectedDialog();
+
+    if (selected == null || !messageSearch.bindPeer(
+        selected.peerKind,
+        selected.peerId,
+        selected.title)) {
+      activeDetail = "Open a dialog before searching its messages.";
+      return false;
+    }
+    if (!messageSearch.begin(query)) {
+      activeDetail = "Search text must be 1-" +
+        Integer.toString(MessageSearchStateModel.QUERY_MAX) + " characters.";
+      return false;
+    }
+    router.navigate(SCREEN_MESSAGE_SEARCH);
+    activeDetail = messageSearch.detail;
+    recomputeWorkingSet();
+    return true;
+  }
+
+  public void onMessageSearchReady() {
+    activeDetail = messageSearch.detail;
+    recomputeWorkingSet();
+  }
+
+  public void onMessageSearchFailed(String detail) {
+    messageSearch.fail(detail);
+    activeDetail = messageSearch.detail;
+    recomputeWorkingSet();
+  }
+
+  public boolean selectMessageSearchIndex(int index) {
+    boolean changed = messageSearch.selectIndex(index);
+
+    if (changed) {
+      activeDetail = "Selected search result " + Integer.toString(index + 1) +
+        " of " + Integer.toString(messageSearch.results.count) + ".";
+    }
+    return changed;
+  }
+
+  public reader.MessageListModel.Item selectedMessageSearchResult() {
+    return messageSearch.selected();
   }
 
   public boolean openSelectedDiscoveryResult() {
@@ -1635,7 +1707,9 @@ public class AppShellModel {
   public WarmStateSnapshot captureWarmState() {
     WarmStateSnapshot snapshot = new WarmStateSnapshot();
 
-    snapshot.route = router.currentScreen;
+    snapshot.route = router.currentScreen == SCREEN_MESSAGE_SEARCH
+      ? SCREEN_HISTORY
+      : router.currentScreen;
     reader.exportWarmState(snapshot);
     snapshot.composePeerKind = compose.peerKind;
     snapshot.composePeerId = compose.peerId;
@@ -1666,6 +1740,7 @@ public class AppShellModel {
     }
 
     reader.importWarmState(snapshot);
+    messageSearch.clear();
     compose.bindPeer(snapshot.composePeerKind, snapshot.composePeerId, snapshot.composePeerTitle);
     compose.text = snapshot.composeText != null ? snapshot.composeText : "";
     compose.status = snapshot.composeStatus;
@@ -1733,6 +1808,10 @@ public class AppShellModel {
     int cachedHistoryBytes = (reader.historySlotCount() - 1) * reader.historyCapacityPerSlot() * 100;
     int composeBytes = compose.text.length() > 0 ? compose.text.length() * 2 : 0;
     int mediaQueueBytes = mediaQueue.count * 96 + mediaQueue.totalStoredBytes();
+    int searchBytes =
+      messageSearch.results.capacity() * MessageSearchStateModel.RESULT_WORKING_BYTES +
+      MessageSearchStateModel.STATE_WORKING_BYTES +
+      (messageSearch.query.length() + messageSearch.peerTitle.length()) * 2;
 
     workingSet.init(TARGET_RAM_BUDGET_BYTES, TARGET_RESERVED_BYTES);
     workingSet.add(WorkingSet.WORK_AUTH, 12 * 1024, true);
@@ -1744,6 +1823,7 @@ public class AppShellModel {
     if (mediaQueueBytes > 0) {
       workingSet.add(WorkingSet.WORK_UI, mediaQueueBytes, false);
     }
+    workingSet.add(WorkingSet.WORK_UI, searchBytes, true);
     workingSet.add(WorkingSet.WORK_READER_DIALOGS, reader.dialogs.capacity() * 168, true);
     workingSet.add(WorkingSet.WORK_READER_HISTORY, historyBytes, true);
     if (cachedHistoryBytes > 0) {

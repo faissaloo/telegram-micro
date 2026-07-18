@@ -49,6 +49,8 @@ if [[ "$(uname -s)" == 'Linux' ]]; then
     env -u DISPLAY bash "${ROOT_DIR}/scripts/verify-ui.sh"
   expect_status 69 'displayless history UI verification fails before emulator startup' \
     env -u DISPLAY bash "${ROOT_DIR}/scripts/verify-history-ui.sh"
+  expect_status 69 'displayless search UI verification fails before emulator startup' \
+    env -u DISPLAY bash "${ROOT_DIR}/scripts/verify-search-ui.sh"
 fi
 
 dynamic_port="$(unset SQUIRRELJME_MCP_PORT; mcp_pick_port)"

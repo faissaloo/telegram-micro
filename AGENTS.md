@@ -84,6 +84,8 @@ Treat references as specifications and implementation evidence, not code to copy
 
 For outbound message mutations, prove the whole idempotence invariant: the peer, payload/context, and nonzero `random_id` stay coherent across navigation, reconnect, and restart; no more than one optimistic history row exists; catch-up may reconcile `updateMessageID` before a resend; and a retry reuses the exact original identity. Never generate a replacement ID for an ambiguously acknowledged request.
 
+For server-backed secondary lists such as search, declare query and result limits before implementation, reject an oversized server page before mutating core or peer state, keep ephemeral results out of warm/durable state, distinguish zero results from failure, and prove that Back restores the originating screen without unintended read or mutation side effects.
+
 ## Nokia C2-01 constraints
 
 - Prefer fixed-capacity models, bounded arrays, reusable buffers, and ownership transfer over unbounded collections and repeated copies.

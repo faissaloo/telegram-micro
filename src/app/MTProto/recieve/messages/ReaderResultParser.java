@@ -8,6 +8,7 @@ import reader.MessageListModel;
 import reader.PeerDirectory;
 import reader.ReaderStateModel;
 import reader.SecretChatDirectory;
+import search.MessageSearchStateModel;
 
 public final class ReaderResultParser {
   public static final int TG_VECTOR_ID = (int)0x1cb5c415L;
@@ -247,6 +248,9 @@ public final class ReaderResultParser {
   private final PeerDirectory scratchPeers;
   private final DialogScratch parsedDialogScratch = new DialogScratch();
   private final MessageScratch parsedMessageScratch = new MessageScratch();
+  private int parsedMessageCount = 0;
+  private int parsedMessageTotalCount = 0;
+  private boolean parsedMessagesNotModified = false;
   private String lastError = "";
 
   public static final class LiveMessageEvent {
@@ -1146,11 +1150,6 @@ public final class ReaderResultParser {
   }
 
   public boolean applyHistory(RPCResponse response, ReaderStateModel state, int peerKind, long peerId) {
-    TLReader reader;
-    int constructor;
-    int messageCount;
-    int chatCount;
-    int userCount;
     int i;
 
     if (response == null || state == null || response.body == null) {
@@ -1158,30 +1157,148 @@ public final class ReaderResultParser {
       return false;
     }
 
+    if (!parseMessagesPayload(
+        response,
+        state.peers,
+        true,
+        state.history.capacity(),
+        "History")) {
+      return false;
+    }
+    if (parsedMessagesNotModified) {
+      state.historyPeerKind = peerKind;
+      state.historyPeerId = peerId;
+      lastError = "";
+      return true;
+    }
+    if (!state.peers.copyFrom(scratchPeers)) {
+      lastError = "Peer directory capacity exceeded during history load.";
+      return false;
+    }
+    for (i = 0; i < parsedMessageCount; ++i) {
+      MessageScratch message = messageScratch[i];
+      PeerRef senderPeer = message.hasFromPeer ? message.fromPeer : message.peer;
+      String sender = state.peers.titleOrFallback(senderPeer.peerKind, senderPeer.peerId);
+
+      if (!state.appendHistoryMessage(
+          message.id,
+          sender,
+          message.previewText(),
+          message.outgoing,
+          false,
+          message.hasMedia,
+          message.mediaLabel,
+          message.mediaInfo,
+          message.mediaRef,
+          message.date)) {
+        lastError = "History capacity exceeded.";
+        return false;
+      }
+    }
+
+    state.historyPeerKind = peerKind;
+    state.historyPeerId = peerId;
+    lastError = "";
+    return true;
+  }
+
+  public boolean applyMessageSearch(
+    RPCResponse response,
+    ReaderStateModel state,
+    MessageSearchStateModel search
+  ) {
+    int i;
+
+    if (response == null || state == null || search == null || response.body == null) {
+      lastError = "Search payload is missing.";
+      return false;
+    }
+    if (!search.loading) {
+      lastError = "Search result arrived without a pending bounded query.";
+      return false;
+    }
+    if (!parseMessagesPayload(
+        response,
+        state.peers,
+        false,
+        search.results.capacity(),
+        "Search")) {
+      return false;
+    }
+    for (i = 0; i < parsedMessageCount; ++i) {
+      if (messageScratch[i].id <= 0) {
+        lastError = "Search result contains an invalid message id.";
+        return false;
+      }
+    }
+    if (!state.peers.copyFrom(scratchPeers)) {
+      lastError = "Peer directory capacity exceeded during message search.";
+      return false;
+    }
+    for (i = 0; i < parsedMessageCount; ++i) {
+      MessageScratch message = messageScratch[i];
+      PeerRef senderPeer = message.hasFromPeer ? message.fromPeer : message.peer;
+      String sender = state.peers.titleOrFallback(senderPeer.peerKind, senderPeer.peerId);
+
+      if (!search.appendResult(
+          message.id,
+          sender,
+          message.previewText(),
+          message.outgoing,
+          message.hasMedia,
+          message.mediaLabel,
+          message.mediaInfo,
+          message.date)) {
+        lastError = "Search result page could not be retained boundedly.";
+        return false;
+      }
+    }
+    search.finish(parsedMessageTotalCount);
+    lastError = "";
+    return true;
+  }
+
+  private boolean parseMessagesPayload(
+    RPCResponse response,
+    PeerDirectory seedPeers,
+    boolean allowNotModified,
+    int maxMessageCount,
+    String purpose
+  ) {
+    TLReader reader;
+    int constructor;
+    int chatCount;
+    int userCount;
+    int i;
+
+    parsedMessageCount = 0;
+    parsedMessageTotalCount = 0;
+    parsedMessagesNotModified = false;
     try {
       resetScratch();
-      if (!scratchPeers.copyFrom(state.peers)) {
-        lastError = "Could not seed history peer cache.";
+      if (!scratchPeers.copyFrom(seedPeers)) {
+        lastError = "Could not seed " + purpose.toLowerCase() + " peer cache.";
         return false;
       }
 
       reader = new TLReader(response.body);
       constructor = response.type;
-
       if (constructor == CombinatorIds.messages_messages_not_modified) {
+        if (!allowNotModified) {
+          lastError = "Unexpected search constructor: 0x" + Integer.toHexString(constructor);
+          return false;
+        }
         reader.readInt();
         if (!reader.atEnd()) {
           throw new IllegalArgumentException("History-not-modified payload did not fully parse.");
         }
-        state.historyPeerKind = peerKind;
-        state.historyPeerId = peerId;
-        lastError = "";
+        parsedMessagesNotModified = true;
         return true;
       }
 
       if (constructor == CombinatorIds.messages_messages_slice) {
         int flags = reader.readInt();
-        reader.readInt();
+        parsedMessageTotalCount = reader.readInt();
         if ((flags & (1 << 0)) != 0) {
           reader.readInt();
         }
@@ -1195,11 +1312,11 @@ public final class ReaderResultParser {
           throw new IllegalArgumentException("messages.messagesSlice flags are not supported.");
         }
       } else if (constructor == CombinatorIds.messages_messages_slice_legacy) {
-        reader.readInt();
+        parsedMessageTotalCount = reader.readInt();
       } else if (constructor == CombinatorIds.messages_channel_messages) {
         int flags = reader.readInt();
         reader.readInt();
-        reader.readInt();
+        parsedMessageTotalCount = reader.readInt();
         if ((flags & (1 << 2)) != 0) {
           reader.readInt();
         }
@@ -1208,11 +1325,18 @@ public final class ReaderResultParser {
         }
       } else if (constructor != CombinatorIds.messages_messages &&
                  constructor != CombinatorIds.messages_messages_legacy) {
-        lastError = "Unexpected history constructor: 0x" + Integer.toHexString(constructor);
+        lastError = "Unexpected " + purpose.toLowerCase() + " constructor: 0x" +
+          Integer.toHexString(constructor);
         return false;
       }
 
-      messageCount = parseMessagesVector(reader);
+      if (parsedMessageTotalCount < 0) {
+        throw new IllegalArgumentException("Message result total must not be negative.");
+      }
+      parsedMessageCount = parseMessagesVector(reader, maxMessageCount, purpose);
+      if (parsedMessageTotalCount < parsedMessageCount) {
+        parsedMessageTotalCount = parsedMessageCount;
+      }
 
       if (constructor == CombinatorIds.messages_messages ||
           constructor == CombinatorIds.messages_messages_slice ||
@@ -1227,44 +1351,13 @@ public final class ReaderResultParser {
       for (i = 0; i < chatCount; ++i) {
         parseChatToPeers(reader, scratchPeers);
       }
-
       userCount = reader.readVectorCount();
       for (i = 0; i < userCount; ++i) {
         parseUserToPeers(reader, scratchPeers);
       }
-
       if (!reader.atEnd()) {
-        throw new IllegalArgumentException("History payload did not fully parse.");
+        throw new IllegalArgumentException(purpose + " payload did not fully parse.");
       }
-
-      if (!state.peers.copyFrom(scratchPeers)) {
-        lastError = "Peer directory capacity exceeded during history load.";
-        return false;
-      }
-      for (i = 0; i < messageCount; ++i) {
-        MessageScratch message = messageScratch[i];
-        PeerRef senderPeer = message.hasFromPeer ? message.fromPeer : message.peer;
-        String sender = state.peers.titleOrFallback(senderPeer.peerKind, senderPeer.peerId);
-
-        if (!state.appendHistoryMessage(
-            message.id,
-            sender,
-            message.previewText(),
-            message.outgoing,
-            false,
-            message.hasMedia,
-            message.mediaLabel,
-            message.mediaInfo,
-            message.mediaRef,
-            message.date)) {
-          lastError = "History capacity exceeded.";
-          return false;
-        }
-      }
-
-      state.historyPeerKind = peerKind;
-      state.historyPeerId = peerId;
-      lastError = "";
       return true;
     } catch (IllegalArgumentException e) {
       lastError = e.getMessage();
@@ -1300,9 +1393,19 @@ public final class ReaderResultParser {
   }
 
   private int parseMessagesVector(TLReader reader) {
+    return parseMessagesVector(reader, Integer.MAX_VALUE, "Message");
+  }
+
+  private int parseMessagesVector(TLReader reader, int maximumCount, String purpose) {
     int count = reader.readVectorCount();
     int kept = 0;
     int i;
+
+    if (maximumCount <= 0 || count > maximumCount) {
+      throw new IllegalArgumentException(
+        purpose + " result page exceeds its bounded capacity."
+      );
+    }
 
     for (i = 0; i < count; ++i) {
       int messageOffset = reader.offset();

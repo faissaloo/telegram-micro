@@ -46,6 +46,7 @@ import mtproto.send.messages.SendGetFullChat;
 import mtproto.send.messages.SendGetHistory;
 import mtproto.send.messages.SendReadHistory;
 import mtproto.send.messages.SendRequestEncryption;
+import mtproto.send.messages.SendSearchMessages;
 import mtproto.send.messages.SendSendMessage;
 import mtproto.send.upload.SendUploadGetFile;
 import mtproto.send.updates.SendGetChannelDifference;
@@ -68,6 +69,7 @@ import session.SessionSnapshot;
 import session.SessionStore;
 import session.WarmStateSnapshot;
 import session.WarmStateStore;
+import search.MessageSearchStateModel;
 import sync.ChannelSyncState;
 import sync.SyncState;
 import ui.AppShellActions;
@@ -109,6 +111,8 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
   private static final int PEER_ACTION_SECRET_DISCARD = 4;
   private static final String READ_ACK_WAIT_DETAIL =
     "Wait for the read acknowledgement, then retry.";
+  private static final String MESSAGE_SEARCH_WAIT_DETAIL =
+    "Wait for the message search to finish, then retry.";
   private int pendingSelectedPeerKind = DialogListModel.PEER_UNKNOWN;
   private long pendingSelectedPeerId = 0;
   private int pendingHistoryPeerKind = DialogListModel.PEER_UNKNOWN;
@@ -125,6 +129,9 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
   private long pendingSendPeerId = 0;
   private long pendingSendRandomId = 0;
   private String pendingDiscoveryQuery = "";
+  private int pendingMessageSearchPeerKind = DialogListModel.PEER_UNKNOWN;
+  private long pendingMessageSearchPeerId = 0;
+  private String pendingMessageSearchQuery = "";
   private int pendingPeerInfoKind = DialogListModel.PEER_UNKNOWN;
   private long pendingPeerInfoId = 0;
   private int pendingPeerActionType = PEER_ACTION_NONE;
@@ -290,6 +297,7 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     differenceRequestInFlight = false;
     channelDifferenceRequestInFlight = false;
     clearPendingDiscoverySearch();
+    clearPendingMessageSearch();
     clearPendingPeerInfo();
     clearPendingPeerAction();
     clearPendingDeleteState();
@@ -316,6 +324,12 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     pendingDiscoveryQuery = "";
   }
 
+  private void clearPendingMessageSearch() {
+    pendingMessageSearchPeerKind = DialogListModel.PEER_UNKNOWN;
+    pendingMessageSearchPeerId = 0;
+    pendingMessageSearchQuery = "";
+  }
+
   private void clearPendingPeerInfo() {
     pendingPeerInfoKind = DialogListModel.PEER_UNKNOWN;
     pendingPeerInfoId = 0;
@@ -339,12 +353,18 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     return pendingReadPeerKind != DialogListModel.PEER_UNKNOWN && pendingReadMaxId > 0;
   }
 
+  private boolean messageSearchRequestInFlight() {
+    return pendingMessageSearchPeerKind != DialogListModel.PEER_UNKNOWN &&
+      pendingMessageSearchPeerId != 0;
+  }
+
   private boolean hasRpcConflictForVisibleRead() {
     return syncStateRequestInFlight ||
       differenceRequestInFlight ||
       channelDifferenceRequestInFlight ||
       (syncState != null && syncState.needsDifference) ||
       pendingHistoryPeerKind != DialogListModel.PEER_UNKNOWN ||
+      messageSearchRequestInFlight() ||
       (appShellModel != null &&
         (appShellModel.reader.loadingDialogs || appShellModel.reader.loadingHistory)) ||
       pendingDeleteMessageId != 0 ||
@@ -453,7 +473,8 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
 
     screen = appShellModel.router.currentScreen;
     return screen == AppShellModel.SCREEN_HISTORY ||
-      screen == AppShellModel.SCREEN_COMPOSE;
+      screen == AppShellModel.SCREEN_COMPOSE ||
+      screen == AppShellModel.SCREEN_MESSAGE_SEARCH;
   }
 
   private boolean scheduleAuthorizedReconnect(String detail, int errorCode) {
@@ -485,6 +506,10 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     // original random_id for an idempotent retry on the new connection.
     clearPendingSendState();
     clearPendingHistoryState();
+    if (messageSearchRequestInFlight() && appShellModel != null) {
+      appShellModel.onMessageSearchFailed("Message search was interrupted; retry after reconnecting.");
+    }
+    clearPendingMessageSearch();
     syncStateRequestInFlight = false;
     differenceRequestInFlight = false;
     channelDifferenceRequestInFlight = false;
@@ -775,6 +800,10 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
         return;
       }
       if (midlet.handleReadHistoryRpcError(rpc_error.error_code, error_message)) {
+        connection.clearPendingRetryRequest();
+        return;
+      }
+      if (midlet.handleMessageSearchRpcError(rpc_error.error_code, error_message)) {
         connection.clearPendingRetryRequest();
         return;
       }
@@ -1716,9 +1745,11 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
       clearPendingDiscoverySearch();
       return;
     }
-    if (readRequestInFlight()) {
-      appShellModel.discovery.detail = READ_ACK_WAIT_DETAIL;
-      appShellModel.activeDetail = READ_ACK_WAIT_DETAIL;
+    if (readRequestInFlight() || messageSearchRequestInFlight()) {
+      appShellModel.discovery.detail = readRequestInFlight()
+        ? READ_ACK_WAIT_DETAIL
+        : MESSAGE_SEARCH_WAIT_DETAIL;
+      appShellModel.activeDetail = appShellModel.discovery.detail;
       if (appShellScreen != null) {
         appShellScreen.showDiscovery();
       }
@@ -1735,6 +1766,80 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     (new SendSearch(trimmed, DiscoveryStateModel.RESULT_CAPACITY)).send(connection);
   }
 
+  private boolean hasRpcConflictForMessageSearch() {
+    return messageSearchRequestInFlight() ||
+      readRequestInFlight() ||
+      syncStateRequestInFlight ||
+      differenceRequestInFlight ||
+      channelDifferenceRequestInFlight ||
+      pendingHistoryPeerKind != DialogListModel.PEER_UNKNOWN ||
+      pendingDeleteMessageId != 0 ||
+      pendingSendPeerKind != DialogListModel.PEER_UNKNOWN ||
+      pendingDiscoveryQuery.length() > 0 ||
+      pendingPeerInfoKind != DialogListModel.PEER_UNKNOWN ||
+      pendingPeerActionType != PEER_ACTION_NONE ||
+      pendingMediaMessageId != 0 ||
+      resumeOutboundAfterDialogs ||
+      (appShellModel != null &&
+        (appShellModel.reader.loadingDialogs || appShellModel.reader.loadingHistory));
+  }
+
+  private void requestMessageSearch(String query) {
+    SendGetDialogs.DialogInputPeer peer;
+
+    if (appShellModel == null || appShellScreen == null) {
+      return;
+    }
+    if (messageSearchRequestInFlight()) {
+      appShellModel.messageSearch.detail = MESSAGE_SEARCH_WAIT_DETAIL;
+      appShellModel.activeDetail = MESSAGE_SEARCH_WAIT_DETAIL;
+      appShellScreen.showMessageSearchResults();
+      return;
+    }
+    if (!appShellModel.beginMessageSearch(query)) {
+      appShellScreen.showMessageSearchQuery();
+      return;
+    }
+    if (connection == null || !appShellModel.authorized) {
+      appShellModel.onMessageSearchFailed(
+        "Message search requires an active Telegram connection; reconnect and retry."
+      );
+      appShellScreen.showMessageSearchResults();
+      return;
+    }
+    if (hasRpcConflictForMessageSearch()) {
+      appShellModel.onMessageSearchFailed(
+        "Another Telegram request is finishing; retry this search in a moment."
+      );
+      appShellScreen.showMessageSearchResults();
+      return;
+    }
+
+    try {
+      peer = toInputPeer(appShellModel.messageSearch.peerKind, appShellModel.messageSearch.peerId);
+    } catch (IllegalArgumentException e) {
+      appShellModel.onMessageSearchFailed("Message search is unavailable: " + e.getMessage());
+      appShellScreen.showMessageSearchResults();
+      return;
+    }
+
+    pendingMessageSearchPeerKind = appShellModel.messageSearch.peerKind;
+    pendingMessageSearchPeerId = appShellModel.messageSearch.peerId;
+    pendingMessageSearchQuery = appShellModel.messageSearch.query;
+    appShellScreen.showMessageSearchResults();
+    try {
+      (new SendSearchMessages(
+        peer,
+        appShellModel.messageSearch.query,
+        MessageSearchStateModel.RESULT_CAPACITY
+      )).send(connection);
+    } catch (IllegalArgumentException e) {
+      clearPendingMessageSearch();
+      appShellModel.onMessageSearchFailed("Message search is unavailable: " + e.getMessage());
+      appShellScreen.showMessageSearchResults();
+    }
+  }
+
   private void requestSelectedPeerInfo(String detail) {
     long accessHash;
 
@@ -1742,8 +1847,10 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
       clearPendingPeerInfo();
       return;
     }
-    if (readRequestInFlight()) {
-      appShellModel.notePeerError(READ_ACK_WAIT_DETAIL);
+    if (readRequestInFlight() || messageSearchRequestInFlight()) {
+      appShellModel.notePeerError(
+        readRequestInFlight() ? READ_ACK_WAIT_DETAIL : MESSAGE_SEARCH_WAIT_DETAIL
+      );
       appShellScreen.showPeer();
       return;
     }
@@ -2336,6 +2443,10 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     if (readerParser == null || appShellModel == null) {
       return;
     }
+    if (messageSearchRequestInFlight()) {
+      applyMessageSearch(response);
+      return;
+    }
     if (!readerParser.applyHistory(response, appShellModel.reader, pendingHistoryPeerKind, pendingHistoryPeerId)) {
       recordFailure(FailureLog.CATEGORY_READER, FailureLog.SEVERITY_ERROR, -402, response.type);
       System.out.println("HISTORY FAIL: " + readerParser.lastError());
@@ -2371,6 +2482,78 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
       );
     } else {
       requestVisibleHistoryRead();
+    }
+  }
+
+  private void applyMessageSearch(RPCResponse response) {
+    int peerKind = pendingMessageSearchPeerKind;
+    long peerId = pendingMessageSearchPeerId;
+    boolean applied;
+
+    if (readerParser == null || appShellModel == null || appShellScreen == null) {
+      clearPendingMessageSearch();
+      return;
+    }
+    if (appShellModel.messageSearch.peerKind != peerKind ||
+        appShellModel.messageSearch.peerId != peerId ||
+        !pendingMessageSearchQuery.equals(appShellModel.messageSearch.query)) {
+      clearPendingMessageSearch();
+      appShellModel.onMessageSearchFailed(
+        "Search target changed before Telegram replied; reopen the chat and retry."
+      );
+      if (appShellScreen.isShowingMessageSearchResults()) {
+        appShellScreen.showMessageSearchResults();
+      }
+      return;
+    }
+
+    applied = readerParser.applyMessageSearch(
+      response,
+      appShellModel.reader,
+      appShellModel.messageSearch
+    );
+    clearPendingMessageSearch();
+    if (!applied) {
+      recordFailure(FailureLog.CATEGORY_READER, FailureLog.SEVERITY_ERROR, -407, response.type);
+      appShellModel.onMessageSearchFailed(
+        "Message search response was rejected: " + readerParser.lastError()
+      );
+    } else {
+      appShellModel.onMessageSearchReady();
+      System.out.println("MESSAGE SEARCH READY: count=" +
+        Integer.toString(appShellModel.messageSearch.results.count));
+    }
+    if (appShellScreen.isShowingMessageSearchResults()) {
+      appShellScreen.showMessageSearchResults();
+    }
+    resumeAfterMessageSearch();
+  }
+
+  private void resumeAfterMessageSearch() {
+    DialogListModel.Item selected;
+    ChannelSyncState.Entry channelState;
+
+    if (connection == null || appShellModel == null || !appShellModel.authorized) {
+      return;
+    }
+    if (syncState != null && syncState.needsDifference) {
+      requestUpdatesDifference("Catching up Telegram updates after message search...");
+      return;
+    }
+    selected = selectedDialogForPeer(
+      appShellModel.reader.historyPeerKind,
+      appShellModel.reader.historyPeerId
+    );
+    if (selected != null && selected.peerKind == DialogListModel.PEER_CHANNEL) {
+      channelState = appShellModel.reader.channelSync.find(selected.peerId);
+      if (channelState != null && channelState.needsDifference) {
+        requestChannelDifferenceFor(selected, "Continuing channel catch-up after message search...");
+        return;
+      }
+    }
+    requestVisibleHistoryRead();
+    if (!readRequestInFlight()) {
+      maybeStartQueuedMediaDownload();
     }
   }
 
@@ -2531,7 +2714,7 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     if (connection == null || appShellModel == null || !appShellModel.authorized) {
       return;
     }
-    if (readRequestInFlight() || syncStateRequestInFlight) {
+    if (readRequestInFlight() || messageSearchRequestInFlight() || syncStateRequestInFlight) {
       return;
     }
 
@@ -2563,7 +2746,8 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     if (connection == null || appShellModel == null || !appShellModel.authorized) {
       return;
     }
-    if (readRequestInFlight() || differenceRequestInFlight || syncStateRequestInFlight) {
+    if (readRequestInFlight() || messageSearchRequestInFlight() ||
+        differenceRequestInFlight || syncStateRequestInFlight) {
       return;
     }
 
@@ -2596,7 +2780,7 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     if (selected.peerKind != DialogListModel.PEER_CHANNEL || selected.peerId == 0) {
       return;
     }
-    if (readRequestInFlight() || channelDifferenceRequestInFlight) {
+    if (readRequestInFlight() || messageSearchRequestInFlight() || channelDifferenceRequestInFlight) {
       return;
     }
 
@@ -3511,6 +3695,22 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     return true;
   }
 
+  private boolean handleMessageSearchRpcError(int errorCode, String errorMessage) {
+    if (appShellModel == null || appShellScreen == null || !messageSearchRequestInFlight()) {
+      return false;
+    }
+
+    clearPendingMessageSearch();
+    appShellModel.onMessageSearchFailed(
+      "Message search failed: RPC " + Integer.toString(errorCode) + ": " + errorMessage
+    );
+    if (appShellScreen.isShowingMessageSearchResults()) {
+      appShellScreen.showMessageSearchResults();
+    }
+    resumeAfterMessageSearch();
+    return true;
+  }
+
   private boolean handlePeerRpcError(int errorCode, String errorMessage) {
     boolean peerInfoPending;
     boolean peerActionVisible;
@@ -3579,8 +3779,10 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     if (connection == null || appShellModel == null || pendingMediaMessageId != 0) {
       return;
     }
-    if (readRequestInFlight()) {
-      appShellModel.activeDetail = READ_ACK_WAIT_DETAIL;
+    if (readRequestInFlight() || messageSearchRequestInFlight()) {
+      appShellModel.activeDetail = readRequestInFlight()
+        ? READ_ACK_WAIT_DETAIL
+        : MESSAGE_SEARCH_WAIT_DETAIL;
       return;
     }
     entry = appShellModel.mediaQueue.nextQueued();
@@ -3760,8 +3962,10 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     if (connection == null || appShellModel == null) {
       return;
     }
-    if (readRequestInFlight()) {
-      appShellModel.activeDetail = READ_ACK_WAIT_DETAIL;
+    if (readRequestInFlight() || messageSearchRequestInFlight()) {
+      appShellModel.activeDetail = readRequestInFlight()
+        ? READ_ACK_WAIT_DETAIL
+        : MESSAGE_SEARCH_WAIT_DETAIL;
       appShellScreen.showCurrent();
       return;
     }
@@ -3775,8 +3979,10 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     if (connection == null || appShellModel == null) {
       return;
     }
-    if (readRequestInFlight()) {
-      appShellModel.activeDetail = READ_ACK_WAIT_DETAIL;
+    if (readRequestInFlight() || messageSearchRequestInFlight()) {
+      appShellModel.activeDetail = readRequestInFlight()
+        ? READ_ACK_WAIT_DETAIL
+        : MESSAGE_SEARCH_WAIT_DETAIL;
       return;
     }
     rememberSelectedDialogForRefresh();
@@ -3793,8 +3999,10 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     if (connection == null || appShellModel == null || selected == null) {
       return;
     }
-    if (readRequestInFlight()) {
-      appShellModel.activeDetail = READ_ACK_WAIT_DETAIL;
+    if (readRequestInFlight() || messageSearchRequestInFlight()) {
+      appShellModel.activeDetail = readRequestInFlight()
+        ? READ_ACK_WAIT_DETAIL
+        : MESSAGE_SEARCH_WAIT_DETAIL;
       appShellScreen.showCurrent();
       return;
     }
@@ -3887,8 +4095,11 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
       appShellScreen.showCurrent();
       return;
     }
-    if (readRequestInFlight()) {
-      appShellModel.onComposeFailed(0, READ_ACK_WAIT_DETAIL);
+    if (readRequestInFlight() || messageSearchRequestInFlight()) {
+      appShellModel.onComposeFailed(
+        0,
+        readRequestInFlight() ? READ_ACK_WAIT_DETAIL : MESSAGE_SEARCH_WAIT_DETAIL
+      );
       appShellScreen.showCompose();
       return;
     }
@@ -3972,6 +4183,11 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     if (connection == null || appShellModel == null) {
       return;
     }
+    if (messageSearchRequestInFlight()) {
+      appShellModel.activeDetail = MESSAGE_SEARCH_WAIT_DETAIL;
+      appShellScreen.showCurrent();
+      return;
+    }
     if (!appShellModel.selectDialog(index)) {
       return;
     }
@@ -3987,6 +4203,21 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     appShellModel.openDiscovery();
     persistWarmState();
     appShellScreen.showDiscovery();
+  }
+
+  public void openMessageSearch() {
+    if (appShellModel == null || appShellScreen == null) {
+      return;
+    }
+    if (!appShellModel.openMessageSearch()) {
+      appShellScreen.showCurrent();
+      return;
+    }
+    appShellScreen.showMessageSearchQuery();
+  }
+
+  public void searchCurrentHistory(String query) {
+    requestMessageSearch(query);
   }
 
   public void searchDiscovery(String query) {
@@ -4157,6 +4388,11 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
       appShellScreen.showHistory();
       return;
     }
+    if (messageSearchRequestInFlight()) {
+      appShellModel.activeDetail = MESSAGE_SEARCH_WAIT_DETAIL;
+      appShellScreen.showHistory();
+      return;
+    }
 
     pendingDeletePeerKind = dialog.peerKind;
     pendingDeletePeerId = dialog.peerId;
@@ -4235,8 +4471,10 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     if (connection == null || appShellModel == null || appShellScreen == null) {
       return;
     }
-    if (readRequestInFlight()) {
-      appShellModel.notePeerError(READ_ACK_WAIT_DETAIL);
+    if (readRequestInFlight() || messageSearchRequestInFlight()) {
+      appShellModel.notePeerError(
+        readRequestInFlight() ? READ_ACK_WAIT_DETAIL : MESSAGE_SEARCH_WAIT_DETAIL
+      );
       appShellScreen.showPeer();
       return;
     }
@@ -4266,8 +4504,10 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     if (connection == null || appShellModel == null || appShellScreen == null) {
       return;
     }
-    if (readRequestInFlight()) {
-      appShellModel.notePeerError(READ_ACK_WAIT_DETAIL);
+    if (readRequestInFlight() || messageSearchRequestInFlight()) {
+      appShellModel.notePeerError(
+        readRequestInFlight() ? READ_ACK_WAIT_DETAIL : MESSAGE_SEARCH_WAIT_DETAIL
+      );
       appShellScreen.showPeer();
       return;
     }
@@ -4300,8 +4540,10 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     if (appShellModel == null || appShellScreen == null) {
       return;
     }
-    if (readRequestInFlight()) {
-      appShellModel.notePeerError(READ_ACK_WAIT_DETAIL);
+    if (readRequestInFlight() || messageSearchRequestInFlight()) {
+      appShellModel.notePeerError(
+        readRequestInFlight() ? READ_ACK_WAIT_DETAIL : MESSAGE_SEARCH_WAIT_DETAIL
+      );
       appShellScreen.showPeer();
       return;
     }
@@ -4363,8 +4605,10 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     if (appShellModel == null || appShellScreen == null) {
       return;
     }
-    if (readRequestInFlight()) {
-      appShellModel.notePeerError(READ_ACK_WAIT_DETAIL);
+    if (readRequestInFlight() || messageSearchRequestInFlight()) {
+      appShellModel.notePeerError(
+        readRequestInFlight() ? READ_ACK_WAIT_DETAIL : MESSAGE_SEARCH_WAIT_DETAIL
+      );
       appShellScreen.showPeer();
       return;
     }
@@ -4427,8 +4671,10 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     if (appShellModel == null || appShellScreen == null) {
       return;
     }
-    if (readRequestInFlight()) {
-      appShellModel.notePeerError(READ_ACK_WAIT_DETAIL);
+    if (readRequestInFlight() || messageSearchRequestInFlight()) {
+      appShellModel.notePeerError(
+        readRequestInFlight() ? READ_ACK_WAIT_DETAIL : MESSAGE_SEARCH_WAIT_DETAIL
+      );
       appShellScreen.showPeer();
       return;
     }

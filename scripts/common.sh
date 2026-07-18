@@ -474,6 +474,7 @@ write_test_manifest() {
   cat > "${target}" <<EOF
 MIDlet-1: TestRunner, , test.TestRunner
 MIDlet-2: HistoryFixture, , ui.HistoryFixtureMidlet
+MIDlet-3: SearchFixture, , ui.SearchFixtureMidlet
 MIDlet-Name: TelegramMicroTests
 MIDlet-Vendor: Faissaloo
 MIDlet-Version: 1.0

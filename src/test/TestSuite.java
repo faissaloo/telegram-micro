@@ -56,6 +56,7 @@ public class TestSuite {
     TestRunner.register(new SecretChatContext.ParseWrappedShortSecretUpdateTest());
     TestRunner.register(new ReaderContext.BuildGetDialogsRequestTest());
     TestRunner.register(new ReaderContext.BuildGetHistoryRequestTest());
+    TestRunner.register(new ReaderContext.BuildMessageSearchRequestTest());
     TestRunner.register(new ReaderContext.BuildReadHistoryRequestTest());
     TestRunner.register(new OutboundContext.BuildSendMessageRequestTest());
     TestRunner.register(new OutboundContext.BuildReplySendMessageRequestTest());
@@ -79,6 +80,8 @@ public class TestSuite {
     TestRunner.register(new ReaderContext.ParseDialogsPayloadWithCurrentDraftTest());
     TestRunner.register(new ReaderContext.ParseDialogsSliceChannelPayloadTest());
     TestRunner.register(new ReaderContext.ParseHistoryPayloadTest());
+    TestRunner.register(new ReaderContext.ParseMessageSearchPayloadTest());
+    TestRunner.register(new ReaderContext.RejectOversizedMessageSearchPageTest());
     TestRunner.register(new ReaderContext.RejectNegativeHistoryMessageDateTest());
     TestRunner.register(new ReaderContext.ParseLegacyMessageConstructorTest());
     TestRunner.register(new ReaderContext.ParseCurrentMessageOptionalFieldsTest());
@@ -218,6 +221,8 @@ public class TestSuite {
     TestRunner.register(new AppShellModelContext.MediaQueueCanBeClearedTest());
     TestRunner.register(new AppShellModelContext.DiscoverySearchFindsCachedPeerTest());
     TestRunner.register(new AppShellModelContext.DiscoveryComposeOpensPeerWithoutDialogTest());
+    TestRunner.register(new AppShellModelContext.MessageSearchKeepsBoundedResultsSeparateFromHistoryTest());
+    TestRunner.register(new AppShellModelContext.MessageSearchWarmStateReturnsToHistoryWithoutResultsTest());
     TestRunner.register(new AppShellModelContext.BeginComposeSendSupportsPeerWithoutDialogTest());
     TestRunner.register(new AppShellModelContext.PeerScreenBindsChannelActionsTest());
     TestRunner.register(new AppShellModelContext.PeerMembershipChangeUpdatesChannelCapabilitiesTest());

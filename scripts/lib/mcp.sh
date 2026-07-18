@@ -130,6 +130,8 @@ mcp_write_screenshot() {
 
 mcp_assert_png_has_content() {
   local png_file="$1"
+  local required_rgb="${2:-}"
+  local required_count="${3:-0}"
 
   node -e '
     const fs = require("fs");
@@ -142,6 +144,15 @@ mcp_assert_png_has_content() {
     let colorType = 0;
     let interlace = 0;
     const idat = [];
+    const required = process.argv[2] ? process.argv[2].split(",").map(Number) : [];
+    const requiredCount = Number(process.argv[3] || 0);
+    let requiredMatches = 0;
+
+    if (required.length !== 0 &&
+        (required.length !== 3 || required.some((value) =>
+          !Number.isInteger(value) || value < 0 || value > 255) ||
+         !Number.isInteger(requiredCount) || requiredCount <= 0))
+      process.exit(11);
 
     while (offset + 12 <= png.length) {
       const length = png.readUInt32BE(offset);
@@ -215,6 +226,9 @@ mcp_assert_png_has_content() {
         const red = current[x];
         const green = channels === 1 ? red : current[x + 1];
         const blue = channels === 1 ? red : current[x + 2];
+        if (required.length === 3 && red === required[0] &&
+            green === required[1] && blue === required[2])
+          ++requiredMatches;
         const luma = Math.floor((299 * red + 587 * green + 114 * blue) / 1000);
         ++histogram[luma];
         minimum = Math.min(minimum, luma);
@@ -229,5 +243,7 @@ mcp_assert_png_has_content() {
     const pixelCount = width * height;
     if (maximum - minimum < 24 || pixelCount - dominant < 100)
       process.exit(10);
-  ' "${png_file}"
+    if (required.length === 3 && requiredMatches < requiredCount)
+      process.exit(12);
+  ' "${png_file}" "${required_rgb}" "${required_count}"
 }

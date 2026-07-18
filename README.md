@@ -4,7 +4,7 @@
 
 TelegramMicro is an experimental Telegram client for CLDC 1.1/MIDP 2.1 phones. Its design target is the Nokia C2-01: bounded memory, keypad-first interaction, recoverable state, and protocol correctness take priority over broad desktop-style parity.
 
-It is not yet an everyday-ready client. The repository has deterministic build/test automation and bounded foundations for authentication, sessions, dialogs/history, updates, outbound text, limited media, and secret-chat lifecycle work. Interoperability breadth and real-device proof remain incomplete; see [the roadmap](docs/parity-roadmap.md) and [device checklist](docs/device-proof.md).
+It is not yet an everyday-ready client. The repository has deterministic build/test automation and bounded foundations for authentication, sessions, dialogs/history and in-chat search, updates, outbound text, limited media, and secret-chat lifecycle work. Interoperability breadth and real-device proof remain incomplete; see [the roadmap](docs/parity-roadmap.md) and [device checklist](docs/device-proof.md).
 
 ## Quick start
 
@@ -31,10 +31,10 @@ Build outputs are:
 ./scripts/test-target-full.sh     # optional long target-VM crypto soak
 ./scripts/verify.sh --quick       # policy, artifact, and quick test gate
 ./scripts/verify.sh --full        # standard pre-push gate
-./scripts/verify.sh --full --ui   # add isolated first-install MCP proof
+./scripts/verify.sh --full --ui   # add isolated startup/history/search MCP proof
 ```
 
-The production artifact gate excludes test classes and enforces current JAR/class guardrails. The UI lane uses a fresh emulator-state directory, a dynamic localhost MCP port, and a direct PNG capture from the application surface.
+The production artifact gate excludes test classes and enforces current JAR/class guardrails. Each UI lane uses a fresh emulator-state directory, a dynamic localhost MCP port, and a direct PNG capture from the application surface.
 
 See [verification.md](docs/verification.md) for the proof matrix, clean-bootstrap checks, and exact evidence vocabulary.
 

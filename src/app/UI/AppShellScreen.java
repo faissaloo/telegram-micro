@@ -13,6 +13,9 @@ import javax.microedition.midlet.MIDlet;
 import compose.ComposeStateModel;
 import discovery.DiscoveryStateModel;
 import peer.PeerActionStateModel;
+import reader.DialogListModel;
+import reader.MessageListModel;
+import search.MessageSearchStateModel;
 import support.WorkingSet;
 
 public class AppShellScreen implements CommandListener {
@@ -28,8 +31,12 @@ public class AppShellScreen implements CommandListener {
   private Form mediaForm;
   private List discoveryList;
   private TextBox discoveryQueryBox;
+  private MessageSearchCanvas messageSearchCanvas;
+  private TextBox messageSearchQueryBox;
+  private Form messageSearchDetailForm;
   private Form peerForm;
   private TextField composeField;
+  private final char[] messageSearchTimeBuffer = new char[MessageTime.LABEL_LENGTH];
 
   private final Command refreshCommand = new Command("Refresh", Command.SCREEN, 1);
   private final Command newCommand = new Command("New", Command.SCREEN, 2);
@@ -54,6 +61,7 @@ public class AppShellScreen implements CommandListener {
   private final Command acceptSecretCommand = new Command("Accept", Command.SCREEN, 4);
   private final Command discardSecretCommand = new Command("Discard", Command.SCREEN, 5);
   private final Command resultsCommand = new Command("Results", Command.BACK, 2);
+  private final Command searchBackCommand = new Command("Back", Command.BACK, 1);
   private final Command dialogsCommand = new Command("Dialogs", Command.BACK, 2);
   private final Command historyCommand = new Command("History", Command.SCREEN, 3);
   private final Command exitCommand = new Command("Exit", Command.EXIT, 8);
@@ -82,6 +90,8 @@ public class AppShellScreen implements CommandListener {
       showPeer();
     } else if (model.router.currentScreen == AppShellModel.SCREEN_MEDIA) {
       showMedia();
+    } else if (model.router.currentScreen == AppShellModel.SCREEN_MESSAGE_SEARCH) {
+      showMessageSearchResults();
     } else {
       showDialogs();
     }
@@ -122,6 +132,28 @@ public class AppShellScreen implements CommandListener {
     display.setCurrent(discoveryQueryBox);
   }
 
+  public void showMessageSearchResults() {
+    model.navigateMessageSearch();
+    rebuildMessageSearchResults();
+    display.setCurrent(messageSearchCanvas);
+  }
+
+  public void showMessageSearchQuery() {
+    model.navigateMessageSearch();
+    rebuildMessageSearchQuery();
+    display.setCurrent(messageSearchQueryBox);
+  }
+
+  public void showMessageSearchDetail() {
+    model.navigateMessageSearch();
+    rebuildMessageSearchDetail();
+    display.setCurrent(messageSearchDetailForm);
+  }
+
+  public boolean isShowingMessageSearchResults() {
+    return messageSearchCanvas != null && display.getCurrent() == messageSearchCanvas;
+  }
+
   public void showPeer() {
     model.navigatePeer();
     rebuildPeer();
@@ -151,6 +183,7 @@ public class AppShellScreen implements CommandListener {
     if (historyCanvas == null) {
       historyCanvas = new HistoryCanvas(model);
       historyCanvas.addCommand(refreshCommand);
+      historyCanvas.addCommand(searchCommand);
       historyCanvas.addCommand(replyCommand);
       historyCanvas.addCommand(forwardCommand);
       historyCanvas.addCommand(peerCommand);
@@ -309,6 +342,86 @@ public class AppShellScreen implements CommandListener {
     }
   }
 
+  private void rebuildMessageSearchResults() {
+    if (messageSearchCanvas == null) {
+      messageSearchCanvas = new MessageSearchCanvas(model, this);
+      messageSearchCanvas.addCommand(openCommand);
+      messageSearchCanvas.addCommand(editCommand);
+      messageSearchCanvas.addCommand(refreshCommand);
+      messageSearchCanvas.addCommand(searchBackCommand);
+      messageSearchCanvas.addCommand(statusCommand);
+      messageSearchCanvas.addCommand(exitCommand);
+      messageSearchCanvas.setCommandListener(this);
+    }
+    messageSearchCanvas.removeCommand(openCommand);
+    if (model.messageSearch.results.count > 0) {
+      messageSearchCanvas.addCommand(openCommand);
+    }
+    messageSearchCanvas.refresh();
+  }
+
+  private void rebuildMessageSearchQuery() {
+    MessageSearchStateModel search = model.messageSearch;
+
+    if (messageSearchQueryBox == null) {
+      messageSearchQueryBox = new TextBox(
+        "Search messages",
+        search.query,
+        MessageSearchStateModel.QUERY_MAX,
+        TextField.ANY
+      );
+      messageSearchQueryBox.addCommand(searchCommand);
+      messageSearchQueryBox.addCommand(resultsCommand);
+      messageSearchQueryBox.addCommand(exitCommand);
+      messageSearchQueryBox.setCommandListener(this);
+    } else {
+      messageSearchQueryBox.setString(search.query);
+    }
+    messageSearchQueryBox.setTitle(DialogListModel.limit(
+      "Search " + search.peerTitle + " (1-" +
+        MessageSearchStateModel.QUERY_MAX + ")",
+      32
+    ));
+  }
+
+  private void rebuildMessageSearchDetail() {
+    MessageListModel.Item result = model.selectedMessageSearchResult();
+    Form next = new Form("Search result");
+
+    if (result == null) {
+      next.append("No search result is selected.");
+    } else {
+      next.append("Chat: " + model.messageSearch.peerTitle);
+      next.append("\nQuery: " + model.messageSearch.query);
+      next.append("\nResult: " + Integer.toString(model.messageSearch.results.selectedIndex + 1) +
+        " of " + Integer.toString(model.messageSearch.results.count));
+      next.append("\nSender: " + result.sender);
+      next.append("\nTime: " + messageSearchTime(result));
+      next.append("\nMessage id: " + Integer.toString(result.messageId));
+      if (result.text != null && result.text.length() > 0) {
+        next.append("\nText: " + result.text);
+      }
+      if (result.hasMedia) {
+        next.append("\nMedia: " + result.mediaSummary());
+      }
+    }
+    next.addCommand(resultsCommand);
+    next.addCommand(historyCommand);
+    next.addCommand(exitCommand);
+    next.setCommandListener(this);
+    messageSearchDetailForm = next;
+  }
+
+  private String messageSearchTime(MessageListModel.Item result) {
+    int length = result != null
+      ? MessageTime.formatUtc(result.dateSeconds, messageSearchTimeBuffer)
+      : 0;
+
+    return length > 0
+      ? new String(messageSearchTimeBuffer, 0, length)
+      : "unknown";
+  }
+
   private void rebuildPeer() {
     PeerActionStateModel peer = model.peer;
     Form next = new Form("Peer");
@@ -465,6 +578,26 @@ public class AppShellScreen implements CommandListener {
       }
     }
 
+    if (displayable == messageSearchQueryBox) {
+      if (command == searchCommand) {
+        if (actions != null) {
+          actions.searchCurrentHistory(messageSearchQueryBox.getString());
+        } else if (model.beginMessageSearch(messageSearchQueryBox.getString())) {
+          showMessageSearchResults();
+        }
+        return;
+      }
+      if (command == resultsCommand) {
+        showMessageSearchResults();
+        return;
+      }
+    }
+
+    if (displayable == messageSearchDetailForm && command == resultsCommand) {
+      showMessageSearchResults();
+      return;
+    }
+
     if (command == newCommand) {
       if (actions != null) {
         actions.openDiscovery();
@@ -505,6 +638,27 @@ public class AppShellScreen implements CommandListener {
       if (command == peerCommand) {
         if (actions != null) {
           actions.openPeerForSelectedDiscoveryResult();
+        }
+        return;
+      }
+    }
+
+    if (displayable == messageSearchCanvas) {
+      if (command == openCommand) {
+        if (model.messageSearch.results.count > 0) {
+          showMessageSearchDetail();
+        }
+        return;
+      }
+      if (command == editCommand) {
+        showMessageSearchQuery();
+        return;
+      }
+      if (command == refreshCommand) {
+        if (actions != null) {
+          actions.searchCurrentHistory(model.messageSearch.query);
+        } else if (model.beginMessageSearch(model.messageSearch.query)) {
+          showMessageSearchResults();
         }
         return;
       }
@@ -592,6 +746,14 @@ public class AppShellScreen implements CommandListener {
       }
       return;
     }
+    if (displayable == historyCanvas && command == searchCommand) {
+      if (actions != null) {
+        actions.openMessageSearch();
+      } else if (model.openMessageSearch()) {
+        showMessageSearchQuery();
+      }
+      return;
+    }
     if (command == replyCommand) {
       if (actions != null) {
         actions.replyToSelectedMessage();
@@ -647,6 +809,10 @@ public class AppShellScreen implements CommandListener {
     }
     if (command == dialogsCommand) {
       showDialogs();
+      return;
+    }
+    if (command == searchBackCommand) {
+      showHistory();
       return;
     }
     if (command == historyCommand) {

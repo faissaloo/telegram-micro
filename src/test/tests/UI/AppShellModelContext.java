@@ -659,6 +659,125 @@ public class AppShellModelContext {
     }
   }
 
+  public static class MessageSearchKeepsBoundedResultsSeparateFromHistoryTest extends Test {
+    public String label() {
+      return "App shell keeps bounded server search results separate from chat history";
+    }
+
+    public void test() throws TestFailureException {
+      AppShellModel shell = new AppShellModel();
+      int i;
+
+      shell.onAuthorized();
+      shell.appendDialog(
+        DialogListModel.PEER_USER,
+        1L,
+        0x1122334455667788L,
+        true,
+        11,
+        "Alice",
+        "Hello",
+        0,
+        false
+      );
+      shell.finishLocalDialogsLoad();
+      shell.selectDialog(0);
+      shell.beginHistoryLoadForSelected();
+      shell.appendHistoryMessage(10, "Alice", "Cached history", false, false, false);
+      shell.finishHistoryLoad();
+
+      expect(shell.openMessageSearch(), true);
+      expect(shell.router.currentScreen, AppShellModel.SCREEN_MESSAGE_SEARCH);
+      expect(shell.beginMessageSearch("clock"), true);
+      for (i = 0; i < search.MessageSearchStateModel.RESULT_CAPACITY; ++i) {
+        expect(shell.messageSearch.appendResult(
+          100 + i,
+          "Alice",
+          "Match " + Integer.toString(i + 1),
+          false,
+          false,
+          "",
+          "",
+          1700000000 + i
+        ), true);
+      }
+      expect(shell.messageSearch.appendResult(
+        999,
+        "Alice",
+        "Overflow",
+        false,
+        false,
+        "",
+        "",
+        1700000099
+      ), false);
+      shell.messageSearch.finish(12);
+      shell.onMessageSearchReady();
+      expect(shell.selectMessageSearchIndex(5), true);
+
+      expect(shell.messageSearch.results.count, 6);
+      expect(shell.messageSearch.totalCount, 12);
+      expect(shell.selectedMessageSearchResult().messageId, 105);
+      expect(shell.reader.history.count, 1);
+      expect(shell.reader.history.items[0].messageId, 10);
+      expect(shell.reader.history.items[0].text, "Cached history");
+      expect(shell.activeDetail, "Selected search result 6 of 6.");
+    }
+  }
+
+  public static class MessageSearchWarmStateReturnsToHistoryWithoutResultsTest extends Test {
+    public String label() {
+      return "Warm state maps ephemeral message search back to history without persisting results";
+    }
+
+    public void test() throws TestFailureException {
+      AppShellModel source = new AppShellModel();
+      AppShellModel restored = new AppShellModel();
+      session.WarmStateSnapshot snapshot;
+
+      source.onAuthorized();
+      source.appendDialog(
+        DialogListModel.PEER_USER,
+        1L,
+        0x1122334455667788L,
+        true,
+        11,
+        "Alice",
+        "Hello",
+        0,
+        false
+      );
+      source.finishLocalDialogsLoad();
+      source.selectDialog(0);
+      source.beginHistoryLoadForSelected();
+      source.appendHistoryMessage(10, "Alice", "Cached history", false, false, false);
+      source.finishHistoryLoad();
+      expect(source.openMessageSearch(), true);
+      expect(source.beginMessageSearch("clock"), true);
+      expect(source.messageSearch.appendResult(
+        101,
+        "Alice",
+        "Clock result",
+        false,
+        false,
+        "",
+        "",
+        1700000000
+      ), true);
+      source.messageSearch.finish(1);
+      snapshot = source.captureWarmState();
+
+      expect(snapshot.route, AppShellModel.SCREEN_HISTORY);
+      restored.applyWarmState(snapshot, false);
+      expect(restored.router.currentScreen, AppShellModel.SCREEN_HISTORY);
+      expect(restored.reader.history.count, 1);
+      expect(restored.reader.history.items[0].text, "Cached history");
+      expect(restored.messageSearch.results.count, 0);
+      expect(restored.messageSearch.query, "");
+      expect(restored.messageSearch.peerId, 0L);
+    }
+  }
+
   public static class BeginComposeSendSupportsPeerWithoutDialogTest extends Test {
     public String label() {
       return "App shell can stage outbound history for a composed peer without an existing dialog";

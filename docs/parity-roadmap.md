@@ -24,6 +24,7 @@ These states are independent. A parser can be unit verified while the end-to-end
 | Durable session | Versioned bounded snapshots, corrupt/oversized rejection, RMS tests | Power-loss/full-storage device scenarios and migration policy |
 | Dialog/history read | Bounded models, parsing, cache, monotonic read watermarks, and peer-specific read requests | Prove mark-read behavior live/on-device; expand constructor interoperability conservatively |
 | Message context | Sender, content, media, pending/sent/read state, and UTC timestamps are bounded and warm-restorable | Prove delivery semantics and local-time behavior live/on-device |
+| In-chat text search | Explicit server query with a 48-character input cap and 6 pooled ephemeral results; cached history and read state remain untouched | Prove Telegram interoperability and keypad flow live/on-device; add paging only with a measured bounded replacement policy |
 | Text send | One bounded immutable in-flight compose job, exact `random_id` retry, pre-resend `updateMessageID` reconciliation, fail-closed warm recovery, and single pending-row repair | Add a fault-injected transport trace; live/device proof |
 | Reconnect/catch-up | Session restore, difference/channel-difference, PTS-continuity checks, and fallback foundations | More gap/too-long/unknown-update traces and device radio-loss proof |
 | Failure visibility | Bounded failure log/status surfaces | Make every P0 terminal failure actionable without exposing secrets |

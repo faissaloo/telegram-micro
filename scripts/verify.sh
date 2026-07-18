@@ -54,6 +54,8 @@ if [[ "${RUN_UI}" == '1' ]]; then
   ./scripts/verify-ui.sh
   printf '[verify] offline history UI smoke\n'
   ./scripts/verify-history-ui.sh
+  printf '[verify] offline search UI smoke\n'
+  ./scripts/verify-search-ui.sh
 fi
 
 printf '[verify] all requested gates passed\n'

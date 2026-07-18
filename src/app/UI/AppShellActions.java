@@ -4,6 +4,8 @@ public interface AppShellActions {
   void openDialog(int index);
   void openDiscovery();
   void searchDiscovery(String query);
+  void openMessageSearch();
+  void searchCurrentHistory(String query);
   void openSelectedDiscoveryResult();
   void openComposeForSelectedDiscoveryResult();
   void openPeerForSelectedDiscoveryResult();

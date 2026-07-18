@@ -50,6 +50,14 @@ Use the same placement and styling for every row. Avoid avatars until measured d
 
 Do not animate delivery indicators, stickers, emoji, or loading decoration. Preserve CPU and repaint time for navigation feedback.
 
+## In-chat search
+
+- Label the chat scope, query, and retained/total result count; users should never have to infer whether a search is local, global, or still running.
+- Fetch only after the explicit `Search` action. Keep one small server page separate from cached history; do not build a resident local index.
+- Keep sender, compact preview/media label, and timestamp in every result row. Open longer detail through progressive disclosure.
+- Make Back from the result page restore the current chat and its retained selection. Search results must not imply that history was viewed or mark messages read.
+- Distinguish `no matches` from `request failed`, retain the query after failure, and offer `Edit` and `Refresh` as constructive recovery actions.
+
 ## Error prevention and recovery
 
 - Omit or disable actions that cannot succeed with the known peer, rights, access hash, media DC, or message flags.

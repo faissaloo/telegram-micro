@@ -106,6 +106,8 @@ public class CombinatorIds {
   public static int messages_read_history = 0xe306d3a;
   public static int messages_get_dialogs = 0xa0f4cb4f;
   public static int messages_get_history = 0x4423e6c5;
+  public static int messages_search = 0x29ee847a;
+  public static int input_messages_filter_empty = 0x57e2f66c;
   public static int messages_get_full_chat = 0xaeb00b34;
   public static int messages_request_encryption = 0xf64daf43;
   public static int messages_accept_encryption = 0x3dbc0415;

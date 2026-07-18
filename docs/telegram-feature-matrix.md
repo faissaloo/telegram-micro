@@ -62,7 +62,7 @@ Prefer work with high everyday frequency, recovery or compliance value, existing
 | Edit sent messages | live edits parsed; outbound edit absent | `later`; bounded text-only edit with preserved original timestamp. |
 | Local compose draft | `foundation` | Draft and reply/forward context survive interruption; a single in-flight job temporarily locks mutation to avoid duplicating the payload in Nokia-class RAM. |
 | Server-synced drafts | parsed/ignored | `later`; one bounded draft per retained dialog. |
-| Message search within a chat | absent | `next`; server-side query with a small result page, no local index. |
+| Message search within a chat | `foundation` | Explicit `messages.search` only: query is capped at 48 characters, one server page is capped at 6 pooled rows, results remain ephemeral and separate from cached history, failure differs from zero matches, and Back restores the chat. Pagination/context fetch, live interoperability, and device proof remain. |
 | Global message search | absent | `later`; bounded server result page and clear scope label. |
 | Peer discovery/search | `foundation` | P1; distinguish cached vs server results. |
 | Styled-text entities | `partial` parsing/skipping | `later`; render only safe high-value styles/links without layout churn. |
@@ -193,10 +193,10 @@ Prefer work with high everyday frequency, recovery or compliance value, existing
 
 ## Current ordered implementation queue
 
-1. Add server-backed in-chat text search with a small result page.
-2. Model protected-content restrictions before offering forward/save actions.
-3. Add bounded DC auth export/import, then cross-DC media download.
-4. Add a small constructor/fixture corpus and long-session capacity soak.
-5. Investigate sponsored-message requirements before stronger channel claims.
+1. Model protected-content restrictions before offering forward/save actions.
+2. Add bounded DC auth export/import, then cross-DC media download.
+3. Add a small constructor/fixture corpus and long-session capacity soak.
+4. Investigate sponsored-message requirements before stronger channel claims.
+5. Add explicit older search/history pages only after interaction and heap measurements confirm a safe bounded replacement policy.
 
 Reorder this queue only when local references, a live interoperability failure, device evidence, or user research demonstrates higher core value.

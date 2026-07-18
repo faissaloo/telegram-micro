@@ -12,9 +12,9 @@ TelegramMicro separates deterministic offline proof from production-account and 
 | `./scripts/test-target-full.sh` | All registered tests including slow crypto vectors in the target VM | UI, live service; this can be a long soak |
 | `./scripts/verify.sh --quick` | Shell/source policy, clean diff checks, production budgets, quick tests | Slow vectors and UI |
 | `./scripts/verify.sh --full` | Standard offline pre-push gate | UI, production Telegram, physical Nokia |
-| `./scripts/verify.sh --full --ui` | Standard gate plus clean-state first-install/entropy and deterministic history UI captures | Login interoperability or real device |
+| `./scripts/verify.sh --full --ui` | Standard gate plus clean-state first-install/entropy, deterministic history, and bounded search UI captures | Login/search interoperability or real device |
 
-`verify-ui.sh` and `verify-history-ui.sh` require a real display for the pinned GTK2 ScritchUI backend, even though the app runs through the hosted VM. They fail before starting the emulator when Linux has no `DISPLAY`; do not replace this evidence lane with a virtual X server. The first-install lane requires the entropy marker and rejects evidence if bootstrap/reconnect starts before it. The history lane runs a test-JAR-only, account-free model fixture through the production canvas and proves timestamp plus `read`/`sent` layout states. Both write ignored artifacts under `artifacts/ui-smoke` and clean only their isolated temporary state.
+`verify-ui.sh`, `verify-history-ui.sh`, and `verify-search-ui.sh` require a real display for the pinned GTK2 ScritchUI backend, even though the app runs through the hosted VM. They fail before starting the emulator when Linux has no `DISPLAY`; do not replace this evidence lane with a virtual X server. The first-install lane requires the entropy marker and rejects evidence if bootstrap/reconnect starts before it. The history lane runs a test-JAR-only, account-free model fixture through the production canvas and proves timestamp plus `read`/`sent` layout states. The search lane renders a scoped account-free result page through the production shell, waits for the first event-thread paint, and requires the selected-result card before accepting bounded sender/preview/media/time evidence. All three write ignored artifacts under `artifacts/ui-smoke` and clean only their isolated temporary state.
 
 ## Change-to-proof matrix
 
@@ -24,6 +24,7 @@ TelegramMicro separates deterministic offline proof from production-account and 
 - Authentication/crypto changes need local reference comparison, transcript/nonce failure tests, and the full offline gate.
 - Durable-state changes need current round-trip, legacy compatibility when promised, and corrupt/truncated/oversized rejection.
 - UI/startup changes need direct MCP inspection in addition to model tests.
+- Server-backed secondary lists need request-shape proof, over-capacity rejection before model mutation, separation from durable/core state, and explicit zero/failure/back-navigation UI proof.
 - Build/bootstrap changes should be tested against a clean checkout of the pinned SquirrelJME base.
 - Heap/device-budget changes need the artifact gate and eventually the physical-device checklist.
 

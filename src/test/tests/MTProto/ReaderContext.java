@@ -7,9 +7,11 @@ import mtproto.recieve.messages.ReaderResultParser;
 import mtproto.send.messages.SendGetDialogs;
 import mtproto.send.messages.SendGetHistory;
 import mtproto.send.messages.SendReadHistory;
+import mtproto.send.messages.SendSearchMessages;
 import reader.DialogListModel;
 import reader.PeerDirectory;
 import reader.ReaderStateModel;
+import search.MessageSearchStateModel;
 import support.Decode;
 
 public class ReaderContext {
@@ -618,6 +620,62 @@ public class ReaderContext {
     }
   }
 
+  public static class BuildMessageSearchRequestTest extends Test {
+    public String label() {
+      return "Can build one bounded messages.search request page";
+    }
+
+    public void test() throws TestFailureException {
+      byte[] body = (new SendSearchMessages(
+        SendGetDialogs.DialogInputPeer.user(77L, 0x1122334455667788L),
+        "clock",
+        6
+      )).message_data.end();
+
+      expect(Decode.Little.int_decode(body, 0), CombinatorIds.messages_search);
+      expect(Decode.Little.int_decode(body, 4), 0);
+      expect(Decode.Little.int_decode(body, 8), CombinatorIds.input_peer_user);
+      expect(Decode.Little.long_decode(body, 12), 77L);
+      expect(Decode.Little.long_decode(body, 20), 0x1122334455667788L);
+      expect(((int)body[28]) & 0xff, 5);
+      expect(((int)body[29]) & 0xff, (int)'c');
+      expect(((int)body[33]) & 0xff, (int)'k');
+      expect(Decode.Little.int_decode(body, 36), CombinatorIds.input_messages_filter_empty);
+      expect(Decode.Little.int_decode(body, 40), 0);
+      expect(Decode.Little.int_decode(body, 44), Integer.MAX_VALUE);
+      expect(Decode.Little.int_decode(body, 48), 0);
+      expect(Decode.Little.int_decode(body, 52), 0);
+      expect(Decode.Little.int_decode(body, 56), 6);
+      expect(Decode.Little.int_decode(body, 60), Integer.MAX_VALUE);
+      expect(Decode.Little.int_decode(body, 64), 0);
+      expect(Decode.Little.long_decode(body, 68), 0L);
+      expect(body.length, 76);
+
+      expectRejectedSearch("", 0, 6);
+      expectRejectedSearch(
+        "1234567890123456789012345678901234567890123456789",
+        0,
+        6
+      );
+      expectRejectedSearch("clock", -1, 6);
+      expectRejectedSearch("clock", 0, 7);
+    }
+
+    private void expectRejectedSearch(String query, int offsetId, int limit) {
+      try {
+        new SendSearchMessages(
+          SendGetDialogs.DialogInputPeer.chat(77L),
+          query,
+          offsetId,
+          limit
+        );
+        expect(true, false);
+      } catch (IllegalArgumentException expected) {
+        expect(true, true);
+      }
+    }
+  }
+
   public static class BuildReadHistoryRequestTest extends Test {
     public String label() {
       return "Can build bounded private and channel read-history requests";
@@ -782,6 +840,114 @@ public class ReaderContext {
       expect(reader.history.items[1].hasMedia, true);
       expect(reader.historyPeerKind, DialogListModel.PEER_USER);
       expect(reader.historyPeerId, 3001L);
+    }
+  }
+
+  public static class ParseMessageSearchPayloadTest extends Test {
+    public String label() {
+      return "Message search parses one bounded page without replacing cached history";
+    }
+
+    public void test() throws TestFailureException {
+      byte[] body = (new Serializer())
+        .append_int(0)
+        .append_int(9)
+        .append_raw_bytes(vector(new byte[][] {
+          textUserMessage(94, 2001L, 3001L, "clock one"),
+          unsupportedUserMediaMessage(91, 2001L, 3001L)
+        }))
+        .append_raw_bytes(vector(new byte[][] {}))
+        .append_raw_bytes(vector(new byte[][] {}))
+        .append_raw_bytes(vector(new byte[][] {
+          user(2001L, 0x1111111111111111L, "Bob"),
+          user(3001L, 0x2222222222222222L, "Alice")
+        }))
+        .end();
+      ReaderStateModel reader = new ReaderStateModel(8, 8);
+      ReaderResultParser parser = new ReaderResultParser(8, 8, 12);
+      MessageSearchStateModel search = new MessageSearchStateModel();
+
+      reader.appendDialog(DialogListModel.PEER_USER, 3001L, "Alice", "cached", 0, false);
+      reader.selectDialog(0);
+      reader.beginHistoryLoad(DialogListModel.PEER_USER, 3001L);
+      reader.appendHistoryMessage(80, "Alice", "cached history", false, false, false);
+      reader.finishHistoryLoad();
+      expect(search.bindPeer(DialogListModel.PEER_USER, 3001L, "Alice"), true);
+      expect(search.begin("clock"), true);
+
+      expect(parser.applyMessageSearch(
+        new RPCResponse(CombinatorIds.messages_messages_slice, body),
+        reader,
+        search
+      ), true);
+
+      expect(search.loading, false);
+      expect(search.results.count, 2);
+      expect(search.totalCount, 9);
+      expect(search.results.items[0].messageId, 94);
+      expect(search.results.items[0].sender, "Bob");
+      expect(search.results.items[0].text, "clock one");
+      expect(search.results.items[0].dateSeconds, 1700000000);
+      expect(search.results.items[1].hasMedia, true);
+      expect(search.results.items[1].mediaLabel, "DOCUMENT");
+      expect(reader.history.count, 1);
+      expect(reader.history.items[0].messageId, 80);
+      expect(reader.history.items[0].text, "cached history");
+      expect(reader.historyPeerId, 3001L);
+    }
+  }
+
+  public static class RejectOversizedMessageSearchPageTest extends Test {
+    public String label() {
+      return "Message search rejects oversized pages before model or peer mutation";
+    }
+
+    public void test() throws TestFailureException {
+      byte[] body = (new Serializer())
+        .append_int(0)
+        .append_int(7)
+        .append_int(CombinatorIds.vector)
+        .append_int(7)
+        .append_raw_bytes(new byte[28])
+        .end();
+      ReaderStateModel reader = new ReaderStateModel(8, 8);
+      ReaderResultParser parser = new ReaderResultParser(8, 8, 12);
+      MessageSearchStateModel search = new MessageSearchStateModel();
+
+      reader.peers.upsertIdentity(
+        DialogListModel.PEER_USER,
+        2001L,
+        0x1111111111111111L,
+        true,
+        false,
+        "Cached Bob",
+        "bob"
+      );
+      expect(search.bindPeer(DialogListModel.PEER_USER, 3001L, "Alice"), true);
+      expect(search.begin("clock"), true);
+
+      expect(parser.applyMessageSearch(
+        new RPCResponse(CombinatorIds.messages_messages_slice, body),
+        reader,
+        search
+      ), false);
+      expect(parser.lastError(), "Search result page exceeds its bounded capacity.");
+      expect(search.loading, true);
+      expect(search.results.count, 0);
+      expect(reader.peers.count, 1);
+      expect(reader.peers.find(DialogListModel.PEER_USER, 2001L).title, "Cached Bob");
+
+      expect(parser.applyMessageSearch(
+        new RPCResponse(
+          CombinatorIds.messages_messages_not_modified,
+          messagesNotModified(1)
+        ),
+        reader,
+        search
+      ), false);
+      expect(parser.lastError().indexOf("Unexpected search constructor") >= 0, true);
+      expect(search.results.count, 0);
+      expect(reader.peers.find(DialogListModel.PEER_USER, 2001L).title, "Cached Bob");
     }
   }
 

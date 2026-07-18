@@ -64,6 +64,40 @@ public final class OutboundRecoveryState {
     return kind != KIND_NONE || phase != PHASE_IDLE || label.length() > 0;
   }
 
+  public static boolean resumePrerequisitesReady(
+    boolean syncReady,
+    boolean dialogsLoading,
+    boolean historyLoading,
+    boolean historyRequestInFlight,
+    boolean syncStateRequestInFlight,
+    boolean differenceRequestInFlight,
+    boolean channelDifferenceRequestInFlight,
+    boolean needsDifference
+  ) {
+    return syncReady &&
+      !dialogsLoading &&
+      !historyLoading &&
+      !historyRequestInFlight &&
+      !syncStateRequestInFlight &&
+      !differenceRequestInFlight &&
+      !channelDifferenceRequestInFlight &&
+      !needsDifference;
+  }
+
+  /**
+   * A live reconnect can reconcile updateMessageID only if it asks for the
+   * difference from the last locally applied state. Fetching the newest state
+   * first would skip the ambiguous acknowledgement. A cold start without a
+   * checkpoint must fall back to updates.getState and rely on random_id
+   * idempotence instead.
+   */
+  public static boolean shouldRequestDifferenceBeforeResume(
+    boolean resumePending,
+    boolean hasSyncCheckpoint
+  ) {
+    return resumePending && hasSyncCheckpoint;
+  }
+
   public String summary() {
     return kindName(kind) + " " + phaseName(phase);
   }

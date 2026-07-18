@@ -24,7 +24,7 @@ These states are independent. A parser can be unit verified while the end-to-end
 | Durable session | Versioned bounded snapshots, corrupt/oversized rejection, RMS tests | Power-loss/full-storage device scenarios and migration policy |
 | Dialog/history read | Bounded models, parsing, cache, monotonic read watermarks, and peer-specific read requests | Prove mark-read behavior live/on-device; expand constructor interoperability conservatively |
 | Message context | Sender, content, media, pending/sent/read state, and UTC timestamps are bounded and warm-restorable | Prove delivery semantics and local-time behavior live/on-device |
-| Text send | Bounded compose/request/reconciliation and recovery foundations | Transport-loss duplicate/retry matrix; live/device proof |
+| Text send | One bounded immutable in-flight compose job, exact `random_id` retry, pre-resend `updateMessageID` reconciliation, fail-closed warm recovery, and single pending-row repair | Add a fault-injected transport trace; live/device proof |
 | Reconnect/catch-up | Session restore, difference/channel-difference, PTS-continuity checks, and fallback foundations | More gap/too-long/unknown-update traces and device radio-loss proof |
 | Failure visibility | Bounded failure log/status surfaces | Make every P0 terminal failure actionable without exposing secrets |
 
@@ -35,7 +35,7 @@ P0 is complete only when the exact release artifact passes the real-device check
 1. Build a curated fixture corpus for currently observed config, auth, dialogs, messages, updates, and RPC errors. Record constructor IDs and reference provenance without storing secrets.
 2. For every parser family, cover unknown constructor, truncation, excessive count/length, allocation refusal, and conservative recovery.
 3. Exercise DC migration/export-import authorization and media DC behavior without retaining multiple unbounded connections.
-4. Strengthen outbound idempotence across restart and ambiguous acknowledgements.
+4. Extend outbound fault injection from deterministic model/restart invariants to transport callback traces and live radio-loss evidence.
 5. Define durable-state compatibility windows and explicit reset/re-auth behavior for unsupported migrations.
 6. Add long-running bounded-state soak tests that assert capacities and lack of progressive retained growth.
 

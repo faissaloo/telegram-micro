@@ -20,6 +20,7 @@ TelegramMicro separates deterministic offline proof from production-account and 
 
 - Parser/TL/transport changes need malformed, truncated, oversized, and unknown-shape regressions where applicable.
 - PTS-bearing mutation acknowledgements need contiguous, duplicate/stale, and gap cases for both cloud and channel state.
+- Outbound-message recovery needs peer/payload/context coherence, exact nonzero `random_id` reuse, duplicate pending-row repair, corrupt warm-state rejection, and both catch-up-before-retry and retry-before-ack callback orders.
 - Authentication/crypto changes need local reference comparison, transcript/nonce failure tests, and the full offline gate.
 - Durable-state changes need current round-trip, legacy compatibility when promised, and corrupt/truncated/oversized rejection.
 - UI/startup changes need direct MCP inspection in addition to model tests.

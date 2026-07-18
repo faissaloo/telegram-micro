@@ -82,6 +82,8 @@ Before changing MTProto behavior, Telegram request/response semantics, update ha
 
 Treat references as specifications and implementation evidence, not code to copy blindly. Unknown constructors, oversized vectors/frames, invalid DH values, replayed messages, decompression overflow, and truncated payloads must fail boundedly.
 
+For outbound message mutations, prove the whole idempotence invariant: the peer, payload/context, and nonzero `random_id` stay coherent across navigation, reconnect, and restart; no more than one optimistic history row exists; catch-up may reconcile `updateMessageID` before a resend; and a retry reuses the exact original identity. Never generate a replacement ID for an ambiguously acknowledged request.
+
 ## Nokia C2-01 constraints
 
 - Prefer fixed-capacity models, bounded arrays, reusable buffers, and ownership transfer over unbounded collections and repeated copies.

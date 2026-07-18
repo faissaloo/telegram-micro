@@ -131,6 +131,8 @@ public class TestSuite {
     TestRunner.register(new SessionContext.SessionStoreRoundTripTest());
     TestRunner.register(new WarmStateContext.CodecRoundTripPreservesWarmStateTest());
     TestRunner.register(new WarmStateContext.AppShellRestoresWarmStateTest());
+    TestRunner.register(new WarmStateContext.IncoherentWarmOutboundFailsClosedTest());
+    TestRunner.register(new WarmStateContext.OutboundResumeWaitsForBothRefreshCallbacksTest());
     TestRunner.register(new WarmStateContext.ForwardComposeContextRoundTripTest());
     TestRunner.register(new WarmStateContext.LegacyWarmStateDecodeRemainsSupportedTest());
     TestRunner.register(new WarmStateContext.PreviousWarmStateVersionDefaultsMessageDateTest());
@@ -161,6 +163,7 @@ public class TestSuite {
     TestRunner.register(new ReaderStateModelContext.HistorySlotsEvictLeastRecentPeerTest());
     TestRunner.register(new ReaderStateModelContext.OutboundAppendUsesBoundedCachedHistoryTest());
     TestRunner.register(new ReaderStateModelContext.PendingOutboundLifecycleUpdatesCachedHistoryTest());
+    TestRunner.register(new ReaderStateModelContext.PendingOutboundRecoveryIsIdempotentTest());
     TestRunner.register(new ReaderStateModelContext.WarmStateRestorePreservesPeerIdentityTest());
     TestRunner.register(new ReaderStateModelContext.LiveShortUpdateRefreshesDialogAndCachedHistoryTest());
     TestRunner.register(new ReaderStateModelContext.LiveShortUpdateFallsBackWhenPeerIsUnknownTest());
@@ -201,6 +204,11 @@ public class TestSuite {
     TestRunner.register(new AppShellModelContext.BeginComposeSendStagesPendingHistoryTest());
     TestRunner.register(new AppShellModelContext.ResumeAuthorizationPreservesWarmShellStateTest());
     TestRunner.register(new AppShellModelContext.InterruptedComposeCanBeResumedTest());
+    TestRunner.register(new AppShellModelContext.InFlightSendKeepsStableComposeWhileBrowsingTest());
+    TestRunner.register(new AppShellModelContext.InterruptedSendResumeIsIdempotentTest());
+    TestRunner.register(new AppShellModelContext.CatchUpReconcilesInterruptedSendBeforeRetryTest());
+    TestRunner.register(new AppShellModelContext.InterruptedForwardResumeIsIdempotentTest());
+    TestRunner.register(new AppShellModelContext.SendCompletionPreservesUnrelatedRouteTest());
     TestRunner.register(new AppShellModelContext.ReplyActionMovesShellIntoComposeTest());
     TestRunner.register(new AppShellModelContext.ForwardActionStagesRealForwardContextTest());
     TestRunner.register(new AppShellModelContext.ForwardContextSurvivesComposePeerSwitchTest());

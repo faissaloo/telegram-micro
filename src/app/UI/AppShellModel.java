@@ -27,6 +27,10 @@ public class AppShellModel {
 
   public static final int TARGET_RAM_BUDGET_BYTES = 256 * 1024;
   public static final int TARGET_RESERVED_BYTES = 80 * 1024;
+  public static final String OUTBOUND_WAIT_DETAIL =
+    "Wait for the current message acknowledgement before composing again.";
+  public static final String OUTBOUND_RECOVERY_INVALID_DETAIL =
+    "Interrupted outbound state was inconsistent; the draft was retained for review.";
 
   public final ScreenRouter router = new ScreenRouter(SCREEN_DIALOGS);
   public final ReaderStateModel reader = new ReaderStateModel();
@@ -112,7 +116,10 @@ public class AppShellModel {
     updateMediaSummary();
     updateReaderSummary();
     updateOutboundSummary();
-    activeDetail = "Saved authorization restored.";
+    activeDetail = compose.status == ComposeStateModel.STATUS_FAILED &&
+        compose.lastErrorMessage != null && compose.lastErrorMessage.length() > 0
+      ? compose.lastErrorMessage
+      : "Saved authorization restored.";
     recomputeWorkingSet();
   }
 
@@ -506,16 +513,24 @@ public class AppShellModel {
     boolean changed = reader.selectDialog(index);
     if (changed) {
       DialogListModel.Item selected = reader.selectedDialog();
+      boolean outboundLocked = isOutboundSendLocked();
 
-      if (selected != null) {
+      if (selected != null && !outboundLocked) {
         compose.bindPeer(selected.peerKind, selected.peerId, selected.title);
       }
-      noteOutboundSelected();
+      if (!outboundLocked) {
+        noteOutboundSelected();
+      }
       updateReaderSummary();
       router.navigate(SCREEN_HISTORY);
-      activeDetail = reader.historyLoaded
-        ? "Showing cached history for " + selectedDialogTitle() + "."
-        : "No cached history for " + selectedDialogTitle() + ".";
+      if (outboundLocked) {
+        activeDetail = "Showing " + selectedDialogTitle() +
+          "; another message is awaiting acknowledgement.";
+      } else {
+        activeDetail = reader.historyLoaded
+          ? "Showing cached history for " + selectedDialogTitle() + "."
+          : "No cached history for " + selectedDialogTitle() + ".";
+      }
       recomputeWorkingSet();
     }
     return changed;
@@ -891,9 +906,14 @@ public class AppShellModel {
     DialogListModel.Item dialog;
     PeerDirectory.Item identity;
     int dialogIndex;
-    String title = resolvePeerTitle(peerKind, peerId, fallbackTitle);
-    boolean preserveForward = compose.hasForwardSource();
+    String title;
+    boolean preserveForward;
 
+    if (blockComposeMutationWhileSending()) {
+      return false;
+    }
+    title = resolvePeerTitle(peerKind, peerId, fallbackTitle);
+    preserveForward = compose.hasForwardSource();
     if (peerKind == DialogListModel.PEER_UNKNOWN || peerId == 0) {
       activeDetail = "Select a peer before composing.";
       return false;
@@ -1137,6 +1157,9 @@ public class AppShellModel {
     DialogListModel.Item dialog = reader.selectedDialog();
     reader.MessageListModel.Item message = reader.selectedMessage();
 
+    if (blockComposeMutationWhileSending()) {
+      return false;
+    }
     if (dialog == null || message == null) {
       activeDetail = "Select a message before replying.";
       return false;
@@ -1153,8 +1176,11 @@ public class AppShellModel {
   public boolean prepareForwardSelectedMessage() {
     DialogListModel.Item dialog = reader.selectedDialog();
     reader.MessageListModel.Item message = reader.selectedMessage();
-    StringBuffer preview = new StringBuffer();
+    StringBuffer preview;
 
+    if (blockComposeMutationWhileSending()) {
+      return false;
+    }
     if (dialog == null || message == null) {
       activeDetail = "Select a message before forwarding.";
       return false;
@@ -1164,6 +1190,7 @@ public class AppShellModel {
       return false;
     }
 
+    preview = new StringBuffer();
     compose.bindPeer(dialog.peerKind, dialog.peerId, dialog.title);
     if (message.text != null && message.text.length() > 0) {
       preview.append(message.text);
@@ -1189,6 +1216,9 @@ public class AppShellModel {
   }
 
   public boolean updateComposeDraft(String text) {
+    if (blockComposeMutationWhileSending()) {
+      return false;
+    }
     if (!compose.replaceText(text)) {
       activeDetail = "Draft exceeds the bounded compose limit.";
       return false;
@@ -1211,6 +1241,13 @@ public class AppShellModel {
     String targetTitle = compose.peerTitle;
     int dialogIndex;
 
+    if (blockComposeMutationWhileSending()) {
+      return false;
+    }
+    if (randomId == 0) {
+      activeDetail = "A nonzero retry identity is required before sending.";
+      return false;
+    }
     if (targetPeerKind == DialogListModel.PEER_UNKNOWN || targetPeerId == 0) {
       DialogListModel.Item selected = reader.selectedDialog();
       if (selected == null) {
@@ -1262,9 +1299,16 @@ public class AppShellModel {
     int targetPeerKind = compose.peerKind;
     long targetPeerId = compose.peerId;
     String targetTitle = compose.peerTitle;
-    StringBuffer label = new StringBuffer();
+    StringBuffer label;
     int dialogIndex;
 
+    if (blockComposeMutationWhileSending()) {
+      return false;
+    }
+    if (randomId == 0) {
+      activeDetail = "A nonzero retry identity is required before forwarding.";
+      return false;
+    }
     if (!compose.hasForwardSource()) {
       activeDetail = "No forward source is selected.";
       return false;
@@ -1274,6 +1318,7 @@ public class AppShellModel {
       return false;
     }
 
+    label = new StringBuffer();
     label.append("Fwd: ");
     label.append(compose.contextPreview != null && compose.contextPreview.length() > 0
       ? compose.contextPreview
@@ -1305,11 +1350,44 @@ public class AppShellModel {
     return true;
   }
 
+  /**
+   * Applies updateMessageID to the durable outbound job. This is deliberately
+   * valid before a reconnect retry has been emitted, allowing updates
+   * catch-up to settle an ambiguously acknowledged send without another RPC.
+   */
+  public boolean reconcileOutboundMessageId(long randomId, int messageId) {
+    int peerKind;
+    long peerId;
+    String pendingText;
+
+    if (messageId <= 0 || randomId == 0 ||
+        !hasRecoverableOutboundSend() || randomId != compose.lastRandomId) {
+      return false;
+    }
+
+    peerKind = compose.peerKind;
+    peerId = compose.peerId;
+    pendingText = compose.hasForwardSource()
+      ? "Fwd: " + (compose.contextPreview != null && compose.contextPreview.length() > 0
+          ? compose.contextPreview
+          : "(empty)")
+      : compose.text;
+    if (!reader.markLatestPendingOutboundSent(peerKind, peerId, messageId)) {
+      if (!reader.ensurePendingOutboundText(peerKind, peerId, "YOU", pendingText) ||
+          !reader.markLatestPendingOutboundSent(peerKind, peerId, messageId)) {
+        return false;
+      }
+    }
+    onComposeSent(messageId);
+    return true;
+  }
+
   public void onComposeSent(int messageId) {
     boolean wasForward = compose.hasForwardSource();
     int peerKind = compose.peerKind;
     long peerId = compose.peerId;
     String peerTitle = compose.peerTitle;
+    boolean returnToOutboundHistory = isShowingOutboundPeer(peerKind, peerId);
 
     compose.markSent(messageId);
     outbound.note(
@@ -1325,12 +1403,15 @@ public class AppShellModel {
     activeDetail = wasForward
       ? "Message forwarded to " + peerTitle + "."
       : "Message sent to " + peerTitle + ".";
-    router.navigate(SCREEN_HISTORY);
+    if (returnToOutboundHistory) {
+      router.navigate(SCREEN_HISTORY);
+    }
     recomputeWorkingSet();
   }
 
   public void onComposeFailed(int errorCode, String detail) {
     boolean wasForward = compose.hasForwardSource();
+    boolean returnToOutboundCompose = isShowingOutboundPeer(compose.peerKind, compose.peerId);
 
     compose.markFailed(errorCode, detail);
     outbound.note(
@@ -1339,31 +1420,65 @@ public class AppShellModel {
       compose.peerKind,
       compose.peerId,
       errorCode,
-      compose.text.length(),
-      compose.text
+      wasForward ? compose.forwardMessageId : compose.text.length(),
+      wasForward ? compose.contextPreview : compose.text
     );
     updateOutboundSummary();
     activeDetail = detail != null && detail.length() > 0
       ? detail
       : "Message send failed.";
-    router.navigate(SCREEN_COMPOSE);
+    if (returnToOutboundCompose) {
+      router.navigate(SCREEN_COMPOSE);
+    }
     recomputeWorkingSet();
   }
 
+  public boolean isOutboundSendLocked() {
+    return compose.status == ComposeStateModel.STATUS_SENDING ||
+      outbound.phase == OutboundRecoveryState.PHASE_IN_FLIGHT;
+  }
+
   public boolean hasRecoverableOutboundSend() {
+    boolean isForward = compose.hasForwardSource();
+
     return (outbound.kind == OutboundRecoveryState.KIND_TEXT ||
       outbound.kind == OutboundRecoveryState.KIND_FORWARD) &&
       outbound.phase == OutboundRecoveryState.PHASE_IN_FLIGHT &&
-      compose.peerKind != DialogListModel.PEER_UNKNOWN &&
+      outbound.sequence > 0 &&
+      outbound.code == 0 &&
+      compose.status == ComposeStateModel.STATUS_SENDING &&
+      compose.dirty &&
+      isSendablePeerKind(compose.peerKind) &&
       compose.peerId != 0 &&
-      ((compose.text != null && compose.text.length() > 0) || compose.hasForwardSource());
+      compose.lastRandomId != 0 &&
+      outbound.peerKind == compose.peerKind &&
+      outbound.peerId == compose.peerId &&
+      ((outbound.kind == OutboundRecoveryState.KIND_TEXT &&
+          !isForward && hasCoherentTextOutboundPayload()) ||
+       (outbound.kind == OutboundRecoveryState.KIND_FORWARD &&
+          isForward && hasCoherentForwardOutboundPayload()));
   }
 
   public boolean resumeInterruptedComposeSend(long randomId) {
-    if (!hasRecoverableOutboundSend()) {
+    String pendingText;
+
+    if (!hasRecoverableOutboundSend() || randomId == 0 || randomId != compose.lastRandomId) {
       return false;
     }
 
+    pendingText = compose.hasForwardSource()
+      ? "Fwd: " + (compose.contextPreview != null && compose.contextPreview.length() > 0
+          ? compose.contextPreview
+          : "(empty)")
+      : compose.text;
+    if (!reader.ensurePendingOutboundText(
+        compose.peerKind,
+        compose.peerId,
+        "YOU",
+        pendingText)) {
+      activeDetail = "Unable to restore the pending outbound history entry.";
+      return false;
+    }
     compose.markSending(randomId);
     outbound.note(
       compose.hasForwardSource() ? OutboundRecoveryState.KIND_FORWARD : OutboundRecoveryState.KIND_TEXT,
@@ -1380,6 +1495,70 @@ public class AppShellModel {
       : "Retrying interrupted outbound message for " + compose.peerTitle + ".";
     recomputeWorkingSet();
     return true;
+  }
+
+  private boolean blockComposeMutationWhileSending() {
+    if (!isOutboundSendLocked()) {
+      return false;
+    }
+    activeDetail = OUTBOUND_WAIT_DETAIL;
+    return true;
+  }
+
+  private boolean hasCoherentTextOutboundPayload() {
+    if (compose.text == null || compose.text.length() == 0 ||
+        outbound.detail != compose.text.length() ||
+        !outboundLabelMatches(compose.text) ||
+        (compose.contextMode != ComposeStateModel.CONTEXT_NONE &&
+          compose.contextMode != ComposeStateModel.CONTEXT_REPLY) ||
+        compose.forwardFromPeerKind != DialogListModel.PEER_UNKNOWN ||
+        compose.forwardFromPeerId != 0 || compose.forwardMessageId != 0) {
+      return false;
+    }
+    return compose.contextMode != ComposeStateModel.CONTEXT_NONE ||
+      compose.replyToMessageId == 0;
+  }
+
+  private boolean hasCoherentForwardOutboundPayload() {
+    return compose.text != null && compose.text.length() == 0 &&
+      compose.contextMode == ComposeStateModel.CONTEXT_FORWARD &&
+      compose.replyToMessageId == 0 &&
+      isSendablePeerKind(compose.forwardFromPeerKind) &&
+      outbound.detail == compose.forwardMessageId &&
+      outboundLabelMatches(compose.contextPreview);
+  }
+
+  private boolean outboundLabelMatches(String value) {
+    String label = outbound.label != null ? outbound.label : "";
+    String source = value != null ? value : "";
+    int expectedLength = source.length() < OutboundRecoveryState.LABEL_MAX
+      ? source.length()
+      : OutboundRecoveryState.LABEL_MAX;
+    int i;
+
+    if (label.length() != expectedLength) {
+      return false;
+    }
+    for (i = 0; i < expectedLength; ++i) {
+      if (label.charAt(i) != source.charAt(i)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private static boolean isSendablePeerKind(int peerKind) {
+    return peerKind == DialogListModel.PEER_USER ||
+      peerKind == DialogListModel.PEER_CHAT ||
+      peerKind == DialogListModel.PEER_CHANNEL;
+  }
+
+  private boolean isShowingOutboundPeer(int peerKind, long peerId) {
+    int screen = router.currentScreen;
+
+    return (screen == SCREEN_HISTORY || screen == SCREEN_COMPOSE) &&
+      reader.historyPeerKind == peerKind &&
+      reader.historyPeerId == peerId;
   }
 
   public void updateReaderSummary() {
@@ -1480,6 +1659,8 @@ public class AppShellModel {
   }
 
   public void applyWarmState(WarmStateSnapshot snapshot, boolean resumePending) {
+    boolean rejectedOutbound;
+
     if (snapshot == null) {
       return;
     }
@@ -1503,6 +1684,7 @@ public class AppShellModel {
     mediaQueue.clear();
     updateMediaSummary();
     outbound.copyFrom(snapshot.outbound);
+    rejectedOutbound = rejectIncoherentWarmOutbound();
     updateOutboundSummary();
     updateReaderSummary();
 
@@ -1512,10 +1694,38 @@ public class AppShellModel {
       router.init(SCREEN_DIALOGS);
     }
 
-    activeDetail = resumePending
-      ? "Warm reader cache restored while reconnecting."
-      : "Warm reader cache restored.";
+    if (rejectedOutbound) {
+      activeDetail = OUTBOUND_RECOVERY_INVALID_DETAIL;
+    } else {
+      activeDetail = resumePending
+        ? "Warm reader cache restored while reconnecting."
+        : "Warm reader cache restored.";
+    }
     recomputeWorkingSet();
+  }
+
+  private boolean rejectIncoherentWarmOutbound() {
+    boolean wasForward;
+    int kind;
+
+    if (!isOutboundSendLocked() || hasRecoverableOutboundSend()) {
+      return false;
+    }
+
+    wasForward = compose.hasForwardSource() || outbound.kind == OutboundRecoveryState.KIND_FORWARD;
+    kind = wasForward ? OutboundRecoveryState.KIND_FORWARD : OutboundRecoveryState.KIND_TEXT;
+    reader.removeLatestPendingOutbound(compose.peerKind, compose.peerId);
+    compose.markFailed(0, OUTBOUND_RECOVERY_INVALID_DETAIL);
+    outbound.note(
+      kind,
+      OutboundRecoveryState.PHASE_FAILED,
+      compose.peerKind,
+      compose.peerId,
+      0,
+      wasForward ? compose.forwardMessageId : compose.text.length(),
+      wasForward ? compose.contextPreview : compose.text
+    );
+    return true;
   }
 
   public void recomputeWorkingSet() {

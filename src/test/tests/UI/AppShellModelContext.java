@@ -268,6 +268,175 @@ public class AppShellModelContext {
     }
   }
 
+  public static class InFlightSendKeepsStableComposeWhileBrowsingTest extends Test {
+    public String label() {
+      return "In-flight send identity survives browsing and blocks compose mutation";
+    }
+
+    public void test() throws TestFailureException {
+      AppShellModel shell = new AppShellModel();
+
+      shell.onAuthorized();
+      shell.appendDialog(DialogListModel.PEER_USER, 1, 0x1111222233334444L, true, 11, "Alice", "Hello", 0, false);
+      shell.appendDialog(DialogListModel.PEER_USER, 2, 0x5555666677778888L, true, 12, "Bob", "Hi", 0, false);
+      shell.finishLocalDialogsLoad();
+      shell.selectDialog(0);
+      expect(shell.beginComposeSend("stable payload", 99L), true);
+
+      expect(shell.selectDialog(1), true);
+      expect(shell.selectedDialog().peerId, 2L);
+      expect(shell.compose.peerId, 1L);
+      expect(shell.compose.text, "stable payload");
+      expect(shell.compose.lastRandomId, 99L);
+      expect(shell.outbound.peerId, 1L);
+      expect(shell.openComposeForSelectedDialog(), false);
+      expect(shell.updateComposeDraft("replacement"), false);
+      expect(shell.prepareReplyToSelectedMessage(), false);
+      expect(shell.prepareForwardSelectedMessage(), false);
+      expect(shell.beginComposeSend("second", 100L), false);
+      expect(shell.beginComposeForward(100L), false);
+      expect(shell.compose.peerId, 1L);
+      expect(shell.compose.text, "stable payload");
+      expect(shell.compose.lastRandomId, 99L);
+      expect(shell.activeDetail, AppShellModel.OUTBOUND_WAIT_DETAIL);
+    }
+  }
+
+  public static class InterruptedSendResumeIsIdempotentTest extends Test {
+    public String label() {
+      return "Interrupted reply reuses its identity and recreates one pending row";
+    }
+
+    public void test() throws TestFailureException {
+      AppShellModel shell = new AppShellModel();
+
+      shell.onAuthorized();
+      shell.appendDialog(DialogListModel.PEER_USER, 1, 0x1111222233334444L, true, 11, "Alice", "Hello", 0, false);
+      shell.finishLocalDialogsLoad();
+      shell.selectDialog(0);
+      shell.beginHistoryLoadForSelected();
+      shell.appendHistoryMessage(10, "Alice", "Original", false, false, false);
+      shell.finishHistoryLoad();
+      expect(shell.prepareReplyToSelectedMessage(), true);
+      expect(shell.beginComposeSend("stable payload", 99L), true);
+
+      shell.beginDialogsLoad();
+      shell.appendDialog(DialogListModel.PEER_USER, 1, 0x1111222233334444L, true, 11, "Alice", "Hello", 0, false);
+      shell.finishDialogsLoad();
+      shell.selectDialog(0);
+      expect(shell.reader.history.count, 0);
+      expect(shell.resumeInterruptedComposeSend(100L), false);
+      expect(shell.reader.history.count, 0);
+      expect(shell.resumeInterruptedComposeSend(99L), true);
+      expect(shell.resumeInterruptedComposeSend(99L), true);
+      expect(shell.reader.history.count, 1);
+      expect(shell.reader.history.items[0].pending, true);
+      expect(shell.reader.history.items[0].text, "stable payload");
+      expect(shell.compose.lastRandomId, 99L);
+      expect(shell.compose.replyToMessageId, 10);
+      expect(shell.reconcileOutboundMessageId(99L, 77), true);
+      expect(shell.reconcileOutboundMessageId(99L, 77), false);
+      expect(shell.reader.history.count, 1);
+      expect(shell.reader.history.items[0].pending, false);
+      expect(shell.reader.history.items[0].messageId, 77);
+    }
+  }
+
+  public static class CatchUpReconcilesInterruptedSendBeforeRetryTest extends Test {
+    public String label() {
+      return "Catch-up can reconcile an interrupted send before any resend";
+    }
+
+    public void test() throws TestFailureException {
+      AppShellModel shell = new AppShellModel();
+
+      shell.onAuthorized();
+      shell.appendDialog(DialogListModel.PEER_USER, 1, 0x1111222233334444L, true, 11, "Alice", "Hello", 0, false);
+      shell.finishLocalDialogsLoad();
+      shell.selectDialog(0);
+      expect(shell.beginComposeSend("accepted before disconnect", 99L), true);
+
+      shell.beginDialogsLoad();
+      shell.appendDialog(DialogListModel.PEER_USER, 1, 0x1111222233334444L, true, 11, "Alice", "Hello", 0, false);
+      shell.finishDialogsLoad();
+      shell.selectDialog(0);
+      expect(shell.reader.history.count, 0);
+      expect(shell.reconcileOutboundMessageId(100L, 77), false);
+      expect(shell.reconcileOutboundMessageId(99L, 77), true);
+      expect(shell.reader.history.count, 1);
+      expect(shell.reader.history.items[0].messageId, 77);
+      expect(shell.reader.history.items[0].pending, false);
+      expect(shell.reader.history.items[0].text, "accepted before disconnect");
+      expect(shell.compose.status, compose.ComposeStateModel.STATUS_SENT);
+      expect(shell.outbound.phase, session.OutboundRecoveryState.PHASE_SENT);
+    }
+  }
+
+  public static class InterruptedForwardResumeIsIdempotentTest extends Test {
+    public String label() {
+      return "Interrupted forward keeps source, destination, and retry identity";
+    }
+
+    public void test() throws TestFailureException {
+      AppShellModel shell = new AppShellModel();
+
+      shell.onAuthorized();
+      shell.appendDialog(DialogListModel.PEER_USER, 1, 0x1111222233334444L, true, 11, "Alice", "Hello", 0, false);
+      shell.appendDialog(DialogListModel.PEER_USER, 2, 0x5555666677778888L, true, 12, "Bob", "Hi", 0, false);
+      shell.finishLocalDialogsLoad();
+      shell.selectDialog(0);
+      shell.beginHistoryLoadForSelected();
+      shell.appendHistoryMessage(10, "Alice", "Forward me", false, false, false);
+      shell.finishHistoryLoad();
+      expect(shell.prepareForwardSelectedMessage(), true);
+      expect(shell.openComposeForPeer(DialogListModel.PEER_USER, 2, "Bob"), true);
+      expect(shell.beginComposeForward(99L), true);
+
+      shell.beginDialogsLoad();
+      shell.appendDialog(DialogListModel.PEER_USER, 1, 0x1111222233334444L, true, 11, "Alice", "Hello", 0, false);
+      shell.appendDialog(DialogListModel.PEER_USER, 2, 0x5555666677778888L, true, 12, "Bob", "Hi", 0, false);
+      shell.finishDialogsLoad();
+      shell.selectDialog(1);
+      expect(shell.resumeInterruptedComposeSend(99L), true);
+      expect(shell.resumeInterruptedComposeSend(99L), true);
+      expect(shell.compose.peerId, 2L);
+      expect(shell.compose.forwardFromPeerId, 1L);
+      expect(shell.compose.forwardMessageId, 10);
+      expect(shell.compose.lastRandomId, 99L);
+      expect(shell.outbound.kind, session.OutboundRecoveryState.KIND_FORWARD);
+      expect(shell.reader.history.count, 1);
+      expect(shell.reader.history.items[0].pending, true);
+      expect(shell.reader.history.items[0].text, "Fwd: Forward me");
+    }
+  }
+
+  public static class SendCompletionPreservesUnrelatedRouteTest extends Test {
+    public String label() {
+      return "Outbound completion does not hijack an unrelated user route";
+    }
+
+    public void test() throws TestFailureException {
+      AppShellModel shell = new AppShellModel();
+
+      shell.onAuthorized();
+      shell.appendDialog(DialogListModel.PEER_USER, 1, 0x1111222233334444L, true, 11, "Alice", "Hello", 0, false);
+      shell.appendDialog(DialogListModel.PEER_USER, 2, 0x5555666677778888L, true, 12, "Bob", "Hi", 0, false);
+      shell.finishLocalDialogsLoad();
+      shell.selectDialog(0);
+      shell.beginComposeSend("stable payload", 99L);
+      shell.selectDialog(1);
+      shell.navigateStatus();
+
+      shell.onComposeSent(77);
+
+      expect(shell.router.currentScreen, AppShellModel.SCREEN_STATUS);
+      expect(shell.selectedDialog().peerId, 2L);
+      expect(shell.compose.status, compose.ComposeStateModel.STATUS_SENT);
+      expect(shell.outbound.phase, session.OutboundRecoveryState.PHASE_SENT);
+      expect(shell.outbound.peerId, 1L);
+    }
+  }
+
   public static class ReplyActionMovesShellIntoComposeTest extends Test {
     public String label() {
       return "App shell can open compose with reply context for the selected message";

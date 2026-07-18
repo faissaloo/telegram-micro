@@ -257,6 +257,7 @@ public class ReaderStateModel {
     int dateSeconds
   ) {
     HistorySlot target;
+    int existingIndex;
 
     if (dateSeconds < 0) {
       return false;
@@ -268,6 +269,13 @@ public class ReaderStateModel {
 
     history = target.messages;
     currentHistorySlot = target;
+    existingIndex = messageIndexById(target.messages, messageId);
+    if (existingIndex >= 0) {
+      // A reconnect difference can reconcile the optimistic row while a
+      // selected-history request is still in flight. Let the authoritative
+      // history row replace it at the response's bounded ordering position.
+      target.messages.removeAt(existingIndex);
+    }
     return target.messages.append(
       messageId,
       sender,
@@ -390,6 +398,57 @@ public class ReaderStateModel {
 
   public boolean appendPendingOutboundText(int peerKind, long peerId, String sender, String text) {
     return appendOutboundEntry(peerKind, peerId, sender, text, true, false);
+  }
+
+  /**
+   * Restores the one visible row owned by the single in-flight outbound job.
+   * Reconnect dialog refreshes clear the bounded history cache, so retrying a
+   * request must recreate this row without creating a second copy when the
+   * cached row survived.
+   */
+  public boolean ensurePendingOutboundText(int peerKind, long peerId, String sender, String text) {
+    HistorySlot slot;
+    int index;
+    int i;
+
+    if (peerKind == DialogListModel.PEER_UNKNOWN || peerId == 0 || text == null) {
+      return false;
+    }
+
+    slot = findHistorySlot(peerKind, peerId);
+    if (slot == null) {
+      return appendPendingOutboundText(peerKind, peerId, sender, text);
+    }
+
+    index = latestPendingOutboundIndex(slot.messages);
+    if (index < 0) {
+      return appendPendingOutboundText(peerKind, peerId, sender, text);
+    }
+
+    // Older clients could leave more than one optimistic row. The runtime has
+    // one outbound RPC lane, so retain only the newest row and repair it from
+    // the durable compose job without allocating another message object.
+    for (i = index - 1; i >= 0; --i) {
+      if (slot.messages.items[i].outgoing && slot.messages.items[i].pending) {
+        slot.messages.removeAt(i);
+        index -= 1;
+      }
+    }
+    slot.messages.items[index].set(0, sender, text, true, true, false);
+    slot.messages.selectedIndex = index;
+    slot.loaded = true;
+    touchHistorySlot(slot);
+    updateDialogPreviewFromSlot(peerKind, peerId, slot);
+    if (isSelectedPeer(peerKind, peerId) ||
+        (historyPeerKind == peerKind && historyPeerId == peerId)) {
+      currentHistorySlot = slot;
+      history = slot.messages;
+      historyLoaded = true;
+      loadingHistory = false;
+      historyPeerKind = peerKind;
+      historyPeerId = peerId;
+    }
+    return true;
   }
 
   public boolean appendOutboundFileNotice(int peerKind, long peerId, String sender, String fileName) {

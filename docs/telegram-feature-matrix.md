@@ -52,15 +52,15 @@ Prefer work with high everyday frequency, recovery or compliance value, existing
 | Broadcast channels | `foundation` read/join/leave paths | P0/P1; channel compliance features remain. |
 | Recent history pagination | `foundation` bounded window | P0; add explicit older/newer slices without unbounded retention. |
 | Message timestamps | `foundation` | Server epoch seconds survive history/live/send/warm-state paths and render as allocation-free `HH:MMZ`; local-zone/device proof remains. |
-| Text send | `foundation` | P0; ambiguous-ack/restart idempotence remains. |
-| Pending/sent state | `foundation` | P0; keep immediate visible feedback and recoverable failure. |
+| Text send | `foundation` | One bounded compose job now keeps peer, text/reply/forward context, and its exact nonzero `random_id` immutable until acknowledgement; reconnect waits for dialog/sync reconciliation and retries idempotently. Fault-injected transport, live, and device proof remain. |
+| Pending/sent state | `foundation` | Cache refresh/restart recreates at most one optimistic row; explicit failure retains the draft and unrelated navigation is not hijacked. Live/device proof remains. |
 | Delivery/read state | `foundation` | Two monotonic integers per retained dialog (96 fixed bytes at capacity 12) drive compact `sent`/`read` labels; live/device semantics remain unproven. |
 | Mark history read | `foundation` | Viewed bounded history emits serialized peer-appropriate read requests with optimistic rollback; PTS acknowledgements detect gaps before catch-up, while live/device proof remains. |
 | Replies | `foundation` outbound context | P0/P1; render a bounded reply preview in history later. |
 | Forward messages | `foundation` | P0/P1; honor protected-content failures explicitly. |
 | Delete messages | `foundation` | P0/P1; add destructive confirmation and revoke-scope clarity. |
 | Edit sent messages | live edits parsed; outbound edit absent | `later`; bounded text-only edit with preserved original timestamp. |
-| Local compose draft | `foundation` | P0; preserve across interruption. |
+| Local compose draft | `foundation` | Draft and reply/forward context survive interruption; a single in-flight job temporarily locks mutation to avoid duplicating the payload in Nokia-class RAM. |
 | Server-synced drafts | parsed/ignored | `later`; one bounded draft per retained dialog. |
 | Message search within a chat | absent | `next`; server-side query with a small result page, no local index. |
 | Global message search | absent | `later`; bounded server result page and clear scope label. |
@@ -151,8 +151,8 @@ Prefer work with high everyday frequency, recovery or compliance value, existing
 | `updates.getState/getDifference` | `foundation` | P0; read/send/delete acknowledgements now preserve PTS gaps for catch-up; expand the fixture corpus. |
 | Channel difference | `foundation` | P0/P1; channel mutation acknowledgements preserve PTS gaps; continue bounded slice and too-long fallback hardening. |
 | Live new/edit/delete updates | `partial` | P0/P1; preserve temporal/read state and unknown-update recovery. |
-| Reconnect/session resume | `foundation` | P0; radio-loss/device soak remains. |
-| Message-ID reconciliation | `foundation` | P0; restart/ambiguous acknowledgement matrix remains. |
+| Reconnect/session resume | `foundation` | Lost volatile RPC slots are cleared; a live reconnect requests the difference from its last applied update checkpoint before resend, while a cold restore without that volatile checkpoint falls back to the same durable `random_id`. Dialog/history and update callbacks settle before the outbound job resumes. Radio-loss/device soak remains. |
+| Message-ID reconciliation | `foundation` | Matching `updateMessageID` can complete the durable job during catch-up before resend, or after retry, using the original peer plus `random_id`; live trace proof remains. |
 | Background push notifications | absent | `platform-excluded` as a reliable always-on service on this target. |
 | Foreground polling | `partial` update connection | P0; throttle and make radio state visible. |
 | Local alerts/vibration/sound | absent | `later`; obey profiles and avoid background assumptions. |
@@ -193,11 +193,10 @@ Prefer work with high everyday frequency, recovery or compliance value, existing
 
 ## Current ordered implementation queue
 
-1. Harden ambiguous send acknowledgement and restart idempotence.
-2. Add server-backed in-chat text search with a small result page.
-3. Model protected-content restrictions before offering forward/save actions.
-4. Add bounded DC auth export/import, then cross-DC media download.
-5. Add a small constructor/fixture corpus and long-session capacity soak.
-6. Investigate sponsored-message requirements before stronger channel claims.
+1. Add server-backed in-chat text search with a small result page.
+2. Model protected-content restrictions before offering forward/save actions.
+3. Add bounded DC auth export/import, then cross-DC media download.
+4. Add a small constructor/fixture corpus and long-session capacity soak.
+5. Investigate sponsored-message requirements before stronger channel claims.
 
 Reorder this queue only when local references, a live interoperability failure, device evidence, or user research demonstrates higher core value.

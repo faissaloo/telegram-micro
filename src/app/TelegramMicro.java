@@ -62,6 +62,7 @@ import session.FailureLogStore;
 import session.EntropySeedCodec;
 import session.EntropyStore;
 import session.KnownDcHost;
+import session.OutboundRecoveryState;
 import session.ResumeState;
 import session.SessionSnapshot;
 import session.SessionStore;
@@ -132,6 +133,7 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
   private long pendingPeerActionStartedAtMs = 0;
   private long pendingChannelDifferencePeerId = 0;
   private boolean resumeOutboundAfterDialogs = false;
+  private boolean outboundResumeSyncReady = false;
   private int pendingRouteAfterDialogs = 0;
   private final AppCredentials bundledCredentials = AppCredentials.bundled();
   private RuntimeDeviceProfile runtimeDeviceProfile;
@@ -305,6 +307,11 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     pendingSendRandomId = 0;
   }
 
+  private void clearPendingHistoryState() {
+    pendingHistoryPeerKind = DialogListModel.PEER_UNKNOWN;
+    pendingHistoryPeerId = 0;
+  }
+
   private void clearPendingDiscoverySearch() {
     pendingDiscoveryQuery = "";
   }
@@ -414,6 +421,7 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
   private void clearReconnectFlags() {
     reconnectAuthorizedPending = false;
     resumeOutboundAfterDialogs = false;
+    outboundResumeSyncReady = false;
     pendingRouteAfterDialogs = 0;
   }
 
@@ -469,9 +477,20 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
 
     // A reconnecting dialog refresh reconciles an ambiguously acknowledged read RPC.
     clearPendingReadState();
-    persistWarmState();
     reconnectAuthorizedPending = true;
     resumeOutboundAfterDialogs = appShellModel != null && appShellModel.hasRecoverableOutboundSend();
+    outboundResumeSyncReady = false;
+    // The old transport can no longer own these volatile RPC slots. The
+    // compose/outbound warm state remains the durable send job and retains its
+    // original random_id for an idempotent retry on the new connection.
+    clearPendingSendState();
+    clearPendingHistoryState();
+    syncStateRequestInFlight = false;
+    differenceRequestInFlight = false;
+    channelDifferenceRequestInFlight = false;
+    pendingChannelDifferencePeerId = 0;
+    syncShellRuntimeState();
+    persistWarmState();
     if (appShellModel != null) {
       pendingRouteAfterDialogs = appShellModel.router.currentScreen;
       refreshSelectedHistoryAfterDialogs =
@@ -583,6 +602,7 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     }
     appShellScreen.show();
     resumeOutboundAfterDialogs = appShellModel != null && appShellModel.hasRecoverableOutboundSend();
+    outboundResumeSyncReady = false;
     if (reconnecting) {
       System.out.println("RECONNECT READY: requesting dialogs on saved session.");
     } else {
@@ -590,7 +610,7 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     }
     persistSessionState();
     requestDialogs();
-    requestUpdatesState();
+    requestAuthorizedRecoverySync();
   }
 
   private void startConnectionAsync(final boolean restoreSavedSession) {
@@ -1271,6 +1291,7 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     }
     appShellScreen.show();
     resumeOutboundAfterDialogs = appShellModel.hasRecoverableOutboundSend();
+    outboundResumeSyncReady = false;
     if (reconnecting) {
       System.out.println("RECONNECT READY: requesting dialogs on saved session.");
     } else if (restoring) {
@@ -1278,7 +1299,7 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     }
     persistSessionState();
     requestDialogs();
-    requestUpdatesState();
+    requestAuthorizedRecoverySync();
   }
 
   private boolean handleResumeRpcError(int code, String message) {
@@ -1344,6 +1365,59 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
       appShellModel.hasRecoverableOutboundSend();
   }
 
+  private boolean outboundResumePrerequisitesReady() {
+    return shouldResumeWarmOutbound() &&
+      appShellModel.authorized &&
+      OutboundRecoveryState.resumePrerequisitesReady(
+        outboundResumeSyncReady,
+        appShellModel.reader.loadingDialogs,
+        appShellModel.reader.loadingHistory,
+        pendingHistoryPeerKind != DialogListModel.PEER_UNKNOWN,
+        syncStateRequestInFlight,
+        differenceRequestInFlight,
+        channelDifferenceRequestInFlight,
+        syncState != null && syncState.needsDifference
+      );
+  }
+
+  /**
+   * Retries only after dialog/access-hash refresh and update reconciliation
+   * have settled. The flag remains set while either response is outstanding,
+   * so callback ordering cannot silently lose an interrupted send.
+   */
+  private boolean maybeResumeInterruptedOutbound() {
+    boolean started;
+
+    if (!resumeOutboundAfterDialogs || appShellModel == null) {
+      return false;
+    }
+    if (!appShellModel.hasRecoverableOutboundSend()) {
+      resumeOutboundAfterDialogs = false;
+      outboundResumeSyncReady = false;
+      if (appShellModel.isOutboundSendLocked()) {
+        appShellModel.onComposeFailed(0, AppShellModel.OUTBOUND_RECOVERY_INVALID_DETAIL);
+        persistWarmState();
+        if (appShellScreen != null) {
+          appShellScreen.showCurrent();
+        }
+      }
+      return false;
+    }
+    if (!outboundResumePrerequisitesReady()) {
+      return false;
+    }
+
+    started = tryResumeInterruptedOutbound();
+    if (started || !appShellModel.hasRecoverableOutboundSend()) {
+      resumeOutboundAfterDialogs = false;
+      outboundResumeSyncReady = false;
+    }
+    if (started && appShellScreen != null) {
+      appShellScreen.showCurrent();
+    }
+    return started;
+  }
+
   private boolean tryResumeInterruptedOutbound() {
     SendGetDialogs.DialogInputPeer fromPeer;
     SendGetDialogs.DialogInputPeer peer;
@@ -1358,13 +1432,17 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     } catch (IllegalArgumentException e) {
       appShellModel.onComposeFailed(0, "Interrupted outbound message cannot be retried: " + e.getMessage());
       persistWarmState();
-      appShellScreen.showCompose();
+      appShellScreen.showCurrent();
       return false;
     }
 
-    randomId = appShellModel.compose.lastRandomId != 0
-      ? appShellModel.compose.lastRandomId
-      : nextOutboundRandomId();
+    randomId = appShellModel.compose.lastRandomId;
+    if (randomId == 0) {
+      appShellModel.onComposeFailed(0, AppShellModel.OUTBOUND_RECOVERY_INVALID_DETAIL);
+      persistWarmState();
+      appShellScreen.showCurrent();
+      return false;
+    }
     if (!appShellModel.resumeInterruptedComposeSend(randomId)) {
       return false;
     }
@@ -1382,7 +1460,7 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
       } catch (IllegalArgumentException e) {
         appShellModel.onComposeFailed(0, "Interrupted forward cannot be retried: " + e.getMessage());
         persistWarmState();
-        appShellScreen.showCompose();
+        appShellScreen.showCurrent();
         clearPendingSendState();
         return false;
       }
@@ -1393,7 +1471,12 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
         peer
       )).send(connection);
     } else {
-      (new SendSendMessage(peer, appShellModel.compose.text, randomId)).send(connection);
+      (new SendSendMessage(
+        peer,
+        appShellModel.compose.text,
+        randomId,
+        appShellModel.compose.replyToMessageId
+      )).send(connection);
     }
     return true;
   }
@@ -2221,14 +2304,6 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     }
     restoreSelectedDialogAfterRefresh();
     persistWarmState();
-    if (resumeOutboundAfterDialogs) {
-      resumeOutboundAfterDialogs = false;
-      if (tryResumeInterruptedOutbound()) {
-        appShellScreen.showCurrent();
-        pendingRouteAfterDialogs = 0;
-        return;
-      }
-    }
     if (refreshSelectedHistoryAfterDialogs) {
       DialogListModel.Item selected = appShellModel.selectedDialog();
 
@@ -2237,6 +2312,14 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
         requestHistoryFor(selected);
         return;
       }
+    }
+    if (maybeResumeInterruptedOutbound()) {
+      if (pendingRouteAfterDialogs != 0) {
+        appShellModel.router.init(pendingRouteAfterDialogs);
+      }
+      pendingRouteAfterDialogs = 0;
+      appShellScreen.showCurrent();
+      return;
     }
     if (pendingRouteAfterDialogs != 0) {
       appShellModel.router.init(pendingRouteAfterDialogs);
@@ -2256,12 +2339,13 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     if (!readerParser.applyHistory(response, appShellModel.reader, pendingHistoryPeerKind, pendingHistoryPeerId)) {
       recordFailure(FailureLog.CATEGORY_READER, FailureLog.SEVERITY_ERROR, -402, response.type);
       System.out.println("HISTORY FAIL: " + readerParser.lastError());
+      clearPendingHistoryState();
       appShellModel.onReaderFailure("History parse failed: " + readerParser.lastError());
       appShellScreen.showCurrent();
+      maybeResumeInterruptedOutbound();
       return;
     }
-    pendingHistoryPeerKind = DialogListModel.PEER_UNKNOWN;
-    pendingHistoryPeerId = 0;
+    clearPendingHistoryState();
     if (response.type == CombinatorIds.messages_messages_not_modified) {
       appShellModel.finishHistoryUnchanged();
       System.out.println("HISTORY READY: unchanged");
@@ -2272,6 +2356,13 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     persistWarmState();
     pendingRouteAfterDialogs = 0;
     appShellScreen.showHistory();
+    if (routeAfterHistory != 0 && routeAfterHistory != AppShellModel.SCREEN_HISTORY) {
+      appShellModel.router.init(routeAfterHistory);
+      appShellScreen.showCurrent();
+    }
+    if (maybeResumeInterruptedOutbound()) {
+      return;
+    }
     if (appShellModel.reader.historyPeerKind == DialogListModel.PEER_CHANNEL &&
         appShellModel.reader.historyPeerId != 0) {
       requestChannelDifferenceFor(
@@ -2280,10 +2371,6 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
       );
     } else {
       requestVisibleHistoryRead();
-    }
-    if (routeAfterHistory != 0 && routeAfterHistory != AppShellModel.SCREEN_HISTORY) {
-      appShellModel.router.init(routeAfterHistory);
-      appShellScreen.showCurrent();
     }
   }
 
@@ -2302,7 +2389,7 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     } catch (IllegalArgumentException e) {
       recordFailure(FailureLog.CATEGORY_READER, FailureLog.SEVERITY_ERROR, -403, response.type);
       appShellModel.onComposeFailed(0, e.getMessage());
-      appShellScreen.showCompose();
+      appShellScreen.showCurrent();
       clearPendingSendState();
       return;
     }
@@ -2326,7 +2413,9 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     }
     appShellModel.onComposeSent(sent.messageId);
     persistWarmState();
-    appShellScreen.showHistory();
+    resumeOutboundAfterDialogs = false;
+    outboundResumeSyncReady = false;
+    appShellScreen.showCurrent();
     clearPendingSendState();
     if (syncState.needsDifference) {
       requestUpdatesDifference("Catching up Telegram updates after sending a message...");
@@ -2336,31 +2425,32 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
   }
 
   private boolean applyPendingOutboundMessageId(ReaderResultParser.LiveMessageEvent event) {
+    boolean runtimeSendPending;
+
     if (event == null || event.kind != ReaderResultParser.LiveMessageEvent.KIND_MESSAGE_ID) {
       return false;
     }
-    if (pendingSendPeerKind == DialogListModel.PEER_UNKNOWN ||
-        pendingSendPeerId == 0 ||
-        pendingSendRandomId == 0 ||
-        event.randomId != pendingSendRandomId) {
+
+    runtimeSendPending = pendingSendPeerKind != DialogListModel.PEER_UNKNOWN &&
+      pendingSendPeerId != 0 && pendingSendRandomId != 0;
+    if (runtimeSendPending) {
+      if (appShellModel == null ||
+          pendingSendPeerKind != appShellModel.compose.peerKind ||
+          pendingSendPeerId != appShellModel.compose.peerId ||
+          event.randomId != pendingSendRandomId) {
+        return false;
+      }
+    } else if (!resumeOutboundAfterDialogs) {
       return false;
     }
 
-    if (!appShellModel.reader.markLatestPendingOutboundSent(
-          pendingSendPeerKind,
-          pendingSendPeerId,
-          event.messageId)) {
-      appShellModel.reader.appendOutboundText(
-        pendingSendPeerKind,
-        pendingSendPeerId,
-        "YOU",
-        appShellModel.compose.contextMode == compose.ComposeStateModel.CONTEXT_FORWARD
-          ? "Fwd: " + appShellModel.compose.contextPreview
-          : appShellModel.compose.text
-      );
+    if (appShellModel == null ||
+        !appShellModel.reconcileOutboundMessageId(event.randomId, event.messageId)) {
+      return false;
     }
-    appShellModel.onComposeSent(event.messageId);
     persistWarmState();
+    resumeOutboundAfterDialogs = false;
+    outboundResumeSyncReady = false;
     clearPendingSendState();
     return true;
   }
@@ -2446,9 +2536,25 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     }
 
     ensureSyncState();
+    if (resumeOutboundAfterDialogs) {
+      outboundResumeSyncReady = false;
+    }
     syncStateRequestInFlight = true;
     syncShellRuntimeState();
     (new SendGetState()).send(connection);
+  }
+
+  private void requestAuthorizedRecoverySync() {
+    ensureSyncState();
+    if (OutboundRecoveryState.shouldRequestDifferenceBeforeResume(
+        resumeOutboundAfterDialogs,
+        syncState.hasState)) {
+      syncState.markNeedsDifference();
+      syncShellRuntimeState();
+      requestUpdatesDifference("Reconciling interrupted outbound acknowledgement...");
+      return;
+    }
+    requestUpdatesState();
   }
 
   private void requestUpdatesDifference(String reason) {
@@ -2468,6 +2574,9 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     }
 
     args = syncState.buildDifferenceArgs();
+    if (resumeOutboundAfterDialogs) {
+      outboundResumeSyncReady = false;
+    }
     differenceRequestInFlight = true;
     if (reason != null && reason.length() > 0) {
       appShellModel.activeDetail = reason;
@@ -2538,7 +2647,10 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     syncShellRuntimeState();
     if (syncState.needsDifference) {
       requestUpdatesDifference("Applying queued updates catch-up...");
+      return;
     }
+    outboundResumeSyncReady = true;
+    maybeResumeInterruptedOutbound();
   }
 
   private boolean mergeLiveBatchPeers(ReaderResultParser.LiveUpdateBatch batch) {
@@ -2732,11 +2844,16 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
       if (appShellModel != null) {
         appShellModel.activeDetail = "Updates are in sync.";
       }
+      outboundResumeSyncReady = true;
+      if (maybeResumeInterruptedOutbound()) {
+        return;
+      }
       requestVisibleHistoryRead();
       return;
     }
 
     if (difference.type == RecieveUpdatesDifference.TYPE_TOO_LONG) {
+      outboundResumeSyncReady = false;
       System.out.println("SYNC DIFF: too long pts=" + Integer.toString(difference.pts));
       scheduleReaderRefreshFromSync("Telegram reported updatesTooLong; refreshing reader.");
       requestUpdatesState();
@@ -2755,6 +2872,10 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
       if (difference.type == RecieveUpdatesDifference.TYPE_SLICE) {
         requestUpdatesDifference("Applying next Telegram catch-up slice...");
       } else {
+        outboundResumeSyncReady = true;
+        if (maybeResumeInterruptedOutbound()) {
+          return;
+        }
         requestVisibleHistoryRead();
       }
       return;
@@ -2763,6 +2884,7 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     System.out.println("SYNC DIFF: " +
       (difference.type == RecieveUpdatesDifference.TYPE_SLICE ? "slice" : "full") +
       " pts=" + Integer.toString(difference.pts));
+    outboundResumeSyncReady = false;
     scheduleReaderRefreshFromSync("Applying Telegram catch-up to reader.");
     requestUpdatesState();
   }
@@ -2813,6 +2935,9 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
       title = appShellModel.reader.peers.titleOrFallback(DialogListModel.PEER_CHANNEL, difference.peerId);
       appShellModel.activeDetail = "Channel sync is current for " + title + ".";
       System.out.println("CHANNEL DIFF: empty pts=" + Integer.toString(difference.pts));
+      if (maybeResumeInterruptedOutbound()) {
+        return;
+      }
       requestVisibleHistoryRead();
       return;
     }
@@ -2956,6 +3081,9 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
         "Applying next channel catch-up slice..."
       );
     } else {
+      if (maybeResumeInterruptedOutbound()) {
+        return;
+      }
       requestVisibleHistoryRead();
     }
   }
@@ -3363,7 +3491,7 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
       "Send failed: RPC " + Integer.toString(errorCode) + ": " + errorMessage
     );
     persistWarmState();
-    appShellScreen.showCompose();
+    appShellScreen.showCurrent();
     clearPendingSendState();
     return true;
   }
@@ -3749,6 +3877,14 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     long randomId;
 
     if (connection == null || appShellModel == null) {
+      return;
+    }
+    if (pendingSendPeerKind != DialogListModel.PEER_UNKNOWN ||
+        pendingSendPeerId != 0 ||
+        pendingSendRandomId != 0 ||
+        appShellModel.isOutboundSendLocked()) {
+      appShellModel.activeDetail = AppShellModel.OUTBOUND_WAIT_DETAIL;
+      appShellScreen.showCurrent();
       return;
     }
     if (readRequestInFlight()) {

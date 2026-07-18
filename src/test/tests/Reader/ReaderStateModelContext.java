@@ -137,6 +137,47 @@ public class ReaderStateModelContext {
     }
   }
 
+  public static class PendingOutboundRecoveryIsIdempotentTest extends Test {
+    public String label() {
+      return "Reader restores exactly one pending outbound row after cache loss";
+    }
+
+    public void test() throws TestFailureException {
+      ReaderStateModel reader = new ReaderStateModel(2, 4, 2);
+
+      reader.appendDialog(DialogListModel.PEER_USER, 1, "Alice", "Ping", 0, false);
+      reader.selectDialog(0);
+      expect(reader.appendPendingOutboundText(DialogListModel.PEER_USER, 1, "YOU", "stale"), true);
+      expect(reader.appendPendingOutboundText(DialogListModel.PEER_USER, 1, "YOU", "duplicate"), true);
+      expect(reader.ensurePendingOutboundText(DialogListModel.PEER_USER, 1, "YOU", "stable retry"), true);
+      expect(reader.history.count, 1);
+      expect(reader.history.items[0].pending, true);
+      expect(reader.history.items[0].text, "stable retry");
+
+      reader.beginDialogsLoad();
+      reader.appendDialog(DialogListModel.PEER_USER, 1, "Alice", "Ping", 0, false);
+      reader.finishDialogsLoad();
+      reader.selectDialog(0);
+      expect(reader.history.count, 0);
+      expect(reader.ensurePendingOutboundText(DialogListModel.PEER_USER, 1, "YOU", "stable retry"), true);
+      expect(reader.ensurePendingOutboundText(DialogListModel.PEER_USER, 1, "YOU", "stable retry"), true);
+      expect(reader.history.count, 1);
+      expect(reader.history.items[0].pending, true);
+      expect(reader.history.items[0].text, "stable retry");
+
+      reader.beginHistoryLoad(DialogListModel.PEER_USER, 1);
+      expect(reader.ensurePendingOutboundText(DialogListModel.PEER_USER, 1, "YOU", "stable retry"), true);
+      expect(reader.markLatestPendingOutboundSent(DialogListModel.PEER_USER, 1, 77), true);
+      expect(reader.appendHistoryMessage(80, "Alice", "Newer", false, false, false), true);
+      expect(reader.appendHistoryMessage(77, "YOU", "server copy", true, false, false), true);
+      expect(reader.history.count, 2);
+      expect(reader.history.items[0].messageId, 80);
+      expect(reader.history.items[1].messageId, 77);
+      expect(reader.history.items[1].text, "server copy");
+      expect(reader.history.items[1].pending, false);
+    }
+  }
+
   public static class WarmStateRestorePreservesPeerIdentityTest extends Test {
     public String label() {
       return "Reader warm-state import preserves bounded peer identity and access hashes";

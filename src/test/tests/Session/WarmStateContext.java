@@ -319,6 +319,90 @@ public class WarmStateContext {
     }
   }
 
+  public static class IncoherentWarmOutboundFailsClosedTest extends Test {
+    public String label() {
+      return "Warm outbound retry requires matching peer and nonzero random id";
+    }
+
+    public void test() throws TestFailureException {
+      WarmStateSnapshot mismatchedPeer = buildWarmShell().captureWarmState();
+      WarmStateSnapshot missingRandomId = buildWarmShell().captureWarmState();
+      WarmStateSnapshot mismatchedPayload = buildWarmShell().captureWarmState();
+      AppShellModel restoredPeer = new AppShellModel();
+      AppShellModel restoredRandom = new AppShellModel();
+      AppShellModel restoredPayload = new AppShellModel();
+
+      mismatchedPeer.outbound.peerId = 2L;
+      restoredPeer.applyWarmState(mismatchedPeer, true);
+      expect(restoredPeer.hasRecoverableOutboundSend(), false);
+      expect(restoredPeer.isOutboundSendLocked(), false);
+      expect(restoredPeer.compose.status, compose.ComposeStateModel.STATUS_FAILED);
+      expect(restoredPeer.compose.text, "draft warm state");
+      expect(restoredPeer.outbound.phase, OutboundRecoveryState.PHASE_FAILED);
+      expect(restoredPeer.reader.history.count, 1);
+      expect(restoredPeer.activeDetail, AppShellModel.OUTBOUND_RECOVERY_INVALID_DETAIL);
+
+      missingRandomId.composeLastRandomId = 0;
+      restoredRandom.applyWarmState(missingRandomId, true);
+      expect(restoredRandom.hasRecoverableOutboundSend(), false);
+      expect(restoredRandom.isOutboundSendLocked(), false);
+      expect(restoredRandom.compose.status, compose.ComposeStateModel.STATUS_FAILED);
+      expect(restoredRandom.compose.text, "draft warm state");
+      expect(restoredRandom.outbound.phase, OutboundRecoveryState.PHASE_FAILED);
+      expect(restoredRandom.reader.history.count, 1);
+      expect(restoredRandom.activeDetail, AppShellModel.OUTBOUND_RECOVERY_INVALID_DETAIL);
+
+      mismatchedPayload.outbound.detail += 1;
+      restoredPayload.applyWarmState(mismatchedPayload, true);
+      expect(restoredPayload.hasRecoverableOutboundSend(), false);
+      expect(restoredPayload.isOutboundSendLocked(), false);
+      expect(restoredPayload.compose.status, compose.ComposeStateModel.STATUS_FAILED);
+      expect(restoredPayload.compose.text, "draft warm state");
+      expect(restoredPayload.outbound.phase, OutboundRecoveryState.PHASE_FAILED);
+      expect(restoredPayload.reader.history.count, 1);
+      expect(restoredPayload.activeDetail, AppShellModel.OUTBOUND_RECOVERY_INVALID_DETAIL);
+    }
+  }
+
+  public static class OutboundResumeWaitsForBothRefreshCallbacksTest extends Test {
+    public String label() {
+      return "Outbound resume waits for dialog, history, and sync callbacks in either order";
+    }
+
+    public void test() throws TestFailureException {
+      expect(OutboundRecoveryState.resumePrerequisitesReady(
+        false, false, false, false, false, false, false, false
+      ), false);
+      expect(OutboundRecoveryState.resumePrerequisitesReady(
+        true, true, false, false, false, false, false, false
+      ), false);
+      expect(OutboundRecoveryState.resumePrerequisitesReady(
+        true, false, true, false, false, false, false, false
+      ), false);
+      expect(OutboundRecoveryState.resumePrerequisitesReady(
+        true, false, false, true, false, false, false, false
+      ), false);
+      expect(OutboundRecoveryState.resumePrerequisitesReady(
+        true, false, false, false, true, false, false, false
+      ), false);
+      expect(OutboundRecoveryState.resumePrerequisitesReady(
+        true, false, false, false, false, true, false, false
+      ), false);
+      expect(OutboundRecoveryState.resumePrerequisitesReady(
+        true, false, false, false, false, false, true, false
+      ), false);
+      expect(OutboundRecoveryState.resumePrerequisitesReady(
+        true, false, false, false, false, false, false, true
+      ), false);
+      expect(OutboundRecoveryState.resumePrerequisitesReady(
+        true, false, false, false, false, false, false, false
+      ), true);
+      expect(OutboundRecoveryState.shouldRequestDifferenceBeforeResume(true, true), true);
+      expect(OutboundRecoveryState.shouldRequestDifferenceBeforeResume(true, false), false);
+      expect(OutboundRecoveryState.shouldRequestDifferenceBeforeResume(false, true), false);
+    }
+  }
+
   public static class ForwardComposeContextRoundTripTest extends Test {
     public String label() {
       return "Warm state codec preserves forward compose context";

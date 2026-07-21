@@ -1,0 +1,18 @@
+diff --git a/nanocoat/lib/scritchui/gtk2/gtk2Component.c b/nanocoat/lib/scritchui/gtk2/gtk2Component.c
+--- a/nanocoat/lib/scritchui/gtk2/gtk2Component.c
++++ b/nanocoat/lib/scritchui/gtk2/gtk2Component.c
+@@ -185,10 +185,12 @@ static sjme_errorCode sjme_scritchui_gtk2_eventInputKey(
+ 		return SJME_ERROR_INVALID_ARGUMENT;
+ 	
+ 	/* Unicode key? */
+-	if (event->type == GDK_KEY_PRESS)
++	if (event->type == GDK_KEY_PRESS && unicode != 0)
+ 	{
+-		fillTwo->type = SJME_SCRITCHINPUT_TYPE_KEY_CHAR_PRESSED;
++		fill->type = SJME_SCRITCHINPUT_TYPE_KEY_CHAR_PRESSED;
+ 		fill->data.key.code = (sjme_jint)unicode;
++		fill->data.key.modifiers =
++			inState->implIntern->mapGtkToScritchMod(event->state);
+ 	}
+ 	
+ 	/* Determine type. */

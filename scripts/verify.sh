@@ -51,6 +51,8 @@ else
   ./scripts/verify-squirreljme-network.sh
   printf '[verify] runtime profiles\n'
   ./scripts/verify-runtime-profiles.sh
+  printf '[verify] hosted keyboard input routing\n'
+  ./scripts/verify-squirreljme-input-routing.sh
 fi
 
 if [[ "${RUN_UI}" == '1' ]]; then

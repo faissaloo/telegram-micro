@@ -60,4 +60,6 @@ if SQUIRRELJME_MCP_PORT=invalid mcp_pick_port >/dev/null 2>&1; then
   exit 1
 fi
 
+node --check "${ROOT_DIR}/scripts/support/gcf-loopback-server.js"
+
 printf 'Automation safety checks passed.\n'

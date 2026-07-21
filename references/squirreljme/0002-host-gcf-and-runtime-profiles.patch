@@ -1,0 +1,1220 @@
+diff --git a/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/gcf/HostIPConnectionFactory.java b/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/gcf/HostIPConnectionFactory.java
+new file mode 100644
+index 0000000000..a9d9d3f9fb
+--- /dev/null
++++ b/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/gcf/HostIPConnectionFactory.java
+@@ -0,0 +1,117 @@
++// -*- Mode: Java; indent-tabs-mode: t; tab-width: 4 -*-
++// ---------------------------------------------------------------------------
++// SquirrelJME
++//     Copyright (C) Stephanie Gawroriski <xer@multiphasicapps.net>
++// ---------------------------------------------------------------------------
++// SquirrelJME is under the Mozilla Public License Version 2.0.
++// See license.mkd for licensing and copyright information.
++// ---------------------------------------------------------------------------
++
++package cc.squirreljme.emulator.gcf;
++
++import cc.squirreljme.runtime.gcf.IPAddress;
++import cc.squirreljme.runtime.gcf.IPConnectionFactory;
++import cc.squirreljme.runtime.gcf.TCPClientConnection;
++import java.io.IOException;
++import java.net.InetAddress;
++import java.net.InetSocketAddress;
++import java.net.Socket;
++import java.net.UnknownHostException;
++import javax.microedition.io.ConnectionNotFoundException;
++import javax.microedition.io.Connector;
++
++/**
++ * Uses the host Java runtime for IP connections made by hosted SquirrelJME.
++ *
++ * @since 2026/07/21
++ */
++public final class HostIPConnectionFactory
++	extends IPConnectionFactory
++{
++	/**
++	 * {@inheritDoc}
++	 * @since 2026/07/21
++	 */
++	@Override
++	public IPAddress resolveAddress(IPAddress __addr)
++		throws ConnectionNotFoundException, IOException, NullPointerException
++	{
++		if (__addr == null)
++			throw new NullPointerException("NARG");
++
++		String host = HostIPConnectionFactory.__unbracket(__addr.hostname);
++		if (host == null || host.length() == 0)
++			throw new ConnectionNotFoundException("EC0i");
++
++		try
++		{
++			String numeric = InetAddress.getByName(host).getHostAddress();
++
++			// IPAddress cannot represent Java's scoped IPv6 form yet.
++			if (numeric.indexOf('%') >= 0)
++				throw new ConnectionNotFoundException("EC0i");
++			if (numeric.indexOf(':') >= 0)
++				numeric = '[' + numeric + ']';
++
++			return new IPAddress(numeric, __addr.port);
++		}
++		catch (UnknownHostException e)
++		{
++			throw new ConnectionNotFoundException("EC0i");
++		}
++	}
++
++	/**
++	 * {@inheritDoc}
++	 * @since 2026/07/21
++	 */
++	@Override
++	public TCPClientConnection tcpClientConnect(IPAddress __addr, int __mode)
++		throws ConnectionNotFoundException, IOException, NullPointerException
++	{
++		if (__addr == null)
++			throw new NullPointerException("NARG");
++		if (__addr.hostname == null ||
++			__addr.port == IPAddress.ASSIGNED_PORT)
++			throw new ConnectionNotFoundException("EC0j");
++		if (__mode != Connector.READ && __mode != Connector.WRITE &&
++			__mode != Connector.READ_WRITE)
++			throw new IllegalArgumentException("EC20 " + __mode);
++
++		Socket socket = new Socket();
++		try
++		{
++			socket.connect(new InetSocketAddress(
++				HostIPConnectionFactory.__unbracket(__addr.hostname),
++				__addr.port));
++			return new HostTCPClientConnection(__addr, __mode, socket);
++		}
++		catch (IOException e)
++		{
++			try
++			{
++				socket.close();
++			}
++			catch (IOException ignored)
++			{
++			}
++			throw e;
++		}
++	}
++
++	/**
++	 * Removes URI brackets from an IPv6 host.
++	 *
++	 * @param __host The host.
++	 * @return The unbracketed host.
++	 * @since 2026/07/21
++	 */
++	private static String __unbracket(String __host)
++	{
++		if (__host != null && __host.length() >= 2 &&
++			__host.charAt(0) == '[' &&
++			__host.charAt(__host.length() - 1) == ']')
++			return __host.substring(1, __host.length() - 1);
++		return __host;
++	}
++}
+diff --git a/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/gcf/HostTCPClientConnection.java b/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/gcf/HostTCPClientConnection.java
+new file mode 100644
+index 0000000000..91737cf5f7
+--- /dev/null
++++ b/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/gcf/HostTCPClientConnection.java
+@@ -0,0 +1,315 @@
++// -*- Mode: Java; indent-tabs-mode: t; tab-width: 4 -*-
++// ---------------------------------------------------------------------------
++// SquirrelJME
++//     Copyright (C) Stephanie Gawroriski <xer@multiphasicapps.net>
++// ---------------------------------------------------------------------------
++// SquirrelJME is under the Mozilla Public License Version 2.0.
++// See license.mkd for licensing and copyright information.
++// ---------------------------------------------------------------------------
++
++package cc.squirreljme.emulator.gcf;
++
++import cc.squirreljme.runtime.gcf.IPAddress;
++import cc.squirreljme.runtime.gcf.TCPClientConnection;
++import java.io.IOException;
++import java.io.InputStream;
++import java.io.OutputStream;
++import java.net.Socket;
++import javax.microedition.io.SocketConnection;
++
++/**
++ * TCP client connection backed by a host Java socket.
++ *
++ * @since 2026/07/21
++ */
++final class HostTCPClientConnection
++	extends TCPClientConnection
++{
++	/** The host socket. */
++	private final Socket _socket;
++
++	/**
++	 * Initializes the host connection.
++	 *
++	 * @param __addr The connected remote address.
++	 * @param __mode The connection mode.
++	 * @param __socket The connected host socket.
++	 * @throws NullPointerException On null arguments.
++	 * @since 2026/07/21
++	 */
++	HostTCPClientConnection(IPAddress __addr, int __mode, Socket __socket)
++		throws NullPointerException
++	{
++		super(__addr, __mode);
++		if (__socket == null)
++			throw new NullPointerException("NARG");
++		this._socket = __socket;
++	}
++
++	/**
++	 * {@inheritDoc}
++	 * @since 2026/07/21
++	 */
++	@Override
++	protected void doClose()
++		throws IOException
++	{
++		this._socket.close();
++	}
++
++	/**
++	 * {@inheritDoc}
++	 * @since 2026/07/21
++	 */
++	@Override
++	protected String doGetLocalAddress()
++		throws IOException
++	{
++		return this._socket.getLocalAddress().getHostAddress();
++	}
++
++	/**
++	 * {@inheritDoc}
++	 * @since 2026/07/21
++	 */
++	@Override
++	protected int doGetLocalPort()
++		throws IOException
++	{
++		return this._socket.getLocalPort();
++	}
++
++	/**
++	 * {@inheritDoc}
++	 * @since 2026/07/21
++	 */
++	@Override
++	protected int doGetSocketOption(byte __option)
++		throws IllegalArgumentException, IOException
++	{
++		Socket socket = this._socket;
++		switch (__option)
++		{
++			case SocketConnection.DELAY:
++				return socket.getTcpNoDelay() ? 0 : 1;
++			case SocketConnection.LINGER:
++				int linger = socket.getSoLinger();
++				return linger < 0 ? 0 : linger;
++			case SocketConnection.KEEPALIVE:
++				return socket.getKeepAlive() ? 1 : 0;
++			case SocketConnection.RCVBUF:
++				return socket.getReceiveBufferSize();
++			case SocketConnection.SNDBUF:
++				return socket.getSendBufferSize();
++			case SocketConnection.TIMEOUT:
++				return socket.getSoTimeout();
++			default:
++				throw new IllegalArgumentException("EC0n " + __option);
++		}
++	}
++
++	/**
++	 * {@inheritDoc}
++	 * @since 2026/07/21
++	 */
++	@Override
++	protected InputStream doOpenInputStream()
++		throws IOException
++	{
++		return new HostSocketInputStream(this._socket);
++	}
++
++	/**
++	 * {@inheritDoc}
++	 * @since 2026/07/21
++	 */
++	@Override
++	protected OutputStream doOpenOutputStream()
++		throws IOException
++	{
++		return new HostSocketOutputStream(this._socket);
++	}
++
++	/**
++	 * {@inheritDoc}
++	 * @since 2026/07/21
++	 */
++	@Override
++	protected void doSetSocketOption(byte __option, int __value)
++		throws IllegalArgumentException, IOException
++	{
++		Socket socket = this._socket;
++		switch (__option)
++		{
++			case SocketConnection.DELAY:
++				socket.setTcpNoDelay(__value == 0);
++				break;
++			case SocketConnection.LINGER:
++				socket.setSoLinger(__value > 0, __value);
++				break;
++			case SocketConnection.KEEPALIVE:
++				socket.setKeepAlive(__value != 0);
++				break;
++			case SocketConnection.RCVBUF:
++				if (__value > 0)
++					socket.setReceiveBufferSize(__value);
++				break;
++			case SocketConnection.SNDBUF:
++				if (__value > 0)
++					socket.setSendBufferSize(__value);
++				break;
++			case SocketConnection.TIMEOUT:
++				socket.setSoTimeout(__value);
++				break;
++			default:
++				throw new IllegalArgumentException("EC0n " + __option);
++		}
++	}
++
++	/** Host input stream which half-closes the socket. */
++	private static final class HostSocketInputStream
++		extends InputStream
++	{
++		/** The host stream. */
++		private final InputStream _in;
++
++		/** The host socket. */
++		private final Socket _socket;
++
++		/** Is this stream closed? */
++		private boolean _closed;
++
++		HostSocketInputStream(Socket __socket)
++			throws IOException
++		{
++			this._socket = __socket;
++			this._in = __socket.getInputStream();
++		}
++
++		@Override
++		public int available()
++			throws IOException
++		{
++			this.__checkOpen();
++			return this._in.available();
++		}
++
++		@Override
++		public void close()
++			throws IOException
++		{
++			if (this._closed)
++				return;
++			this._closed = true;
++			if (!this._socket.isClosed() &&
++				!this._socket.isInputShutdown())
++				this._socket.shutdownInput();
++		}
++
++		@Override
++		public int read()
++			throws IOException
++		{
++			this.__checkOpen();
++			return this._in.read();
++		}
++
++		@Override
++		public int read(byte[] __data, int __offset, int __length)
++			throws IOException
++		{
++			this.__checkOpen();
++			return this._in.read(__data, __offset, __length);
++		}
++
++		private void __checkOpen()
++			throws IOException
++		{
++			if (this._closed)
++				throw new IOException("EC0r");
++		}
++	}
++
++	/** Host output stream which half-closes the socket. */
++	private static final class HostSocketOutputStream
++		extends OutputStream
++	{
++		/** The host stream. */
++		private final OutputStream _out;
++
++		/** The host socket. */
++		private final Socket _socket;
++
++		/** Is this stream closed? */
++		private boolean _closed;
++
++		HostSocketOutputStream(Socket __socket)
++			throws IOException
++		{
++			this._socket = __socket;
++			this._out = __socket.getOutputStream();
++		}
++
++		@Override
++		public void close()
++			throws IOException
++		{
++			if (this._closed)
++				return;
++			this._closed = true;
++			IOException failure = null;
++			try
++			{
++				this._out.flush();
++			}
++			catch (IOException e)
++			{
++				failure = e;
++			}
++			if (!this._socket.isClosed() &&
++				!this._socket.isOutputShutdown())
++				try
++				{
++					this._socket.shutdownOutput();
++				}
++				catch (IOException e)
++				{
++					if (failure == null)
++						failure = e;
++				}
++			if (failure != null)
++				throw failure;
++		}
++
++		@Override
++		public void flush()
++			throws IOException
++		{
++			this.__checkOpen();
++			this._out.flush();
++		}
++
++		@Override
++		public void write(int __value)
++			throws IOException
++		{
++			this.__checkOpen();
++			this._out.write(__value);
++		}
++
++		@Override
++		public void write(byte[] __data, int __offset, int __length)
++			throws IOException
++		{
++			this.__checkOpen();
++			this._out.write(__data, __offset, __length);
++		}
++
++		private void __checkOpen()
++			throws IOException
++		{
++			if (this._closed)
++				throw new IOException("EC0v");
++		}
++	}
++}
+diff --git a/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/vm/RuntimeProfile.java b/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/vm/RuntimeProfile.java
+new file mode 100644
+index 0000000000..229681b75a
+--- /dev/null
++++ b/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/vm/RuntimeProfile.java
+@@ -0,0 +1,101 @@
++// -*- Mode: Java; indent-tabs-mode: t; tab-width: 4 -*-
++// ---------------------------------------------------------------------------
++// SquirrelJME
++//     Copyright (C) Stephanie Gawroriski <xer@multiphasicapps.net>
++// ---------------------------------------------------------------------------
++// SquirrelJME is under the Mozilla Public License Version 2.0.
++// See license.mkd for licensing and copyright information.
++// ---------------------------------------------------------------------------
++
++package cc.squirreljme.emulator.vm;
++
++import java.util.Locale;
++
++/**
++ * Validated runtime identity used as the boundary for quirk emulation.
++ *
++ * <p>Profiles other than {@link #IDEAL} are initially identity-only. A
++ * behavior may diverge from the ideal profile only when its compatibility
++ * rule has a focused regression and documented runtime evidence.</p>
++ *
++ * @since 2026/07/21
++ */
++public final class RuntimeProfile
++{
++	/** Property visible to the emulated application. */
++	public static final String PROPERTY =
++		"cc.squirreljme.runtime.profile";
++
++	/** Specification-oriented behavior. */
++	public static final String IDEAL = "ideal";
++
++	/** Nokia's classic KVM family. */
++	public static final String NOKIA_KVM = "nokia-kvm";
++
++	/** Nokia Java Runtime used by later Series 40 devices. */
++	public static final String NOKIA_JRT = "nokia-jrt";
++
++	/** Myriad's Jbed runtime. */
++	public static final String MYRIAD_JBED = "myriad-jbed";
++
++	/** Aplix's JBlend runtime. */
++	public static final String APLIX_JBLEND = "aplix-jblend";
++
++	/** IBM's J9 runtime. */
++	public static final String IBM_J9 = "ibm-j9";
++
++	/** Insignia's Jeode runtime. */
++	public static final String INSIGNIA_JEODE = "insignia-jeode";
++
++	/** Sony Ericsson Java Platform runtime family. */
++	public static final String SONY_ERICSSON_JP = "sony-ericsson-jp";
++
++	/** Not used. */
++	private RuntimeProfile()
++	{
++	}
++
++	/**
++	 * Normalizes and validates a profile identifier.
++	 *
++	 * @param __profile The requested identifier, or {@code null} for ideal.
++	 * @return The canonical profile identifier.
++	 * @throws IllegalArgumentException If the identifier is unknown.
++	 * @since 2026/07/21
++	 */
++	public static String normalize(String __profile)
++		throws IllegalArgumentException
++	{
++		if (__profile == null)
++			return RuntimeProfile.IDEAL;
++
++		String profile = __profile.trim().toLowerCase(Locale.ROOT);
++		if (RuntimeProfile.IDEAL.equals(profile) ||
++			RuntimeProfile.NOKIA_KVM.equals(profile) ||
++			RuntimeProfile.NOKIA_JRT.equals(profile) ||
++			RuntimeProfile.MYRIAD_JBED.equals(profile) ||
++			RuntimeProfile.APLIX_JBLEND.equals(profile) ||
++			RuntimeProfile.IBM_J9.equals(profile) ||
++			RuntimeProfile.INSIGNIA_JEODE.equals(profile) ||
++			RuntimeProfile.SONY_ERICSSON_JP.equals(profile))
++			return profile;
++
++		if ("kvm".equals(profile) || "nokia".equals(profile))
++			return RuntimeProfile.NOKIA_KVM;
++		if ("jrt".equals(profile))
++			return RuntimeProfile.NOKIA_JRT;
++		if ("jbed".equals(profile))
++			return RuntimeProfile.MYRIAD_JBED;
++		if ("jblend".equals(profile))
++			return RuntimeProfile.APLIX_JBLEND;
++		if ("j9".equals(profile))
++			return RuntimeProfile.IBM_J9;
++		if ("jeode".equals(profile) || "jecode".equals(profile))
++			return RuntimeProfile.INSIGNIA_JEODE;
++		if ("sony-ericsson".equals(profile) || "semc".equals(profile))
++			return RuntimeProfile.SONY_ERICSSON_JP;
++
++		throw new IllegalArgumentException(
++			"Unknown runtime profile: " + __profile);
++	}
++}
+diff --git a/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/vm/VMFactory.java b/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/vm/VMFactory.java
+index ef98dda260..86181c7d7f 100644
+--- a/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/vm/VMFactory.java
++++ b/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/vm/VMFactory.java
+@@ -211,6 +211,7 @@ public abstract class VMFactory
+ 		
+ 		// Command line format is:
+ 		// -Xemulator:(vm)
++		// -Xprofile:(runtime-profile)
+ 		// -Xsnapshot:(path-to-nps)
+ 		// -Xentry:id
+ 		// -Xlibraries:(class:path:...)
+@@ -288,6 +289,11 @@ public abstract class VMFactory
+ 			else if (item.startsWith("-Xemulator:"))
+ 				vmName = item.substring("-Xemulator:".length());
+ 			
++			// Runtime compatibility profile
++			else if (item.startsWith("-Xprofile:"))
++				systemProperties.put(RuntimeProfile.PROPERTY,
++					item.substring("-Xprofile:".length()));
++
+ 			// VisualVM Snapshot Dump path
+ 			else if (item.startsWith("-Xsnapshot:"))
+ 				snapshotPath = Paths.get(
+@@ -685,6 +691,11 @@ public abstract class VMFactory
+ 				Debugging.debugNote("Args: %s", Arrays.asList(__args));
+ 			}
+ 			
++			// Validate the final profile after suite properties are applied.
++			systemProperties.put(RuntimeProfile.PROPERTY,
++				RuntimeProfile.normalize(
++					systemProperties.get(RuntimeProfile.PROPERTY)));
++
+ 			// Run the VM
+ 			VirtualMachine vm = VMFactory.mainVm(vmName,
+ 				profilerSnapshot,
+diff --git a/emulators/emulator-base/src/main/resources/META-INF/services/cc.squirreljme.runtime.gcf.IPConnectionFactory b/emulators/emulator-base/src/main/resources/META-INF/services/cc.squirreljme.runtime.gcf.IPConnectionFactory
+new file mode 100644
+index 0000000000..0accfac4c6
+--- /dev/null
++++ b/emulators/emulator-base/src/main/resources/META-INF/services/cc.squirreljme.runtime.gcf.IPConnectionFactory
+@@ -0,0 +1 @@
++cc.squirreljme.emulator.gcf.HostIPConnectionFactory
+diff --git a/modules/gcf/src/main/java/cc/squirreljme/runtime/gcf/AbstractBaseConnection.java b/modules/gcf/src/main/java/cc/squirreljme/runtime/gcf/AbstractBaseConnection.java
+index 3a0adaaf5f..fe249402e5 100644
+--- a/modules/gcf/src/main/java/cc/squirreljme/runtime/gcf/AbstractBaseConnection.java
++++ b/modules/gcf/src/main/java/cc/squirreljme/runtime/gcf/AbstractBaseConnection.java
+@@ -49,7 +49,8 @@ public abstract class AbstractBaseConnection
+ 		throws IllegalArgumentException
+ 	{
+ 		/* {@squirreljme.error EC20 Invalid connection mode. (The mode)} */
+-		if ((__mode & ~(Connector.READ | Connector.WRITE)) != 0)
++		if (__mode != Connector.READ && __mode != Connector.WRITE &&
++			__mode != Connector.READ_WRITE)
+ 			throw new IllegalArgumentException(__error__(
+ 				"EC20 %d", __mode));
+ 		
+diff --git a/modules/gcf/src/main/java/cc/squirreljme/runtime/gcf/ConnectionStateTracker.java b/modules/gcf/src/main/java/cc/squirreljme/runtime/gcf/ConnectionStateTracker.java
+index 9fe86aaa69..7df9fa02f2 100644
+--- a/modules/gcf/src/main/java/cc/squirreljme/runtime/gcf/ConnectionStateTracker.java
++++ b/modules/gcf/src/main/java/cc/squirreljme/runtime/gcf/ConnectionStateTracker.java
+@@ -16,10 +16,21 @@ package cc.squirreljme.runtime.gcf;
+  */
+ public final class ConnectionStateTracker
+ {
+-	/** Has the input been closed? */
+-	boolean _inclosed;
++	/** Has the connection object been closed? */
++	boolean _connectionClosed;
+ 	
+-	/** Has the output been closed? */
+-	boolean _outclosed;
+-}
++	/** Has the input stream been opened? */
++	boolean _inputOpened;
++
++	/** Has the input stream been closed? */
++	boolean _inputClosed;
++
++	/** Has the output stream been opened? */
++	boolean _outputOpened;
+ 
++	/** Has the output stream been closed? */
++	boolean _outputClosed;
++
++	/** Has the underlying transport been closed? */
++	boolean _transportClosed;
++}
+diff --git a/modules/gcf/src/main/java/cc/squirreljme/runtime/gcf/IPConnectionFactory.java b/modules/gcf/src/main/java/cc/squirreljme/runtime/gcf/IPConnectionFactory.java
+index cbf6ec4756..69c1cb3aea 100644
+--- a/modules/gcf/src/main/java/cc/squirreljme/runtime/gcf/IPConnectionFactory.java
++++ b/modules/gcf/src/main/java/cc/squirreljme/runtime/gcf/IPConnectionFactory.java
+@@ -41,13 +41,15 @@ public abstract class IPConnectionFactory
+ 	 * Opens a TCP client connection to the remote address.
+ 	 *
+ 	 * @param __addr The address to connect to.
++	 * @param __mode The connection mode.
+ 	 * @return The connection.
+ 	 * @throws ConnectionNotFoundException If the connection was not found.
+ 	 * @throws IOException On connection issues.
+ 	 * @throws NullPointerException On null arguments.
+ 	 * @since 2019/05/06
+ 	 */
+-	public abstract TCPClientConnection tcpClientConnect(IPAddress __addr)
++	public abstract TCPClientConnection tcpClientConnect(IPAddress __addr,
++		int __mode)
+ 		throws ConnectionNotFoundException, IOException, NullPointerException;
+ 	
+ 	/**
+@@ -105,4 +107,3 @@ public abstract class IPConnectionFactory
+ 		return rv;
+ 	}
+ }
+-
+diff --git a/modules/gcf/src/main/java/cc/squirreljme/runtime/gcf/NullIPConnectionFactory.java b/modules/gcf/src/main/java/cc/squirreljme/runtime/gcf/NullIPConnectionFactory.java
+index 818028a942..51177cf92d 100644
+--- a/modules/gcf/src/main/java/cc/squirreljme/runtime/gcf/NullIPConnectionFactory.java
++++ b/modules/gcf/src/main/java/cc/squirreljme/runtime/gcf/NullIPConnectionFactory.java
+@@ -40,7 +40,8 @@ public final class NullIPConnectionFactory
+ 	 * @since 2019/05/12
+ 	 */
+ 	@Override
+-	public final TCPClientConnection tcpClientConnect(IPAddress __addr)
++	public final TCPClientConnection tcpClientConnect(IPAddress __addr,
++		int __mode)
+ 		throws ConnectionNotFoundException, IOException, NullPointerException
+ 	{
+ 		/* {@squirreljme.error EC0j TCP client connections are not
+@@ -48,4 +49,3 @@ public final class NullIPConnectionFactory
+ 		throw new ConnectionNotFoundException("EC0j");
+ 	}
+ }
+-
+diff --git a/modules/gcf/src/main/java/cc/squirreljme/runtime/gcf/TCPClientConnection.java b/modules/gcf/src/main/java/cc/squirreljme/runtime/gcf/TCPClientConnection.java
+index e3723f290a..0e2697d088 100644
+--- a/modules/gcf/src/main/java/cc/squirreljme/runtime/gcf/TCPClientConnection.java
++++ b/modules/gcf/src/main/java/cc/squirreljme/runtime/gcf/TCPClientConnection.java
+@@ -15,6 +15,7 @@ import java.io.IOException;
+ import java.io.InputStream;
+ import java.io.OutputStream;
+ import javax.microedition.io.AccessPoint;
++import javax.microedition.io.Connector;
+ import javax.microedition.io.SocketConnection;
+ 
+ /**
+@@ -133,66 +134,14 @@ public abstract class TCPClientConnection
+ 	protected final void becomingClosed()
+ 		throws IOException
+ 	{
+-		// Tracker knows if the streams have been closed...
+ 		ConnectionStateTracker tracker = this.tracker;
+-		
+-		// Close input
+-		IOException supin = null;
+-		if (!tracker._inclosed)
+-			try
+-			{
+-				this.openInputStream().close();
+-			}
+-			catch (IOException e)
+-			{
+-				supin = e;
+-			}
+-		
+-		// Close output
+-		IOException supout = null;
+-		if (!tracker._outclosed)
+-			try
+-			{
+-				this.openOutputStream().close();
+-			}
+-			catch (IOException e)
+-			{
+-				supout = e;
+-			}
+-		
+-		// Forward close
+-		IOException supclo = null;
+-		try
++		synchronized (tracker)
+ 		{
+-			this.doClose();
++			tracker._connectionClosed = true;
+ 		}
+-		catch (IOException e)
+-		{
+-			supclo = e;
+-		}
+-		
+-		// Set tracker as closed
+-		tracker._inclosed = true;
+-		tracker._outclosed = true;
+ 		
+-		// Exceptions were thrown?
+-		if (supin != null || supout != null || supclo != null)
+-		{
+-			/* {@squirreljme.error EC0k The connection could not be closed
+-			properly.} */
+-			IOException t = new IOException("EC0k");
+-			
+-			// Add suppressed exceptions
+-			if (supin != null)
+-				t.addSuppressed(supin);
+-			if (supout != null)
+-				t.addSuppressed(supout);
+-			if (supclo != null)
+-				t.addSuppressed(supclo);
+-			
+-			// Toss it
+-			throw t;
+-		}
++		// Open streams retain the transport until each stream is closed.
++		this.__closeTransportIfUnused();
+ 	}
+ 	
+ 	/**
+@@ -203,6 +152,7 @@ public abstract class TCPClientConnection
+ 	public final AccessPoint getAccessPoint()
+ 		throws IOException
+ 	{
++		this.__checkConnectionOpen();
+ 		return null;
+ 	}
+ 	
+@@ -214,6 +164,7 @@ public abstract class TCPClientConnection
+ 	public final String getAddress()
+ 		throws IOException
+ 	{
++		this.__checkConnectionOpen();
+ 		return TCPClientConnection.__hostString(this.ipaddr.hostname);
+ 	}
+ 	
+@@ -225,6 +176,7 @@ public abstract class TCPClientConnection
+ 	public final String getLocalAddress()
+ 		throws IOException
+ 	{
++		this.__checkConnectionOpen();
+ 		return this.doGetLocalAddress();
+ 	}
+ 	
+@@ -236,6 +188,7 @@ public abstract class TCPClientConnection
+ 	public final int getLocalPort()
+ 		throws IOException
+ 	{
++		this.__checkConnectionOpen();
+ 		return this.doGetLocalPort();
+ 	}
+ 	
+@@ -247,6 +200,7 @@ public abstract class TCPClientConnection
+ 	public final int getPort()
+ 		throws IOException
+ 	{
++		this.__checkConnectionOpen();
+ 		return this.ipaddr.port;
+ 	}
+ 	
+@@ -267,6 +221,7 @@ public abstract class TCPClientConnection
+ 			__o != SocketConnection.TIMEOUT)
+ 			throw new IllegalArgumentException("EC0n " + __o);
+ 
++		this.__checkConnectionOpen();
+ 		return this.doGetSocketOption(__o);
+ 	}
+ 	
+@@ -278,11 +233,18 @@ public abstract class TCPClientConnection
+ 	public final InputStream openInputStream()
+ 		throws IOException
+ 	{
+-		/* {@squirreljme.error EC0l The input has been closed.} */
++		/* {@squirreljme.error EC0l The input cannot be opened.} */
+ 		ConnectionStateTracker tracker = this.tracker;
+-		if (tracker._inclosed)
+-			throw new IOException("EC0l");
+-		return new TrackedInputStream(tracker, this.doOpenInputStream());
++		synchronized (tracker)
++		{
++			if (tracker._connectionClosed || tracker._inputOpened ||
++				(this.mode & Connector.READ) == 0)
++				throw new IOException("EC0l");
++
++			InputStream result = this.doOpenInputStream();
++			tracker._inputOpened = true;
++			return new TrackedInputStream(tracker, result, this);
++		}
+ 	}
+ 	
+ 	/**
+@@ -293,11 +255,18 @@ public abstract class TCPClientConnection
+ 	public final OutputStream openOutputStream()
+ 		throws IOException
+ 	{
+-		/* {@squirreljme.error EC0m The output has been closed.} */
++		/* {@squirreljme.error EC0m The output cannot be opened.} */
+ 		ConnectionStateTracker tracker = this.tracker;
+-		if (tracker._outclosed)
+-			throw new IOException("EC0m");
+-		return new TrackedOutputStream(tracker, this.doOpenOutputStream());
++		synchronized (tracker)
++		{
++			if (tracker._connectionClosed || tracker._outputOpened ||
++				(this.mode & Connector.WRITE) == 0)
++				throw new IOException("EC0m");
++
++			OutputStream result = this.doOpenOutputStream();
++			tracker._outputOpened = true;
++			return new TrackedOutputStream(tracker, result, this);
++		}
+ 	}
+ 	
+ 	/**
+@@ -343,10 +312,64 @@ public abstract class TCPClientConnection
+ 				break;
+ 		}
+ 		
++		this.__checkConnectionOpen();
++
+ 		// Forward
+ 		this.doSetSocketOption(__o, __v);
+ 	}
+ 
++	/**
++	 * Notes that one of the connection streams has closed.
++	 *
++	 * @throws IOException If the transport could not be closed.
++	 * @since 2026/07/21
++	 */
++	final void streamClosed()
++		throws IOException
++	{
++		this.__closeTransportIfUnused();
++	}
++
++	/**
++	 * Checks whether methods on the connection object may still be used.
++	 *
++	 * @throws IOException If the connection object has been closed.
++	 * @since 2026/07/21
++	 */
++	private void __checkConnectionOpen()
++		throws IOException
++	{
++		synchronized (this.tracker)
++		{
++			/* {@squirreljme.error EC22 The TCP connection is closed.} */
++			if (this.tracker._connectionClosed)
++				throw new IOException("EC22");
++		}
++	}
++
++	/**
++	 * Closes the transport after the connection and all opened streams close.
++	 *
++	 * @throws IOException If the transport could not be closed.
++	 * @since 2026/07/21
++	 */
++	private void __closeTransportIfUnused()
++		throws IOException
++	{
++		ConnectionStateTracker tracker = this.tracker;
++		synchronized (tracker)
++		{
++			if (tracker._transportClosed || !tracker._connectionClosed ||
++				(tracker._inputOpened && !tracker._inputClosed) ||
++				(tracker._outputOpened && !tracker._outputClosed))
++				return;
++
++			tracker._transportClosed = true;
++		}
++
++		this.doClose();
++	}
++
+ 	/**
+ 	 * Normalizes the given host name for accessors.
+ 	 *
+diff --git a/modules/gcf/src/main/java/cc/squirreljme/runtime/gcf/TrackedInputStream.java b/modules/gcf/src/main/java/cc/squirreljme/runtime/gcf/TrackedInputStream.java
+index 386cf806d4..8ce7cc5c72 100644
+--- a/modules/gcf/src/main/java/cc/squirreljme/runtime/gcf/TrackedInputStream.java
++++ b/modules/gcf/src/main/java/cc/squirreljme/runtime/gcf/TrackedInputStream.java
+@@ -27,22 +27,28 @@ public final class TrackedInputStream
+ 	/** The wrapped stream. */
+ 	protected final InputStream in;
+ 	
++	/** The connection which owns the stream. */
++	protected final TCPClientConnection owner;
++
+ 	/**
+ 	 * Initializes the tracked stream.
+ 	 *
+ 	 * @param __t The tracker.
+ 	 * @param __in The input.
++	 * @param __owner The connection which owns the stream.
+ 	 * @throws NullPointerException On null arguments.
+ 	 * @since 2019/05/13
+ 	 */
+-	public TrackedInputStream(ConnectionStateTracker __t, InputStream __in)
++	public TrackedInputStream(ConnectionStateTracker __t, InputStream __in,
++		TCPClientConnection __owner)
+ 		throws NullPointerException
+ 	{
+-		if (__t == null || __in == null)
++		if (__t == null || __in == null || __owner == null)
+ 			throw new NullPointerException("NARG");
+ 		
+ 		this.tracker = __t;
+ 		this.in = __in;
++		this.owner = __owner;
+ 	}
+ 	
+ 	/**
+@@ -54,7 +60,7 @@ public final class TrackedInputStream
+ 		throws IOException
+ 	{
+ 		/* {@squirreljme.error EC0r The input has been closed.} */
+-		if (this.tracker._inclosed)
++		if (this.tracker._inputClosed)
+ 			throw new IOException("EC0r");
+ 		
+ 		return this.in.available();
+@@ -68,11 +74,38 @@ public final class TrackedInputStream
+ 	public final void close()
+ 		throws IOException
+ 	{
+-		// Always close the input
+-		this.in.close();
++		ConnectionStateTracker tracker = this.tracker;
++		IOException failure = null;
++		synchronized (tracker)
++		{
++			if (tracker._inputClosed)
++				return;
++			try
++			{
++				this.in.close();
++			}
++			catch (IOException e)
++			{
++				failure = e;
++			}
++			finally
++			{
++				tracker._inputClosed = true;
++			}
++		}
++
++		try
++		{
++			this.owner.streamClosed();
++		}
++		catch (IOException e)
++		{
++			if (failure == null)
++				failure = e;
++		}
+ 		
+-		// Set stream as closed
+-		this.tracker._inclosed = true;
++		if (failure != null)
++			throw failure;
+ 	}
+ 	
+ 	/**
+@@ -84,14 +117,11 @@ public final class TrackedInputStream
+ 		throws IOException
+ 	{
+ 		/* {@squirreljme.error EC0s The input has been closed.} */
+-		if (this.tracker._inclosed)
++		if (this.tracker._inputClosed)
+ 			throw new IOException("EC0s");
+ 		
+ 		// Read data
+-		int rv = this.in.read();
+-		if (rv < 0)
+-			this.close();
+-		return rv;
++		return this.in.read();
+ 	}
+ 	
+ 	/**
+@@ -103,14 +133,11 @@ public final class TrackedInputStream
+ 		throws IOException
+ 	{
+ 		/* {@squirreljme.error EC0t The input has been closed.} */
+-		if (this.tracker._inclosed)
++		if (this.tracker._inputClosed)
+ 			throw new IOException("EC0t");
+ 		
+ 		// Read data
+-		int rv = this.in.read(__b);
+-		if (rv < 0)
+-			this.close();
+-		return rv;
++		return this.in.read(__b);
+ 	}
+ 	
+ 	/**
+@@ -122,14 +149,10 @@ public final class TrackedInputStream
+ 		throws IOException
+ 	{
+ 		/* {@squirreljme.error EC0u The input has been closed.} */
+-		if (this.tracker._inclosed)
++		if (this.tracker._inputClosed)
+ 			throw new IOException("EC0u");
+ 		
+ 		// Read data
+-		int rv = this.in.read(__b, __o, __l);
+-		if (rv < 0)
+-			this.close();
+-		return rv;
++		return this.in.read(__b, __o, __l);
+ 	}
+ }
+-
+diff --git a/modules/gcf/src/main/java/cc/squirreljme/runtime/gcf/TrackedOutputStream.java b/modules/gcf/src/main/java/cc/squirreljme/runtime/gcf/TrackedOutputStream.java
+index dbb6f7ad0c..5186a9e08a 100644
+--- a/modules/gcf/src/main/java/cc/squirreljme/runtime/gcf/TrackedOutputStream.java
++++ b/modules/gcf/src/main/java/cc/squirreljme/runtime/gcf/TrackedOutputStream.java
+@@ -27,22 +27,28 @@ public final class TrackedOutputStream
+ 	/** The wrapped stream. */
+ 	protected final OutputStream out;
+ 	
++	/** The connection which owns the stream. */
++	protected final TCPClientConnection owner;
++
+ 	/**
+ 	 * Initializes the tracked stream.
+ 	 *
+ 	 * @param __t The tracker.
+ 	 * @param __out The output.
++	 * @param __owner The connection which owns the stream.
+ 	 * @throws NullPointerException On null arguments.
+ 	 * @since 2019/05/13
+ 	 */
+-	public TrackedOutputStream(ConnectionStateTracker __t, OutputStream __out)
++	public TrackedOutputStream(ConnectionStateTracker __t, OutputStream __out,
++		TCPClientConnection __owner)
+ 		throws NullPointerException
+ 	{
+-		if (__t == null || __out == null)
++		if (__t == null || __out == null || __owner == null)
+ 			throw new NullPointerException("NARG");
+ 		
+ 		this.tracker = __t;
+ 		this.out = __out;
++		this.owner = __owner;
+ 	}
+ 	
+ 	/**
+@@ -53,11 +59,38 @@ public final class TrackedOutputStream
+ 	public final void close()
+ 		throws IOException
+ 	{
+-		// Always close the output
+-		this.out.close();
++		ConnectionStateTracker tracker = this.tracker;
++		IOException failure = null;
++		synchronized (tracker)
++		{
++			if (tracker._outputClosed)
++				return;
++			try
++			{
++				this.out.close();
++			}
++			catch (IOException e)
++			{
++				failure = e;
++			}
++			finally
++			{
++				tracker._outputClosed = true;
++			}
++		}
++
++		try
++		{
++			this.owner.streamClosed();
++		}
++		catch (IOException e)
++		{
++			if (failure == null)
++				failure = e;
++		}
+ 		
+-		// Set stream as closed
+-		this.tracker._outclosed = true;
++		if (failure != null)
++			throw failure;
+ 	}
+ 	
+ 	/**
+@@ -69,7 +102,7 @@ public final class TrackedOutputStream
+ 		throws IOException
+ 	{
+ 		/* {@squirreljme.error EC0v The output has been closed.} */
+-		if (this.tracker._outclosed)
++		if (this.tracker._outputClosed)
+ 			throw new IOException("EC0v");
+ 		
+ 		// Forward
+@@ -85,7 +118,7 @@ public final class TrackedOutputStream
+ 		throws IOException
+ 	{
+ 		/* {@squirreljme.error EC0w The output has been closed.} */
+-		if (this.tracker._outclosed)
++		if (this.tracker._outputClosed)
+ 			throw new IOException("EC0w");
+ 		
+ 		// Forward
+@@ -101,7 +134,7 @@ public final class TrackedOutputStream
+ 		throws IOException, NullPointerException
+ 	{
+ 		/* {@squirreljme.error EC0x The output has been closed.} */
+-		if (this.tracker._outclosed)
++		if (this.tracker._outputClosed)
+ 			throw new IOException("EC0x");
+ 		
+ 		// Forward
+@@ -117,11 +150,10 @@ public final class TrackedOutputStream
+ 		throws IndexOutOfBoundsException, IOException, NullPointerException
+ 	{
+ 		/* {@squirreljme.error EC0y The output has been closed.} */
+-		if (this.tracker._outclosed)
++		if (this.tracker._outputClosed)
+ 			throw new IOException("EC0y");
+ 		
+ 		// Forward
+ 		this.out.write(__b, __o, __l);
+ 	}
+ }
+-
+diff --git a/modules/gcf/src/main/java/javax/microedition/io/Connector.java b/modules/gcf/src/main/java/javax/microedition/io/Connector.java
+index 40b1ba3e5d..25abe300d4 100644
+--- a/modules/gcf/src/main/java/javax/microedition/io/Connector.java
++++ b/modules/gcf/src/main/java/javax/microedition/io/Connector.java
+@@ -400,6 +400,11 @@ public class Connector
+ 		// Check
+ 		if (__uri == null)
+ 			throw new NullPointerException("NARG");
++
++		/* {@squirreljme.error EC20 Invalid connection mode. (The mode)} */
++		if (__mode != Connector.READ && __mode != Connector.WRITE &&
++			__mode != Connector.READ_WRITE)
++			throw new IllegalArgumentException("EC20 " + __mode);
+ 		
+ 		// If missing, create
+ 		if (__opts == null)
+@@ -463,8 +468,14 @@ public class Connector
+ 					// Creating client
+ 					else
+ 					{
++						/* {@squirreljme.error EC21 TCP client connection is
++						missing a port.} */
++						if (addr.port == IPAddress.ASSIGNED_PORT)
++							throw new IllegalArgumentException("EC21");
++
+ 						IPConnectionFactory pf = IPConnectionFactory.factory();
+-						return pf.tcpClientConnect(pf.resolveAddress(addr));
++						return pf.tcpClientConnect(pf.resolveAddress(addr),
++							__mode);
+ 					}
+ 				}
+ 				
+@@ -486,5 +497,3 @@ public class Connector
+ 			__uri));
+ 	}
+ }
+-
+-

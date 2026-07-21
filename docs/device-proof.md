@@ -7,7 +7,7 @@ Emulator tests protect correctness and regressions; they do not establish real h
 - Git commit and whether the tree was clean.
 - SHA-256 of `bin/TelegramMicro.jar` and `bin/TelegramMicro.jad`.
 - JAR byte size and class count reported by `check-device-budget.sh`.
-- Phone model, firmware, free storage, network type, and Java security prompts.
+- Phone model, firmware, reported Java runtime/platform properties, free storage, network type, and Java security prompts.
 - Whether the account/state is fresh or restored.
 
 Keep this record outside Git if it contains account/device identifiers.
@@ -43,3 +43,5 @@ Keep this record outside Git if it contains account/device identifiers.
 The candidate passes only if the exact artifact completes the checklist without OOM, uncaught exception, corrupted authorization state, unintended network action, or unusable keypad/navigation behavior. Record each omitted scenario as not tested.
 
 If a failure appears only on device, preserve the artifact hash, minimal reproduction, last visible state, and any safe diagnostic code. Add an emulator/unit regression where possible, but retain the device scenario until the same artifact is rerun successfully.
+
+When the failure suggests a runtime quirk, also record the narrow probe transcript and provenance fields from [runtime-emulation.md](runtime-emulation.md). Do not generalize one handset observation to an entire KVM/JRT/Jbed/JBlend/J9/Jeode/Sony Ericsson family without additional evidence.

@@ -40,6 +40,7 @@ Do not stop for a choice that can be resolved from local code, tests, references
 - `docs/parity-roadmap.md`: prioritized capability backlog, not a parity claim.
 - `docs/telegram-feature-matrix.md`: extensive Telegram surface inventory and constrained-client disposition.
 - `docs/ux-guidelines.md`: NN/g-derived keypad-first interaction and heuristic review rules.
+- `docs/runtime-emulation.md`: runtime-profile status, conformance probes, and quirk evidence contract.
 
 ## Scripted workflow
 
@@ -53,6 +54,8 @@ Prefer scripts over the J2MEWTK UI:
 - `./scripts/verify.sh --quick`: source policy, production artifact, and quick tests.
 - `./scripts/verify.sh --full`: default pre-commit/pre-push gate.
 - `./scripts/verify.sh --full --ui`: add isolated offline startup/UI proof.
+- `./scripts/verify-squirreljme-network.sh`: isolated hosted target-VM GCF TCP proof.
+- `./scripts/verify-runtime-profiles.sh`: profile validation and target-property proof.
 - `./scripts/run.sh`: launch the hosted emulator manually.
 
 Bootstrap may download pinned tools. Once present, ordinary verification should reuse them deterministically.
@@ -65,6 +68,7 @@ Bootstrap may download pinned tools. Once present, ordinary verification should 
 | MTProto, TL, auth, crypto, transport, parser | Local reference inspection, hostile/boundary regression, `./scripts/test-full.sh` |
 | RMS/session/warm state | Round-trip, corrupt/truncated/oversized input test, `./scripts/test-full.sh` |
 | Build/bootstrap/SquirrelJME patch | `./scripts/verify.sh --full` from a clean pinned checkout when practical |
+| GCF or runtime-profile behavior | Official MIDP/CLDC reference, focused loopback/profile regression, and clean-pinned `./scripts/verify.sh --full` |
 | Startup/LCDUI/MCP behavior | `./scripts/verify.sh --full --ui` and inspect the direct surface capture |
 | Device budget or lifecycle | Artifact budget gate plus the relevant checklist in `docs/device-proof.md` |
 | Live Telegram behavior | Offline gates first, then the explicit production procedure in `docs/verification.md` |
@@ -105,6 +109,8 @@ For server-backed secondary lists such as search, declare query and result limit
 - Use dynamic localhost MCP ports unless a caller explicitly supplies one.
 - Keep emulator state in `TELEGRAM_MICRO_EMULATOR_STATE_DIR`; never repurpose `HOME`.
 - Stop only the run associated with a known MCP port. `stop-emulator.sh --all` is an explicit emergency cleanup.
+- Select emulation with `TELEGRAM_MICRO_RUNTIME_PROFILE`; unknown IDs must fail before launch.
+- Treat every vendor profile as identity-only unless `docs/runtime-emulation.md` records a focused probe and authoritative device/runtime evidence. Never invent a quirk from brand folklore.
 
 ## Production and secret safety
 

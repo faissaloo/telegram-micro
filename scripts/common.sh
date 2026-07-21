@@ -41,6 +41,7 @@ APP_JAR="${DIST_DIR}/TelegramMicro.jar"
 APP_JAD="${DIST_DIR}/TelegramMicro.jad"
 TEST_JAR="${DIST_DIR}/TelegramMicroTests.jar"
 PATCH_FINGERPRINT_FILE="${SQUIRRELJME_DIR}/.telegrammicro-patch-fingerprint"
+PATCH_APPLIED_FINGERPRINT_FILE="${SQUIRRELJME_DIR}/.telegrammicro-applied-patch-fingerprint"
 
 BUILD_WORK_DIR=''
 APP_CLASSES_DIR=''
@@ -189,20 +190,39 @@ squirreljme_patch_fingerprint() {
   printf '%s\n' "${SQUIRRELJME_PATCH_FINGERPRINT}"
 }
 
-squirreljme_patches_applied() {
+squirreljme_patch_target_files() {
   local patch
-  local found=0
 
   while IFS= read -r patch; do
     [[ -n "${patch}" ]] || continue
-    found=1
+    git apply --numstat "${patch}" | cut -f 3
+  done < <(squirreljme_patch_files) | sort -u
+}
 
-    if ! git -C "${SQUIRRELJME_DIR}" apply --reverse --check "${patch}" >/dev/null 2>&1; then
-      return 1
-    fi
-  done < <(squirreljme_patch_files)
+squirreljme_patched_state_fingerprint() {
+  local target
 
-  [[ "${found}" -eq 1 ]]
+  {
+    while IFS= read -r target; do
+      [[ -n "${target}" ]] || continue
+      printf '%s\n' "${target}"
+      if [[ -f "${SQUIRRELJME_DIR}/${target}" ]]; then
+        sha256sum "${SQUIRRELJME_DIR}/${target}" | cut -d ' ' -f 1
+      else
+        printf 'missing\n'
+      fi
+    done < <(squirreljme_patch_target_files)
+  } | sha256sum | cut -d ' ' -f 1
+}
+
+squirreljme_patches_applied() {
+  local actual
+  local expected
+
+  [[ -f "${PATCH_APPLIED_FINGERPRINT_FILE}" ]] || return 1
+  actual="$(<"${PATCH_APPLIED_FINGERPRINT_FILE}")"
+  expected="${SQUIRRELJME_PATCH_FINGERPRINT} $(squirreljme_patched_state_fingerprint)"
+  [[ "${actual}" == "${expected}" ]]
 }
 
 ensure_squirreljme_base_checkout() {
@@ -229,7 +249,11 @@ ensure_squirreljme_base_checkout() {
 verify_squirreljme_patch_sources() {
   local required
   local -a required_sources=(
+    'emulators/emulator-base/src/main/java/cc/squirreljme/emulator/gcf/HostIPConnectionFactory.java'
+    'emulators/emulator-base/src/main/java/cc/squirreljme/emulator/gcf/HostTCPClientConnection.java'
     'emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibMcpServer.java'
+    'emulators/emulator-base/src/main/java/cc/squirreljme/emulator/vm/RuntimeProfile.java'
+    'emulators/emulator-base/src/main/resources/META-INF/services/cc.squirreljme.runtime.gcf.IPConnectionFactory'
     'modules/midp-lcdui/src/main/java/javax/microedition/lcdui/__ExecFormInput__.java'
     'modules/midp-lcdui/src/main/java/javax/microedition/lcdui/__ExecFormPaint__.java'
   )
@@ -244,6 +268,11 @@ verify_squirreljme_patch_sources() {
 
 apply_squirreljme_patches() {
   require_command git
+
+  if squirreljme_patches_applied; then
+    verify_squirreljme_patch_sources
+    return
+  fi
 
   local patch
   local found=0
@@ -270,6 +299,10 @@ apply_squirreljme_patches() {
   fi
 
   verify_squirreljme_patch_sources
+  printf '%s %s\n' \
+    "${SQUIRRELJME_PATCH_FINGERPRINT}" \
+    "$(squirreljme_patched_state_fingerprint)" \
+    > "${PATCH_APPLIED_FINGERPRINT_FILE}"
 }
 
 export_bootstrap_environment() {
@@ -293,7 +326,11 @@ verify_squirreljme_standalone_jar() {
   local listing
   local required
   local -a required_classes=(
+    'META-INF/services/cc.squirreljme.runtime.gcf.IPConnectionFactory'
+    'cc/squirreljme/emulator/gcf/HostIPConnectionFactory.class'
+    'cc/squirreljme/emulator/gcf/HostTCPClientConnection.class'
     'cc/squirreljme/emulator/scritchui/dylib/DylibMcpServer.class'
+    'cc/squirreljme/emulator/vm/RuntimeProfile.class'
     'javax/microedition/lcdui/__ExecFormInput__.class'
     'javax/microedition/lcdui/__ExecFormPaint__.class'
   )
@@ -475,6 +512,8 @@ write_test_manifest() {
 MIDlet-1: TestRunner, , test.TestRunner
 MIDlet-2: HistoryFixture, , ui.HistoryFixtureMidlet
 MIDlet-3: SearchFixture, , ui.SearchFixtureMidlet
+MIDlet-4: GcfSocketProbe, , runtime.GcfSocketProbeMidlet
+MIDlet-5: RuntimeProfileProbe, , runtime.RuntimeProfileProbeMidlet
 MIDlet-Name: TelegramMicroTests
 MIDlet-Vendor: Faissaloo
 MIDlet-Version: 1.0
@@ -596,6 +635,9 @@ run_built_suite() {
   fi
   if [[ -n "${SQUIRRELJME_VM_ARGS:-}" ]]; then
     read -r -a vm_args <<< "${SQUIRRELJME_VM_ARGS}"
+  fi
+  if [[ -n "${TELEGRAM_MICRO_RUNTIME_PROFILE:-}" ]]; then
+    vm_args+=("-Xprofile:${TELEGRAM_MICRO_RUNTIME_PROFILE}")
   fi
   if [[ -n "${SQUIRRELJME_MCP_PORT:-}" ]]; then
     if [[ ! "${SQUIRRELJME_MCP_PORT}" =~ ^[0-9]+$ ]] || \

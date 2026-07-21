@@ -47,6 +47,10 @@ if [[ "${TEST_LANE}" == 'quick' ]]; then
   ./scripts/test.sh
 else
   ./scripts/test-full.sh
+  printf '[verify] hosted GCF loopback\n'
+  ./scripts/verify-squirreljme-network.sh
+  printf '[verify] runtime profiles\n'
+  ./scripts/verify-runtime-profiles.sh
 fi
 
 if [[ "${RUN_UI}" == '1' ]]; then

@@ -17,7 +17,7 @@ These states are independent. A parser can be unit verified while the end-to-end
 
 | Capability | Current bounded foundation | Next evidence/work |
 | --- | --- | --- |
-| Deterministic build | Pinned SquirrelJME base/patches and checksum-pinned tools; production/test artifacts split | Keep CI green; exercise clean bootstrap after patch/tool changes |
+| Deterministic build | Pinned SquirrelJME base/ordered patches and checksum-pinned tools; production/test artifacts split; patched-source drift fingerprinted | Keep CI green; exercise clean bootstrap after patch/tool changes |
 | First-install entropy | Production CSPRNG seed gate and offline startup marker | Physical keypad/usability and repeated cold-start proof |
 | MTProto authentication | Handshake, nonce/hash checks, DH validation, auth-key/session persistence paths | Maintain hostile transcript vectors; live and device login matrix |
 | Login UI | Phone/code/password state models and MCP automation | Error/retry/expiry UI proof; physical keypad proof |
@@ -39,6 +39,7 @@ P0 is complete only when the exact release artifact passes the real-device check
 4. Extend outbound fault injection from deterministic model/restart invariants to transport callback traces and live radio-loss evidence.
 5. Define durable-state compatibility windows and explicit reset/re-auth behavior for unsupported migrations.
 6. Add long-running bounded-state soak tests that assert capacities and lack of progressive retained growth.
+7. Expand the default-ideal J2ME conformance corpus, then add vendor runtime quirks only from the probe and provenance contract in [runtime-emulation.md](runtime-emulation.md). Current vendor profiles are identity-only.
 
 ## P2: device-suitable usability
 

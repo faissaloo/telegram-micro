@@ -10,8 +10,10 @@ TelegramMicro separates deterministic offline proof from production-account and 
 | `./scripts/test.sh` | Quick registered tests execute in the SquirrelJME target VM | Slow crypto vectors, UI, Telegram interoperability |
 | `./scripts/test-full.sh` | Quick target-VM lane plus large crypto vectors on the host JVM | All vectors in target VM, UI, live service |
 | `./scripts/test-target-full.sh` | All registered tests including slow crypto vectors in the target VM | UI, live service; this can be a long soak |
+| `./scripts/verify-squirreljme-network.sh` | Hosted target-VM DNS/TCP modes, options, duplex close, and stream lifetime against an isolated loopback server | TLS, Telegram, SpringCoat-native IP, radio, or physical device |
+| `./scripts/verify-runtime-profiles.sh` | Profile validation, aliases, default, target-property propagation, and unknown-profile rejection | Any vendor-specific quirk; profiles are identity-only |
 | `./scripts/verify.sh --quick` | Shell/source policy, clean diff checks, production budgets, quick tests | Slow vectors and UI |
-| `./scripts/verify.sh --full` | Standard offline pre-push gate | UI, production Telegram, physical Nokia |
+| `./scripts/verify.sh --full` | Standard offline pre-push gate, including hosted GCF loopback and runtime profiles | UI, production Telegram, physical Nokia |
 | `./scripts/verify.sh --full --ui` | Standard gate plus clean-state first-install/entropy, deterministic history, and bounded search UI captures | Login/search interoperability or real device |
 
 `verify-ui.sh`, `verify-history-ui.sh`, and `verify-search-ui.sh` require a real display for the pinned GTK2 ScritchUI backend, even though the app runs through the hosted VM. They fail before starting the emulator when Linux has no `DISPLAY`; do not replace this evidence lane with a virtual X server. The first-install lane requires the entropy marker and rejects evidence if bootstrap/reconnect starts before it. The history lane runs a test-JAR-only, account-free model fixture through the production canvas and proves timestamp plus `read`/`sent` layout states. The search lane renders a scoped account-free result page through the production shell, waits for the first event-thread paint, and requires the selected-result card before accepting bounded sender/preview/media/time evidence. All three write ignored artifacts under `artifacts/ui-smoke` and clean only their isolated temporary state.
@@ -26,11 +28,12 @@ TelegramMicro separates deterministic offline proof from production-account and 
 - UI/startup changes need direct MCP inspection in addition to model tests.
 - Server-backed secondary lists need request-shape proof, over-capacity rejection before model mutation, separation from durable/core state, and explicit zero/failure/back-navigation UI proof.
 - Build/bootstrap changes should be tested against a clean checkout of the pinned SquirrelJME base.
+- GCF/runtime-profile changes need the isolated socket/profile probes plus the clean pinned bootstrap. A vendor quirk additionally needs the evidence contract in [runtime-emulation.md](runtime-emulation.md).
 - Heap/device-budget changes need the artifact gate and eventually the physical-device checklist.
 
 ## Clean bootstrap proof
 
-For bootstrap or SquirrelJME-patch work, point `SQUIRRELJME_DIR` at an unused directory and run the standard gate. The bootstrap script owns only the explicit directory, verifies the pinned base and patch fingerprint, and rejects unrelated dirty state.
+For bootstrap or SquirrelJME-patch work, point `SQUIRRELJME_DIR` at an unused directory and run the standard gate. The bootstrap script owns only the explicit directory, verifies the pinned base, ordered patch fingerprint, and patched touched-file state, and rejects drift instead of silently reusing it.
 
 Do not delete or reset an existing checkout to manufacture cleanliness. Use a new temporary destination.
 

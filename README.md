@@ -34,7 +34,7 @@ Build outputs are:
 ./scripts/verify.sh --full --ui   # add isolated startup/history/search MCP proof
 ```
 
-The production artifact gate excludes test classes and enforces current JAR/class guardrails. Each UI lane uses a fresh emulator-state directory, a dynamic localhost MCP port, and a direct PNG capture from the application surface.
+The production artifact gate excludes test classes and enforces current JAR/class guardrails. The full gate also runs account-free hosted GCF loopback and runtime-profile propagation probes. Each UI lane uses a fresh emulator-state directory, a dynamic localhost MCP port, and a direct PNG capture from the application surface.
 
 See [verification.md](docs/verification.md) for the proof matrix, clean-bootstrap checks, and exact evidence vocabulary.
 
@@ -56,6 +56,14 @@ Edit the ignored local file before building. Without credentials, the login UI r
 ```sh
 SQUIRRELJME_MCP_PORT="$PORT" ./scripts/run.sh
 ```
+
+The emulator has a validated runtime-profile boundary. Vendor profiles are currently identity-only, not quirk-complete:
+
+```sh
+TELEGRAM_MICRO_RUNTIME_PROFILE=nokia-jrt ./scripts/run.sh
+```
+
+See [runtime-emulation.md](docs/runtime-emulation.md) for profile IDs, exact current evidence, and the device-probe requirements for adding a real runtime divergence.
 
 Use the embedded ScritchUI MCP endpoint and `scritch.screenshot` for direct application-surface evidence. The pinned GTK2 backend still needs a real X display even in hosted mode; a displayless agent should report the UI lane unavailable rather than add a virtual X server. Keep isolated state in `TELEGRAM_MICRO_EMULATOR_STATE_DIR`; do not replace the process `HOME`.
 
@@ -88,6 +96,7 @@ Sign-in stores reusable emulator state under its ignored evidence directory and 
 - [Prioritized parity roadmap](docs/parity-roadmap.md)
 - [Telegram feature matrix](docs/telegram-feature-matrix.md)
 - [Keypad-first UX guidance](docs/ux-guidelines.md)
+- [J2ME runtime emulation and quirk evidence](docs/runtime-emulation.md)
 - [Agent development contract](AGENTS.md)
 
 Local Telegram/MTProto reference implementations are under the ignored `references/ps2` tree. Protocol changes should be reference-first and should include hostile boundary tests.

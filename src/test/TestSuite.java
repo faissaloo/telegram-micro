@@ -189,6 +189,10 @@ public class TestSuite {
     TestRunner.register(new LoginStateModelContext.BootstrapPreservesRestoredCodeStageTest());
     TestRunner.register(new LoginStateModelContext.RestoredCodeExpiresToPhoneStageTest());
     TestRunner.register(new LoginStateModelContext.UserVisiblePhoneErrorKeepsPhoneStageTest());
+    TestRunner.register(new LoginStateModelContext.SendCodeWaitExpiresBoundedlyTest());
+    TestRunner.register(new LoginStateModelContext.SendCodeDisconnectRequiresExplicitRetryTest());
+    TestRunner.register(new LoginStateModelContext.SignInDisconnectClearsSecretAndPreservesCodeContextTest());
+    TestRunner.register(new LoginStateModelContext.IdleDisconnectInvalidatesBootstrapTest());
     TestRunner.register(new AppCredentialsContext.ConfiguredCredentialsAreUsableTest());
     TestRunner.register(new AppCredentialsContext.MissingGeneratedCredentialsFallBackForHeaderTest());
     TestRunner.register(new RuntimeDeviceProfileContext.PlatformPropertyBuildsRealDeviceModelTest());

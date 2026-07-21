@@ -2,6 +2,11 @@ package ui;
 
 public class LoginStateModel {
   public static final long CODE_VALIDITY_WINDOW_MILLIS = 5L * 60L * 1000L;
+  public static final long REQUEST_TIMEOUT_MILLIS = 60L * 1000L;
+  public static final int REQUEST_NONE = 0;
+  public static final int REQUEST_SEND_CODE = 1;
+  public static final int REQUEST_SIGN_IN = 2;
+  public static final int REQUEST_PASSWORD = 3;
   public static final int STAGE_BOOTSTRAP = 0;
   public static final int STAGE_PHONE = 1;
   public static final int STAGE_CODE = 2;
@@ -25,6 +30,9 @@ public class LoginStateModel {
   private int bootstrapDc = 0;
   private String bootstrapEndpoint = "";
   private int bootstrapEndpointCount = 0;
+  private int pendingRequest = REQUEST_NONE;
+  private long pendingRequestStartedAtMillis = 0;
+  private int ambiguousRequest = REQUEST_NONE;
 
   private static boolean starts_with(String value, String prefix) {
     return value != null && prefix != null && value.startsWith(prefix);
@@ -64,6 +72,46 @@ public class LoginStateModel {
     password = "";
     passwordParametersLoaded = false;
     passwordHint = "";
+  }
+
+  private void clearPendingRequest() {
+    pendingRequest = REQUEST_NONE;
+    pendingRequestStartedAtMillis = 0;
+  }
+
+  private void beginPendingRequest(int request, long now) {
+    pendingRequest = request;
+    pendingRequestStartedAtMillis = now;
+    ambiguousRequest = REQUEST_NONE;
+  }
+
+  private void noteUncertainRequest(int request, String connectionDetail) {
+    bootstrapReady = false;
+    ambiguousRequest = request;
+    clearPendingRequest();
+    loginCode = "";
+    password = "";
+    stage = STAGE_ERROR;
+
+    if (request == REQUEST_SEND_CODE) {
+      statusLine = "Send-code result unknown";
+      detailLine = "Telegram did not confirm the request before the connection closed. " +
+        "If a code arrived, do not request another. Use Back to reconnect.";
+    } else if (request == REQUEST_SIGN_IN) {
+      statusLine = "Sign-in result unknown";
+      detailLine = "Telegram did not confirm sign-in before the connection closed. " +
+        "Use Back to reconnect; the login code will not be resent automatically.";
+    } else if (request == REQUEST_PASSWORD) {
+      statusLine = "Password result unknown";
+      detailLine = "Telegram did not confirm the password before the connection closed. " +
+        "Use Back to reconnect; the password was cleared and will not be resent.";
+    } else {
+      statusLine = "Connection failed";
+      detailLine =
+        (connectionDetail != null && connectionDetail.length() > 0 ?
+          connectionDetail + " " : "") +
+        "Use Back to reconnect.";
+    }
   }
 
   private void clearPendingCodeState() {
@@ -109,6 +157,35 @@ public class LoginStateModel {
       phoneCodeHash != null &&
       phoneCodeHash.length() > 0 &&
       codeSentAtMillis > 0;
+  }
+
+  public boolean hasPendingRequest() {
+    return pendingRequest != REQUEST_NONE && pendingRequestStartedAtMillis > 0;
+  }
+
+  public long requestTimeoutRemainingMillis(long now) {
+    long deadline;
+    long remaining;
+
+    if (!hasPendingRequest()) {
+      return 0;
+    }
+
+    deadline = pendingRequestStartedAtMillis + REQUEST_TIMEOUT_MILLIS;
+    remaining = deadline - now;
+    return remaining > 0 ? remaining : 0;
+  }
+
+  public boolean expirePendingRequestIfNeeded(long now) {
+    int expiredRequest;
+
+    if (!hasPendingRequest() || requestTimeoutRemainingMillis(now) > 0) {
+      return false;
+    }
+
+    expiredRequest = pendingRequest;
+    noteUncertainRequest(expiredRequest, "Telegram did not reply within 60 seconds.");
+    return true;
   }
 
   public long codeExpiryRemainingMillis(long now) {
@@ -173,18 +250,42 @@ public class LoginStateModel {
     }
     if (hasPendingCodeState()) {
       enterCodeStage(false);
+      if (ambiguousRequest == REQUEST_SIGN_IN) {
+        statusLine = "Ready to retry sign-in";
+        detailLine = "The previous sign-in result is unknown. Re-enter the code only if the account did not open.";
+      }
+      ambiguousRequest = REQUEST_NONE;
+      return;
+    }
+    if (ambiguousRequest != REQUEST_NONE) {
+      clearPendingCodeState();
+      stage = STAGE_PHONE;
+      statusLine = "Ready to retry login";
+      if (ambiguousRequest == REQUEST_SEND_CODE) {
+        detailLine = "The previous send-code result is unknown. If no code arrived, submit the same phone number once.";
+      } else {
+        detailLine = "The previous login result is unknown. Start the login flow again; nothing was resent automatically.";
+      }
+      ambiguousRequest = REQUEST_NONE;
       return;
     }
     enterBootstrapReadyPhoneStage();
   }
 
   public void onSendCodeSubmitted() {
+    onSendCodeSubmitted(System.currentTimeMillis());
+  }
+
+  public void onSendCodeSubmitted(long now) {
     submittedPhoneNumber = phoneNumber;
+    beginPendingRequest(REQUEST_SEND_CODE, now);
     statusLine = "Submitting phone";
     detailLine = "Waiting for auth.sentCode.";
   }
 
   public void onSentCode(String phoneCodeHash, int timeoutSeconds) {
+    clearPendingRequest();
+    ambiguousRequest = REQUEST_NONE;
     this.phoneCodeHash = phoneCodeHash;
     this.codeSentAtMillis = System.currentTimeMillis();
     this.loginCode = "";
@@ -194,8 +295,13 @@ public class LoginStateModel {
   }
 
   public void onSignInSubmitted() {
+    onSignInSubmitted(System.currentTimeMillis());
+  }
+
+  public void onSignInSubmitted(long now) {
     submittedLoginCode = loginCode;
     loginCode = "";
+    beginPendingRequest(REQUEST_SIGN_IN, now);
     statusLine = "Signing in";
     detailLine = "Waiting for auth.Authorization.";
   }
@@ -205,6 +311,8 @@ public class LoginStateModel {
   }
 
   public void onPasswordParametersRequested() {
+    clearPendingRequest();
+    ambiguousRequest = REQUEST_NONE;
     clearPendingCodeState();
     stage = STAGE_PASSWORD;
     clearPasswordState();
@@ -230,13 +338,20 @@ public class LoginStateModel {
   }
 
   public void onPasswordSubmitted() {
+    onPasswordSubmitted(System.currentTimeMillis());
+  }
+
+  public void onPasswordSubmitted(long now) {
     stage = STAGE_PASSWORD;
     password = "";
+    beginPendingRequest(REQUEST_PASSWORD, now);
     statusLine = "Checking password";
     detailLine = "Waiting for auth.Authorization.";
   }
 
   public void onAuthorized() {
+    clearPendingRequest();
+    ambiguousRequest = REQUEST_NONE;
     stage = STAGE_AUTHORIZED;
     clearPendingCodeState();
     statusLine = "Authorized";
@@ -244,6 +359,8 @@ public class LoginStateModel {
   }
 
   public void onSignUpRequired() {
+    clearPendingRequest();
+    ambiguousRequest = REQUEST_NONE;
     clearPendingCodeState();
     stage = STAGE_ERROR;
     statusLine = "Sign-up required";
@@ -251,6 +368,8 @@ public class LoginStateModel {
   }
 
   public void onRpcError(int code, String message) {
+    clearPendingRequest();
+    ambiguousRequest = REQUEST_NONE;
     if ("SESSION_PASSWORD_NEEDED".equals(message)) {
       onPasswordNeeded();
       return;
@@ -287,10 +406,16 @@ public class LoginStateModel {
   }
 
   public void onConnectionFailed(String detail) {
-    stage = STAGE_ERROR;
+    int failedRequest = pendingRequest;
     submittedLoginCode = "";
-    statusLine = "Connection failed";
-    detailLine = detail;
+    noteUncertainRequest(failedRequest, detail);
+  }
+
+  public void onReconnectStarted() {
+    bootstrapReady = false;
+    stage = STAGE_BOOTSTRAP;
+    statusLine = "Reconnecting";
+    detailLine = "Opening a fresh login connection. No login request will be resent automatically.";
   }
 
   public void onUserVisibleError(String status, String detail) {
@@ -303,6 +428,8 @@ public class LoginStateModel {
 
   public void goBack() {
     if (stage == STAGE_CODE || stage == STAGE_PASSWORD || stage == STAGE_ERROR) {
+      clearPendingRequest();
+      ambiguousRequest = REQUEST_NONE;
       clearPendingCodeState();
       enterPhoneOrBootstrapStage(
         bootstrapReady ? "Bootstrap ready" : "Connecting",

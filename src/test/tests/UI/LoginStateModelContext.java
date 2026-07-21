@@ -261,4 +261,106 @@ public class LoginStateModelContext {
       expect(state.statusLine, "Missing fields");
     }
   }
+
+  public static class SendCodeWaitExpiresBoundedlyTest extends Test {
+    public String label() {
+      return "Login send-code wait expires without enabling an implicit retry";
+    }
+
+    public void test() throws TestFailureException {
+      LoginStateModel state = new LoginStateModel();
+      long submittedAt = 1000L;
+
+      state.onBootstrapReady(3, "149.154.175.100:443", 19);
+      state.phoneNumber = "+15555550123";
+      state.onSendCodeSubmitted(submittedAt);
+
+      expect(state.hasPendingRequest(), true);
+      expect(state.expirePendingRequestIfNeeded(
+        submittedAt + LoginStateModel.REQUEST_TIMEOUT_MILLIS - 1L), false);
+      expect(state.expirePendingRequestIfNeeded(
+        submittedAt + LoginStateModel.REQUEST_TIMEOUT_MILLIS), true);
+      expect(state.hasPendingRequest(), false);
+      expect(state.bootstrapReady, false);
+      expect(state.stage, LoginStateModel.STAGE_ERROR);
+      expect(state.statusLine, "Send-code result unknown");
+      expect(state.detailLine.indexOf("do not request another") >= 0, true);
+    }
+  }
+
+  public static class SendCodeDisconnectRequiresExplicitRetryTest extends Test {
+    public String label() {
+      return "Login reconnect preserves phone but never replays send-code";
+    }
+
+    public void test() throws TestFailureException {
+      LoginStateModel state = new LoginStateModel();
+
+      state.onBootstrapReady(3, "149.154.175.100:443", 19);
+      state.phoneNumber = "+15555550123";
+      state.onSendCodeSubmitted(1000L);
+      state.onConnectionFailed("Connection terminated by server");
+
+      expect(state.phoneNumber, "+15555550123");
+      expect(state.hasPendingRequest(), false);
+      expect(state.statusLine, "Send-code result unknown");
+
+      state.onReconnectStarted();
+      expect(state.stage, LoginStateModel.STAGE_BOOTSTRAP);
+      expect(state.hasPendingRequest(), false);
+
+      state.onBootstrapReady(3, "149.154.175.100:443", 19);
+      expect(state.stage, LoginStateModel.STAGE_PHONE);
+      expect(state.phoneNumber, "+15555550123");
+      expect(state.statusLine, "Ready to retry login");
+      expect(state.detailLine.indexOf("submit") >= 0, true);
+      expect(state.hasPendingRequest(), false);
+    }
+  }
+
+  public static class SignInDisconnectClearsSecretAndPreservesCodeContextTest extends Test {
+    public String label() {
+      return "Login reconnect clears ambiguous code input but keeps its code hash";
+    }
+
+    public void test() throws TestFailureException {
+      LoginStateModel state = new LoginStateModel();
+
+      state.onBootstrapReady(3, "149.154.175.100:443", 19);
+      state.phoneNumber = "+15555550123";
+      state.onSentCode("hash123", 30);
+      state.loginCode = "12345";
+      state.onSignInSubmitted(1000L);
+      state.onConnectionFailed("Connection terminated by server");
+
+      expect(state.loginCode, "");
+      expect(state.submittedLoginCode, "");
+      expect(state.phoneCodeHash, "hash123");
+      expect(state.statusLine, "Sign-in result unknown");
+
+      state.onReconnectStarted();
+      state.onBootstrapReady(3, "149.154.175.100:443", 19);
+      expect(state.stage, LoginStateModel.STAGE_CODE);
+      expect(state.statusLine, "Ready to retry sign-in");
+      expect(state.hasPendingRequest(), false);
+    }
+  }
+
+  public static class IdleDisconnectInvalidatesBootstrapTest extends Test {
+    public String label() {
+      return "Idle login disconnect invalidates the stale bootstrap socket";
+    }
+
+    public void test() throws TestFailureException {
+      LoginStateModel state = new LoginStateModel();
+
+      state.onBootstrapReady(3, "149.154.175.100:443", 19);
+      state.onConnectionFailed("Connection terminated by server");
+
+      expect(state.bootstrapReady, false);
+      expect(state.stage, LoginStateModel.STAGE_ERROR);
+      expect(state.statusLine, "Connection failed");
+      expect(state.detailLine.indexOf("Back to reconnect") >= 0, true);
+    }
+  }
 }

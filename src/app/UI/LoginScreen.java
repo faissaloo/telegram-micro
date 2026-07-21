@@ -30,6 +30,7 @@ public class LoginScreen implements CommandListener {
   private TextField codeField;
   private TextField passwordField;
   private Thread codeExpiryWatcher;
+  private Thread requestTimeoutWatcher;
 
   private final Command submitCommand = new Command("Submit", Command.OK, 1);
   private final Command backCommand = new Command("Back", Command.BACK, 2);
@@ -44,8 +45,12 @@ public class LoginScreen implements CommandListener {
     this.state = new LoginStateModel();
   }
 
-  public void setConnection(MTProtoConnection connection) {
+  public synchronized void setConnection(MTProtoConnection connection) {
     this.connection = connection;
+  }
+
+  public synchronized boolean isCurrentConnection(MTProtoConnection candidate) {
+    return candidate != null && connection == candidate;
   }
 
   public void setBundledCredentials(AppCredentials bundledCredentials) {
@@ -135,6 +140,50 @@ public class LoginScreen implements CommandListener {
     watcher.start();
   }
 
+  private synchronized void rescheduleRequestTimeoutWatcher() {
+    final long delayMillis;
+    Thread watcher;
+
+    if (requestTimeoutWatcher != null) {
+      requestTimeoutWatcher.interrupt();
+      requestTimeoutWatcher = null;
+    }
+    if (!state.hasPendingRequest()) {
+      return;
+    }
+
+    delayMillis = state.requestTimeoutRemainingMillis(System.currentTimeMillis());
+    if (delayMillis <= 0) {
+      return;
+    }
+
+    watcher = new Thread(new Runnable() {
+      public void run() {
+        try {
+          Thread.sleep(delayMillis);
+        } catch (InterruptedException e) {
+          return;
+        }
+        synchronized (LoginScreen.this) {
+          if (Thread.currentThread() != requestTimeoutWatcher) {
+            return;
+          }
+          requestTimeoutWatcher = null;
+        }
+        if (state.expirePendingRequestIfNeeded(System.currentTimeMillis())) {
+          setConnection(null);
+          if (host != null) {
+            host.onLoginRequestTimedOut();
+          }
+          notifyWarmStateChanged();
+          rebuild();
+        }
+      }
+    });
+    requestTimeoutWatcher = watcher;
+    watcher.start();
+  }
+
   public void onSessionCreated(long elapsedMs) {
     state.onSessionCreated(elapsedMs);
     rebuild();
@@ -191,6 +240,7 @@ public class LoginScreen implements CommandListener {
   }
 
   public void onConnectionFailed(String detail) {
+    setConnection(null);
     state.onConnectionFailed(detail);
     notifyWarmStateChanged();
     rebuild();
@@ -261,14 +311,14 @@ public class LoginScreen implements CommandListener {
       }
       phoneField = new TextField("Phone", state.phoneNumber, 32, TextField.PHONENUMBER);
       next.append(phoneField);
-      if (bundledCredentials.isConfigured()) {
+      if (bundledCredentials.isConfigured() && !state.hasPendingRequest()) {
         next.addCommand(submitCommand);
       }
     } else if (state.stage == LoginStateModel.STAGE_CODE) {
       next.append("\n\nEnter the login code Telegram sent.");
       codeField = new TextField("Code", state.loginCode, 16, TextField.NUMERIC);
       next.append(codeField);
-      if (state.bootstrapReady) {
+      if (state.bootstrapReady && !state.hasPendingRequest()) {
         next.addCommand(submitCommand);
       }
       next.addCommand(backCommand);
@@ -276,21 +326,20 @@ public class LoginScreen implements CommandListener {
       next.append("\n\nEnter the Telegram two-factor password.");
       passwordField = new TextField("Password", state.password, 64, TextField.PASSWORD);
       next.append(passwordField);
-      if (state.passwordParametersLoaded) {
+      if (state.passwordParametersLoaded && !state.hasPendingRequest()) {
         next.addCommand(submitCommand);
       }
       next.addCommand(backCommand);
     } else if (state.stage == LoginStateModel.STAGE_ERROR) {
-      if (state.bootstrapReady) {
-        next.append("\n\nUse Back to return to the login form.");
-        next.addCommand(backCommand);
-      }
+      next.append("\n\nUse Back to return to login or reconnect.");
+      next.addCommand(backCommand);
     }
 
     next.addCommand(exitCommand);
     next.setCommandListener(this);
     form = next;
     rescheduleCodeExpiryWatcher();
+    rescheduleRequestTimeoutWatcher();
     display.setCurrent(form);
   }
 
@@ -301,10 +350,21 @@ public class LoginScreen implements CommandListener {
     }
 
     if (command == backCommand) {
-      state.goBack();
+      boolean reconnect;
+      synchronized (this) {
+        reconnect = connection == null;
+      }
+      if (reconnect && host != null) {
+        state.onReconnectStarted();
+      } else {
+        state.goBack();
+      }
       passwordState = null;
       notifyWarmStateChanged();
       rebuild();
+      if (reconnect && host != null) {
+        host.onLoginReconnectRequested();
+      }
       return;
     }
 
@@ -312,7 +372,11 @@ public class LoginScreen implements CommandListener {
       return;
     }
 
-    if (connection == null) {
+    MTProtoConnection activeConnection;
+    synchronized (this) {
+      activeConnection = connection;
+    }
+    if (activeConnection == null || !activeConnection.connection_open) {
       state.onUserVisibleError("Connection unavailable", "MTProto connection is not ready yet.");
       notifyWarmStateChanged();
       rebuild();
@@ -335,7 +399,7 @@ public class LoginScreen implements CommandListener {
         return;
       }
 
-      (new SendSendCode(state.phoneNumber, bundledCredentials.apiId, bundledCredentials.apiHash)).send(connection);
+      (new SendSendCode(state.phoneNumber, bundledCredentials.apiId, bundledCredentials.apiHash)).send(activeConnection);
       state.onSendCodeSubmitted();
       notifyWarmStateChanged();
       rebuild();
@@ -351,7 +415,7 @@ public class LoginScreen implements CommandListener {
         return;
       }
 
-      (new SendSignIn(state.phoneNumber, state.phoneCodeHash, state.loginCode)).send(connection);
+      (new SendSignIn(state.phoneNumber, state.phoneCodeHash, state.loginCode)).send(activeConnection);
       state.onSignInSubmitted();
       notifyWarmStateChanged();
       rebuild();
@@ -374,7 +438,7 @@ public class LoginScreen implements CommandListener {
       }
 
       try {
-        (new SendCheckPassword(passwordState, state.password, connection.random_number_generator.nextBytes(256))).send(connection);
+        (new SendCheckPassword(passwordState, state.password, activeConnection.random_number_generator.nextBytes(256))).send(activeConnection);
         state.onPasswordSubmitted();
       } catch (IllegalArgumentException e) {
         state.onUserVisibleError("Password check failed", e.getMessage());

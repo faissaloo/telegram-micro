@@ -701,6 +701,16 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
               appShellScreen.showStatus();
             }
           } else {
+            if (connection == threadConnection) {
+              connection = null;
+            }
+            activeLoginScreen.setConnection(null);
+            if (threadConnection != null) {
+              try {
+                threadConnection.close();
+              } catch (IOException closeError) {
+              }
+            }
             activeLoginScreen.onConnectionFailed(e.toString());
           }
           e.printStackTrace();
@@ -724,6 +734,9 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     }
 
     public void execute(Response response) {
+      if (!loginScreen.isCurrentConnection(connection)) {
+        return;
+      }
       long elapsedMs = System.currentTimeMillis() - connection.handshake_start;
       loginScreen.onSessionCreated(elapsedMs);
       appShellModel.onSessionCreated(elapsedMs);
@@ -732,18 +745,23 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
   }
 
   public static class HandleRecieveBootstrapConfigUi extends MTProtoCallback {
+    private MTProtoConnection connection;
     private LoginScreen loginScreen;
     private AppShellModel appShellModel;
     private TelegramMicro midlet;
 
     public HandleRecieveBootstrapConfigUi(int combinator_id, MTProtoConnection connection, LoginScreen loginScreen, AppShellModel appShellModel, TelegramMicro midlet) {
       super(combinator_id, connection);
+      this.connection = connection;
       this.loginScreen = loginScreen;
       this.appShellModel = appShellModel;
       this.midlet = midlet;
     }
 
     public void execute(Response response) {
+      if (!loginScreen.isCurrentConnection(connection)) {
+        return;
+      }
       RecieveConfig config = RecieveConfig.from_rpc_response((RPCResponse)response);
       String endpoint = "";
       RecieveConfig.DCOption current_dc = config.find_this_dc_option();
@@ -779,6 +797,9 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     }
 
     public void execute(Response response) {
+      if (!loginScreen.isCurrentConnection(connection)) {
+        return;
+      }
       RecieveRPCError rpc_error = RecieveRPCError.from_rpc_response((RPCResponse)response);
       String error_message = safeAscii(rpc_error.error_message);
       if ("SESSION_PASSWORD_NEEDED".equals(error_message) &&
@@ -835,14 +856,19 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
   }
 
   public static class HandleRecieveSentCodeUi extends MTProtoCallback {
+    private MTProtoConnection connection;
     private LoginScreen loginScreen;
 
     public HandleRecieveSentCodeUi(MTProtoConnection connection, LoginScreen loginScreen) {
       super(CombinatorIds.auth_sent_code, connection);
+      this.connection = connection;
       this.loginScreen = loginScreen;
     }
 
     public void execute(Response response) {
+      if (!loginScreen.isCurrentConnection(connection)) {
+        return;
+      }
       RecieveSentCode sent_code = RecieveSentCode.from_rpc_response((RPCResponse)response);
       loginScreen.onSentCode(
         sent_code.phone_code_hash,
@@ -852,6 +878,7 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
   }
 
   public static class HandleRecieveAuthorizedUi extends MTProtoCallback {
+    private MTProtoConnection connection;
     private LoginScreen loginScreen;
     private AppShellModel appShellModel;
     private AppShellScreen appShellScreen;
@@ -866,6 +893,7 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
       TelegramMicro midlet
     ) {
       super(combinator_id, connection);
+      this.connection = connection;
       this.loginScreen = loginScreen;
       this.appShellModel = appShellModel;
       this.appShellScreen = appShellScreen;
@@ -873,6 +901,9 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     }
 
     public void execute(Response response) {
+      if (!loginScreen.isCurrentConnection(connection)) {
+        return;
+      }
       loginScreen.onAuthorized();
       appShellModel.onAuthorized();
       appShellScreen.show();
@@ -897,6 +928,9 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
     }
 
     public void execute(Response response) {
+      if (!loginScreen.isCurrentConnection(connection)) {
+        return;
+      }
       RecievePasswordState password_state = RecievePasswordState.from_rpc_response((RPCResponse)response);
       connection.current_password_state = password_state;
       loginScreen.onPasswordStateLoaded(password_state);
@@ -904,14 +938,19 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
   }
 
   public static class HandleRecieveSignUpRequiredUi extends MTProtoCallback {
+    private MTProtoConnection connection;
     private LoginScreen loginScreen;
 
     public HandleRecieveSignUpRequiredUi(MTProtoConnection connection, LoginScreen loginScreen) {
       super(CombinatorIds.auth_authorization_sign_up_required, connection);
+      this.connection = connection;
       this.loginScreen = loginScreen;
     }
 
     public void execute(Response response) {
+      if (!loginScreen.isCurrentConnection(connection)) {
+        return;
+      }
       loginScreen.onSignUpRequired();
     }
   }
@@ -4728,6 +4767,33 @@ public class TelegramMicro extends MIDlet implements AppShellActions, LoginScree
 
   public void onLoginWarmStateChanged() {
     persistWarmState();
+  }
+
+  public void onLoginReconnectRequested() {
+    synchronized (this) {
+      if (connection != null || isAuthorizedSessionActive()) {
+        return;
+      }
+    }
+    startConnectionAsync(false);
+  }
+
+  public void onLoginRequestTimedOut() {
+    MTProtoConnection oldConnection;
+
+    synchronized (this) {
+      ++connectionGeneration;
+      oldConnection = connection;
+      connection = null;
+    }
+    loginScreen.setConnection(null);
+    if (oldConnection != null) {
+      try {
+        oldConnection.close();
+      } catch (IOException e) {
+      }
+    }
+    recordFailure(FailureLog.CATEGORY_NETWORK, FailureLog.SEVERITY_WARN, -303, 0);
   }
 
   public void reconnectSession() {

@@ -8,6 +8,7 @@ This directory contains the TelegramMicro-specific SquirrelJME patch set used by
   - `0001-squirreljme-mcp-and-direct-surface-capture.patch`
   - `0002-host-gcf-and-runtime-profiles.patch`
   - `0003-gtk2-character-input.patch`
+  - `0004-gtk2-softkey-footer.patch`
 
 What it changes:
 - adds an embedded ScritchUI MCP server with control discovery and automation tools
@@ -28,5 +29,7 @@ The second patch:
 The vendor profiles are identity-only until a focused probe and authoritative runtime/device evidence justify a behavioral difference. Hosted TCP proof does not establish SpringCoat-native networking, TLS, Telegram interoperability, or real-device behavior.
 
 The third patch fixes GTK2 hosted keyboard input. Each printable key press now emits a character event in the first event slot and a physical-key event in the second; the prior implementation wrote both types into the second slot, so the latter overwrote the former and MIDP `TextField` items never received typed characters. Non-character keys do not emit a spurious NUL character event.
+
+The fourth patch replaces the hosted GTK menu toolbar with a two-softkey footer below the emulated LCD. MIDP command type and numeric priority select the primary affirmative and negative/navigation actions; remaining commands stay in an Options popup. F1 and F2 activate the virtual left and right softkeys. This is hosted-runtime chrome only and does not alter the application JAR or claim a particular handset's vendor layout.
 
 The scripts in [`scripts/common.sh`](../../scripts/common.sh) pin SquirrelJME to the base commit, apply the ordered patch stack, and record both patch-content and touched-file-state fingerprints before building the standalone JAR.

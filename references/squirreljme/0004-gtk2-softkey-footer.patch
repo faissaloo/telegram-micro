@@ -1,0 +1,533 @@
+diff --git a/modules/midp-lcdui/src/main/java/cc/squirreljme/runtime/lcdui/scritchui/MenuActionTree.java b/modules/midp-lcdui/src/main/java/cc/squirreljme/runtime/lcdui/scritchui/MenuActionTree.java
+index 51b7452..4b34026 100644
+--- a/modules/midp-lcdui/src/main/java/cc/squirreljme/runtime/lcdui/scritchui/MenuActionTree.java
++++ b/modules/midp-lcdui/src/main/java/cc/squirreljme/runtime/lcdui/scritchui/MenuActionTree.java
+@@ -12,15 +12,18 @@ package cc.squirreljme.runtime.lcdui.scritchui;
+ import cc.squirreljme.jvm.mle.scritchui.ScritchInterface;
+ import cc.squirreljme.jvm.mle.scritchui.ScritchLabelInterface;
+ import cc.squirreljme.jvm.mle.scritchui.ScritchMenuInterface;
++import cc.squirreljme.jvm.mle.constants.NonStandardKey;
+ import cc.squirreljme.jvm.mle.scritchui.brackets.ScritchMenuHasChildrenBracket;
+ import cc.squirreljme.jvm.mle.scritchui.brackets.ScritchMenuHasLabelBracket;
+ import cc.squirreljme.jvm.mle.scritchui.brackets.ScritchMenuHasParentBracket;
++import cc.squirreljme.jvm.mle.scritchui.brackets.ScritchMenuItemBracket;
+ import cc.squirreljme.jvm.mle.scritchui.brackets.ScritchMenuKindBracket;
+ import cc.squirreljme.runtime.cldc.annotation.SquirrelJMEVendorApi;
+ import cc.squirreljme.runtime.cldc.debug.Debugging;
+ import java.util.ArrayList;
+ import java.util.Arrays;
+ import java.util.List;
++import javax.microedition.lcdui.Command;
+ import org.jetbrains.annotations.Async;
+ 
+ /**
+@@ -166,6 +169,32 @@ public final class MenuActionTree
+ 			MenuActionTreeLeaf[] leaves = new MenuActionTreeLeaf[n];
+ 			for (int i = 0; i < n; i++)
+ 				leaves[i] = this.map(((MenuActionNodeOnly)__add[i])._menuNode);
++
++			// A two-softkey phone exposes one affirmative action on the left
++			// and one negative/navigation action on the right. Mark those
++			// semantic placements with virtual command keys so native hosted
++			// backends can render faithful device chrome without guessing from
++			// localized labels. Remaining commands stay in the overflow menu.
++			int leftCommand = MenuActionTree.__preferredCommand(
++				__add, 0, -1);
++			int rightCommand = MenuActionTree.__preferredCommand(
++				__add, 1, leftCommand);
++			if (leftCommand < 0)
++				leftCommand = MenuActionTree.__preferredCommand(
++					__add, -1, rightCommand);
++			if (rightCommand < 0)
++				rightCommand = MenuActionTree.__preferredCommand(
++					__add, -1, leftCommand);
++			for (int i = 0; i < n; i++)
++				if (__add[i] instanceof Command &&
++					leaves[i]._scritch instanceof ScritchMenuItemBracket)
++					menuApi.menuItemSetKey(
++						(ScritchMenuItemBracket)leaves[i]._scritch,
++						i == leftCommand ?
++							NonStandardKey.VGAME_COMMAND_LEFT :
++						(i == rightCommand ?
++							NonStandardKey.VGAME_COMMAND_RIGHT :
++							NonStandardKey.UNKNOWN), 0);
+ 			
+ 			// Setup leaves first
+ 			for (int i = 0; i < n; i++)
+@@ -197,4 +226,64 @@ public final class MenuActionTree
+ 				label);
+ 		}
+ 	}
++
++	/**
++	 * Returns the highest-priority command matching the requested semantic
++	 * side. A negative side value accepts any command.
++	 *
++	 * @param __actions Actions to inspect.
++	 * @param __negative {@code 1} for negative, {@code 0} for affirmative,
++	 * or a negative value for either.
++	 * @param __skip Index which must not be selected.
++	 * @return The matching index, or {@code -1}.
++	 * @since 2026/07/21
++	 */
++	private static int __preferredCommand(MenuActionHasParent[] __actions,
++		int __negative, int __skip)
++	{
++		int result = -1;
++		int priority = Integer.MAX_VALUE;
++
++		for (int i = 0, n = __actions.length; i < n; i++)
++		{
++			if (i == __skip || !(__actions[i] instanceof Command))
++				continue;
++
++			Command command = (Command)__actions[i];
++			if (__negative >= 0 &&
++				(__negative != 0) != MenuActionTree.__isNegative(command))
++				continue;
++
++			int checkPriority = command.getPriority();
++			if (result < 0 || checkPriority < priority)
++			{
++				result = i;
++				priority = checkPriority;
++			}
++		}
++
++		return result;
++	}
++
++	/**
++	 * Returns whether the command has negative/navigation semantics.
++	 *
++	 * @param __command Command to inspect.
++	 * @return Whether it belongs on the right softkey.
++	 * @since 2026/07/21
++	 */
++	private static boolean __isNegative(Command __command)
++	{
++		switch (__command.getCommandType())
++		{
++			case Command.BACK:
++			case Command.CANCEL:
++			case Command.EXIT:
++			case Command.STOP:
++				return true;
++
++			default:
++				return false;
++		}
++	}
+ }
+diff --git a/modules/midp-lcdui/src/main/java/javax/microedition/lcdui/Displayable.java b/modules/midp-lcdui/src/main/java/javax/microedition/lcdui/Displayable.java
+index 29b71b8..f068ac8 100644
+--- a/modules/midp-lcdui/src/main/java/javax/microedition/lcdui/Displayable.java
++++ b/modules/midp-lcdui/src/main/java/javax/microedition/lcdui/Displayable.java
+@@ -92,7 +92,7 @@ public abstract class Displayable
+ 			Displayable.__defaultTitle());
+ 		
+ 		// Setup default menu
+-		Menu menuDefault = new Menu("App", "Application",
++		Menu menuDefault = new Menu("Options", "Options",
+ 			null);
+ 		this._menuDefault = menuDefault;
+ 		
+@@ -803,4 +803,3 @@ public abstract class Displayable
+ 	}
+ }
+ 
+-
+diff --git a/nanocoat/include/lib/scritchui/gtk2/gtk2.h b/nanocoat/include/lib/scritchui/gtk2/gtk2.h
+index 0974672..de5790e 100644
+--- a/nanocoat/include/lib/scritchui/gtk2/gtk2.h
++++ b/nanocoat/include/lib/scritchui/gtk2/gtk2.h
+@@ -55,6 +55,9 @@ extern "C" {
+ 
+ /** Storage for the current menu bar in a window. */
+ #define SJME_SUI_GTK2_H_WINBAR 2
++
++/** Proxy button for a menu action shown in hosted softkey chrome. */
++#define SJME_SUI_GTK2_H_SOFTKEY 2
+ 	
+ /** The global state accelerator group. */
+ #define SJME_SUI_GTK2_H_ACCELG 3
+diff --git a/nanocoat/lib/scritchui/gtk2/gtk2Container.c b/nanocoat/lib/scritchui/gtk2/gtk2Container.c
+index 977b680..105974f 100644
+--- a/nanocoat/lib/scritchui/gtk2/gtk2Container.c
++++ b/nanocoat/lib/scritchui/gtk2/gtk2Container.c
+@@ -51,7 +51,7 @@ sjme_errorCode sjme_scritchui_gtk2_containerAdd(
+ 				.handle[SJME_SUI_GTK2_H_WINTABLE];
+ 			gtk_table_attach(GTK_TABLE(windowTarget),
+ 				GTK_WIDGET(addWidget),
+-				0, 1, 1, 2,
++				0, 1, 0, 1,
+ 				GTK_FILL | GTK_EXPAND,
+ 				GTK_FILL | GTK_EXPAND,
+ 				0, 0);
+diff --git a/nanocoat/lib/scritchui/gtk2/gtk2Intern.c b/nanocoat/lib/scritchui/gtk2/gtk2Intern.c
+index 908b91e..2036856 100644
+--- a/nanocoat/lib/scritchui/gtk2/gtk2Intern.c
++++ b/nanocoat/lib/scritchui/gtk2/gtk2Intern.c
+@@ -46,6 +46,8 @@ static const sjme_scritchui_gtk2_intern_keyMap sjme_gtkKeyMap[] =
+ 	{GDK_KEY_KP_Down, SJME_SCRITCHINPUT_KEY_DOWN},
+ 	{GDK_KEY_End, SJME_SCRITCHINPUT_KEY_END},
+ 	{GDK_KEY_KP_End, SJME_SCRITCHINPUT_KEY_END},
++	{GDK_KEY_F1, SJME_SCRITCHINPUT_KEY_VGAME_COMMAND_LEFT},
++	{GDK_KEY_F2, SJME_SCRITCHINPUT_KEY_VGAME_COMMAND_RIGHT},
+ 	{GDK_KEY_F1, SJME_SCRITCHINPUT_KEY_F1},
+ 	{GDK_KEY_F2, SJME_SCRITCHINPUT_KEY_F2},
+ 	{GDK_KEY_F3, SJME_SCRITCHINPUT_KEY_F3},
+diff --git a/nanocoat/lib/scritchui/gtk2/gtk2Label.c b/nanocoat/lib/scritchui/gtk2/gtk2Label.c
+index 440edb4..3f5b697 100644
+--- a/nanocoat/lib/scritchui/gtk2/gtk2Label.c
++++ b/nanocoat/lib/scritchui/gtk2/gtk2Label.c
+@@ -19,6 +19,7 @@ sjme_errorCode sjme_scritchui_gtk2_labelSetString(
+ {
+ 	GtkWidget* gtkWidget;
+ 	GtkWidget* gtkWidgetB;
++	GtkWidget* softkey;
+ 	
+ 	if (inState == NULL || inCommon == NULL)
+ 		return SJME_ERROR_NULL_ARGUMENTS;
+@@ -26,6 +27,7 @@ sjme_errorCode sjme_scritchui_gtk2_labelSetString(
+ 	/* Recover handle. */
+ 	gtkWidget = inCommon->handle[SJME_SUI_GTK2_H_WIDGET];
+ 	gtkWidgetB = inCommon->handle[SJME_SUI_GTK2_H_TOP_WIDGET];
++	softkey = inCommon->handle[SJME_SUI_GTK2_H_SOFTKEY];
+ 	
+ 	/* Depends on the type. */
+ 	switch (inCommon->type)
+@@ -35,11 +37,15 @@ sjme_errorCode sjme_scritchui_gtk2_labelSetString(
+ 			gtk_menu_set_title(GTK_MENU(gtkWidget), inString);
+ 			gtk_menu_item_set_label(GTK_MENU_ITEM(gtkWidgetB),
+ 				inString);
++			if (softkey != NULL)
++				gtk_button_set_label(GTK_BUTTON(softkey), inString);
+ 			break;
+ 		
+ 		case SJME_SCRITCHUI_TYPE_MENU_ITEM:
+ 			gtk_menu_item_set_label(GTK_MENU_ITEM(gtkWidget),
+ 				inString);
++			if (softkey != NULL)
++				gtk_button_set_label(GTK_BUTTON(softkey), inString);
+ 			break;
+ 		
+ 			/* This is simple enough, nothing fancy. */
+diff --git a/nanocoat/lib/scritchui/gtk2/gtk2Menu.c b/nanocoat/lib/scritchui/gtk2/gtk2Menu.c
+index adfe3c4..035b466 100644
+--- a/nanocoat/lib/scritchui/gtk2/gtk2Menu.c
++++ b/nanocoat/lib/scritchui/gtk2/gtk2Menu.c
+@@ -14,13 +14,13 @@
+ #include "lib/scritchui/scritchuiTypes.h"
+ #include "sjme/alloc.h"
+ 
+-static gboolean sjme_scritchui_gtk2_eventActivate(GtkMenuItem* gtkMenuItem,
++static gboolean sjme_scritchui_gtk2_eventActivate(GtkWidget* gtkWidget,
+ 	gpointer data)
+ {
+ 	sjme_scritchui inState;
+ 	sjme_scritchui_uiMenuKind inMenuItem;
+ 	
+-	if (gtkMenuItem == NULL || data == NULL)
++	if (gtkWidget == NULL || data == NULL)
+ 		return FALSE;
+ 	
+ 	/* Restore component. */
+@@ -36,6 +36,100 @@ static gboolean sjme_scritchui_gtk2_eventActivate(GtkMenuItem* gtkMenuItem,
+ 	return FALSE;
+ }
+ 
++static void sjme_scritchui_gtk2_eventSoftkeyMenu(GtkButton* gtkButton,
++	gpointer data)
++{
++	sjme_scritchui_uiMenu inMenu;
++	GtkWidget* menuWidget;
++
++	if (gtkButton == NULL || data == NULL)
++		return;
++
++	inMenu = (sjme_scritchui_uiMenu)data;
++	menuWidget = inMenu->menuKind.common
++		.handle[SJME_SUI_GTK2_H_WIDGET];
++	if (menuWidget != NULL)
++		gtk_menu_popup(GTK_MENU(menuWidget), NULL, NULL, NULL, NULL,
++			0, gtk_get_current_event_time());
++}
++
++static void sjme_scritchui_gtk2_removeSoftkey(GtkWidget* widget,
++	gpointer softkeyBar)
++{
++	gtk_container_remove(GTK_CONTAINER(softkeyBar), widget);
++}
++
++static void sjme_scritchui_gtk2_refreshSoftkeys(
++	sjme_scritchui_uiMenu inMenu, sjme_jint skipIndex)
++{
++	sjme_jint i, n;
++	sjme_scritchui_uiMenuKind parent;
++	sjme_scritchui_uiMenuKind child;
++	sjme_scritchui_uiMenuItem menuItem;
++	GtkWidget* softkeyBar;
++	GtkWidget* left;
++	GtkWidget* right;
++	GtkWidget* options;
++	sjme_jint overflow;
++
++	if (inMenu == NULL)
++		return;
++
++	parent = inMenu->parent.parent;
++	if (parent == NULL ||
++		parent->common.type != SJME_SCRITCHUI_TYPE_MENU_BAR)
++		return;
++
++	softkeyBar = parent->common.handle[SJME_SUI_GTK2_H_TOP_WIDGET];
++	if (softkeyBar == NULL)
++		return;
++
++	/* Rebuild the tiny fixed-capacity footer from semantic key markers. */
++	gtk_container_foreach(GTK_CONTAINER(softkeyBar),
++		sjme_scritchui_gtk2_removeSoftkey, softkeyBar);
++	left = NULL;
++	right = NULL;
++	overflow = 0;
++	n = inMenu->children.numChildren;
++	for (i = 0; i < n; i++)
++	{
++		if (i == skipIndex)
++			continue;
++		child = inMenu->children.children->elements[i];
++		if (child == NULL ||
++			child->common.type != SJME_SCRITCHUI_TYPE_MENU_ITEM)
++		{
++			overflow++;
++			continue;
++		}
++
++		menuItem = (sjme_scritchui_uiMenuItem)child;
++		if (menuItem->accelKey ==
++			SJME_SCRITCHINPUT_KEY_VGAME_COMMAND_LEFT)
++			left = child->common.handle[SJME_SUI_GTK2_H_SOFTKEY];
++		else if (menuItem->accelKey ==
++			SJME_SCRITCHINPUT_KEY_VGAME_COMMAND_RIGHT)
++			right = child->common.handle[SJME_SUI_GTK2_H_SOFTKEY];
++		else
++			overflow++;
++	}
++
++	if (left != NULL)
++		gtk_box_pack_start(GTK_BOX(softkeyBar), left, TRUE, TRUE, 0);
++	if (overflow > 0)
++	{
++		options = inMenu->menuKind.common
++			.handle[SJME_SUI_GTK2_H_SOFTKEY];
++		if (options != NULL)
++			gtk_box_pack_start(GTK_BOX(softkeyBar), options,
++				TRUE, TRUE, 0);
++	}
++	if (right != NULL)
++		gtk_box_pack_start(GTK_BOX(softkeyBar), right, TRUE, TRUE, 0);
++
++	gtk_widget_show_all(softkeyBar);
++}
++
+ static void sjme_scritchui_gtk2_setMenuSize(
+ 	sjme_attrInNotNull sjme_scritchui inState,
+ 	sjme_attrInNotNull sjme_scritchui_uiComponent inComponent,
+@@ -73,23 +167,28 @@ sjme_errorCode sjme_scritchui_gtk2_menuBarNew(
+ 	sjme_attrInNullable sjme_pointer ignored)
+ {
+ 	GtkWidget* widget;
++	GtkWidget* softkeyBar;
+ 	
+ 	if (inState == NULL || inMenuBar == NULL)
+ 		return SJME_ERROR_NULL_ARGUMENTS;
+ 	
+ 	/* Create new bar. */
+ 	widget = gtk_menu_bar_new();
++	softkeyBar = gtk_hbox_new(TRUE, 2);
+ 	
+ 	/* Store handle for later. */
+ 	inMenuBar->menuKind.common
+ 		.handle[SJME_SUI_GTK2_H_WIDGET] = widget;
++	inMenuBar->menuKind.common
++		.handle[SJME_SUI_GTK2_H_TOP_WIDGET] = softkeyBar;
+ 
+ 	/* Do not lose the menu bar. */
+ 	g_object_ref(widget);
++	g_object_ref(softkeyBar);
+ 	
+ 	/* Set a reasonable size. */
+ 	sjme_scritchui_gtk2_setMenuSize(inState,
+-		SJME_SUI_CAST_COMPONENT(inMenuBar), widget);
++		SJME_SUI_CAST_COMPONENT(inMenuBar), softkeyBar);
+ 	
+ 	/* Success? */
+ 	return inState->implIntern->checkError(inState, SJME_ERROR_NONE);
+@@ -131,6 +230,15 @@ sjme_errorCode sjme_scritchui_gtk2_menuInsert(
+ 	/* Menu items need to be shown, otherwise they will be invisible. */
+ 	gtk_widget_show(intoWidget);
+ 	gtk_widget_show(childWidget);
++
++	/* A root application menu owns the hosted softkey footer. */
++	if (intoMenu->common.type == SJME_SCRITCHUI_TYPE_MENU_BAR &&
++		childItem->common.type == SJME_SCRITCHUI_TYPE_MENU)
++		sjme_scritchui_gtk2_refreshSoftkeys(
++			(sjme_scritchui_uiMenu)childItem, -1);
++	else if (intoMenu->common.type == SJME_SCRITCHUI_TYPE_MENU)
++		sjme_scritchui_gtk2_refreshSoftkeys(
++			(sjme_scritchui_uiMenu)intoMenu, -1);
+ 	
+ 	/* Success? */
+ 	return inState->implIntern->checkError(inState, SJME_ERROR_NONE);
+@@ -142,6 +250,7 @@ sjme_errorCode sjme_scritchui_gtk2_menuItemNew(
+ 	sjme_attrInNotNull const sjme_scritchui_impl_initParamMenuItem* init)
+ {
+ 	GtkWidget* widget;
++	GtkWidget* softkey;
+ 	GtkAccelGroup* gtkAccel;
+ 	
+ 	if (inState == NULL || inMenuItem == NULL)
+@@ -149,14 +258,20 @@ sjme_errorCode sjme_scritchui_gtk2_menuItemNew(
+ 	
+ 	/* Create new item. */
+ 	widget = gtk_menu_item_new();
++	softkey = gtk_button_new();
+ 	
+ 	/* Store handle for later. */
+ 	inMenuItem->menuKind.common
+ 		.handle[SJME_SUI_GTK2_H_WIDGET] = widget;
++	inMenuItem->menuKind.common
++		.handle[SJME_SUI_GTK2_H_SOFTKEY] = softkey;
++	g_object_ref(softkey);
+ 	
+ 	/* Menu items can be activated, activation propagates up. */
+ 	g_signal_connect(widget, "activate",
+ 		G_CALLBACK(sjme_scritchui_gtk2_eventActivate), inMenuItem);
++	g_signal_connect(softkey, "clicked",
++		G_CALLBACK(sjme_scritchui_gtk2_eventActivate), inMenuItem);
+ 	
+ 	/* Set a reasonable size. */
+ 	sjme_scritchui_gtk2_setMenuSize(inState,
+@@ -173,6 +288,7 @@ sjme_errorCode sjme_scritchui_gtk2_menuNew(
+ {
+ 	GtkWidget* menuWidget;
+ 	GtkWidget* itemLike;
++	GtkWidget* softkey;
+ 	
+ 	if (inState == NULL || inMenu == NULL)
+ 		return SJME_ERROR_NULL_ARGUMENTS;
+@@ -182,6 +298,7 @@ sjme_errorCode sjme_scritchui_gtk2_menuNew(
+ 	
+ 	/* All menu pieces are essentially items that get added into. */
+ 	itemLike = gtk_menu_item_new();
++	softkey = gtk_button_new();
+ 	gtk_menu_item_set_submenu(GTK_MENU_ITEM(itemLike),
+ 		menuWidget);
+ 
+@@ -192,10 +309,14 @@ sjme_errorCode sjme_scritchui_gtk2_menuNew(
+ 	inMenu->menuKind.common
+ 		.handle[SJME_SUI_GTK2_H_WIDGET] = menuWidget;
+ 	inMenu->menuKind.common.handle[SJME_SUI_GTK2_H_TOP_WIDGET] = itemLike;
++	inMenu->menuKind.common.handle[SJME_SUI_GTK2_H_SOFTKEY] = softkey;
+ 
+ 	/* Do not lose the item nor the menu. */
+ 	g_object_ref(menuWidget);
+ 	g_object_ref(itemLike);
++	g_object_ref(softkey);
++	g_signal_connect(softkey, "clicked",
++		G_CALLBACK(sjme_scritchui_gtk2_eventSoftkeyMenu), inMenu);
+ 	
+ 	/* Success? */
+ 	return inState->implIntern->checkError(inState, SJME_ERROR_NONE);
+@@ -211,6 +332,7 @@ sjme_errorCode sjme_scritchui_gtk2_menuRemove(
+ 	sjme_scritchui_uiMenuKind childItem;
+ 	GtkWidget* menuWidget;
+ 	GtkWidget* removeWidget;
++	GtkWidget* softkeyBar;
+ 	
+ 	if (inState == NULL || fromMenu == NULL)
+ 		return SJME_ERROR_NULL_ARGUMENTS;
+@@ -244,6 +366,19 @@ sjme_errorCode sjme_scritchui_gtk2_menuRemove(
+ 	/* but instead container based removal, so we just remove the handle. */
+ 	gtk_container_remove(GTK_CONTAINER(menuWidget),
+ 		removeWidget);
++
++	/* The core child list is updated after this function returns. */
++	if (fromMenu->common.type == SJME_SCRITCHUI_TYPE_MENU)
++		sjme_scritchui_gtk2_refreshSoftkeys(
++			(sjme_scritchui_uiMenu)fromMenu, atIndex);
++	else if (fromMenu->common.type == SJME_SCRITCHUI_TYPE_MENU_BAR)
++	{
++		softkeyBar = fromMenu->common
++			.handle[SJME_SUI_GTK2_H_TOP_WIDGET];
++		if (softkeyBar != NULL)
++			gtk_container_foreach(GTK_CONTAINER(softkeyBar),
++				sjme_scritchui_gtk2_removeSoftkey, softkeyBar);
++	}
+ 	
+ 	/* Success? */
+ 	return inState->implIntern->checkError(inState, SJME_ERROR_NONE);
+diff --git a/nanocoat/lib/scritchui/gtk2/gtk2Window.c b/nanocoat/lib/scritchui/gtk2/gtk2Window.c
+index 73e687a..10e767f 100644
+--- a/nanocoat/lib/scritchui/gtk2/gtk2Window.c
++++ b/nanocoat/lib/scritchui/gtk2/gtk2Window.c
+@@ -231,10 +231,9 @@ sjme_errorCode sjme_scritchui_gtk2_windowGetFrame(
+ 		resultContent.d.width = alloc.width;
+ 		resultContent.d.height = alloc.height;
+ 		
+-		/* Is there a menu to consider? */
++		/* Is there hosted softkey chrome to consider below the LCD? */
+ 		if (menuH > 0)
+ 		{
+-			resultContent.s.y += menuH;
+ 			resultContent.d.height -= menuH;
+ 		}
+ 	}
+@@ -267,7 +266,7 @@ sjme_errorCode sjme_scritchui_gtk2_windowNew(
+ 	if (gtkWindow == NULL)
+ 		goto fail_newWindow;
+ 	
+-	/* Table for menu bar and main content. */
++	/* Table for main LCD content and the hosted softkey footer. */
+ 	gtkTable = (GtkTable*)gtk_table_new(2, 1, FALSE);
+ 	if (gtkTable == NULL)
+ 		goto fail_newTable;
+@@ -356,8 +355,8 @@ sjme_errorCode sjme_scritchui_gtk2_windowSetMenuBar(
+ 	sjme_errorCode error;
+ 	GtkWindow* gtkWindow;
+ 	GdkWindow* windowGdkWindow; 
+-	GtkMenuBar* gtkMenuBar;
+-	GtkMenuBar* gtkExistingBar;
++	GtkWidget* gtkMenuBar;
++	GtkWidget* gtkExistingBar;
+ 	GtkTable* gtkTable;
+ 	
+ 	if (inState == NULL || inWindow == NULL)
+@@ -370,7 +369,7 @@ sjme_errorCode sjme_scritchui_gtk2_windowSetMenuBar(
+ 	if (inMenuBar == NULL)
+ 		gtkMenuBar = NULL;
+ 	else
+-		gtkMenuBar = inMenuBar->menuKind.common.handle[SJME_SUI_GTK2_H_WIDGET];
++		gtkMenuBar = inMenuBar->menuKind.common.handle[SJME_SUI_GTK2_H_TOP_WIDGET];
+ 	
+ 	/* If a menu bar is already here, remove it */
+ 	if (gtkExistingBar != NULL)
+@@ -386,14 +385,14 @@ sjme_errorCode sjme_scritchui_gtk2_windowSetMenuBar(
+ 		g_object_unref(gtkExistingBar);
+ 	}
+ 	
+-	/* Place into the table at the top. */
++	/* Place below the emulated LCD as device-style softkey chrome. */
+ 	if (gtkMenuBar != NULL)
+ 	{
+-		/* Attach to top of table, do not allow the menu to shrink on the */
++		/* Attach below the LCD, do not allow the footer to shrink on the */
+ 		/* Y axis. */
+ 		gtk_table_attach(GTK_TABLE(gtkTable),
+ 			GTK_WIDGET(gtkMenuBar),
+-			0, 1, 0, 1,
++			0, 1, 1, 2,
+ 			GTK_FILL | GTK_EXPAND,
+ 			0,
+ 			0, 0);

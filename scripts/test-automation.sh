@@ -44,6 +44,9 @@ expect_status 64 'restore gate requires explicit state' \
 expect_status 64 'broad emulator cleanup requires an explicit flag' \
   env -u SQUIRRELJME_MCP_PORT bash "${ROOT_DIR}/scripts/stop-emulator.sh"
 
+expect_status 1 'release tag must match the MIDlet version' \
+  bash "${ROOT_DIR}/scripts/package-release.sh" v99.0.0-preview.1
+
 if [[ "$(uname -s)" == 'Linux' ]]; then
   expect_status 69 'displayless UI verification fails before emulator startup' \
     env -u DISPLAY bash "${ROOT_DIR}/scripts/verify-ui.sh"

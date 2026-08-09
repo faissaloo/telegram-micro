@@ -1,10 +1,23 @@
 # TelegramMicro
 
 [![License: GPL v2](https://img.shields.io/badge/License-GPL%20v2-blue.svg)](https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html)
+[![Release: preview](https://img.shields.io/badge/release-v0.1.0--preview.1-orange.svg)](https://github.com/faissaloo/telegram-micro/releases/tag/v0.1.0-preview.1)
 
 TelegramMicro is an experimental Telegram client for CLDC 1.1/MIDP 2.1 phones. Its design target is the Nokia C2-01: bounded memory, keypad-first interaction, recoverable state, and protocol correctness take priority over broad desktop-style parity.
 
 It is not yet an everyday-ready client. The repository has deterministic build/test automation and bounded foundations for authentication, sessions, dialogs/history and in-chat search, updates, outbound text, limited media, and secret-chat lifecycle work. Interoperability breadth and real-device proof remain incomplete; see [the roadmap](docs/parity-roadmap.md) and [device checklist](docs/device-proof.md).
+
+The first published build is a developer preview. Download its JAR/JAD from [v0.1.0-preview.1](https://github.com/faissaloo/telegram-micro/releases/tag/v0.1.0-preview.1), and read the [release-readiness assessment](docs/release-readiness.md) before installing it. The public binary is intentionally credential-free, so it can inspect startup and device/runtime compatibility but cannot request a Telegram login code. A functional account build requires your own Telegram API ID/hash as described below.
+
+## Screenshots
+
+These are sanitized, account-free captures from deterministic SquirrelJME fixtures. They demonstrate the 240x320-targeted application surface, not physical-device proof.
+
+<p align="center">
+  <img src="docs/images/secure-setup.png" width="220" alt="One-time secure setup entropy collection screen">
+  <img src="docs/images/history-message-state.png" width="220" alt="Bounded chat history with timestamps and sent/read state">
+  <img src="docs/images/message-search-results.png" width="220" alt="Bounded in-chat search result screen">
+</p>
 
 ## Quick start
 
@@ -20,8 +33,16 @@ Bootstrap pins SquirrelJME to the commit recorded in `scripts/common.sh`, applie
 
 Build outputs are:
 
-- `bin/TelegramMicro.jar`
-- `bin/TelegramMicro.jad`
+- `build/dist/TelegramMicro.jar`
+- `build/dist/TelegramMicro.jad`
+
+Prepare a credential-free public release bundle with:
+
+```sh
+./scripts/package-release.sh v0.1.0-preview.1
+```
+
+The packager fails closed if generated credentials are present and writes the JAR, JAD, and `SHA256SUMS` under `build/release/`.
 
 ## Verification lanes
 
@@ -97,6 +118,7 @@ Sign-in stores reusable emulator state under its ignored evidence directory and 
 - [Telegram feature matrix](docs/telegram-feature-matrix.md)
 - [Keypad-first UX guidance](docs/ux-guidelines.md)
 - [J2ME runtime emulation and quirk evidence](docs/runtime-emulation.md)
+- [Release readiness and feature-completeness assessment](docs/release-readiness.md)
 - [Agent development contract](AGENTS.md)
 
 Local Telegram/MTProto reference implementations are under the ignored `references/ps2` tree. Protocol changes should be reference-first and should include hostile boundary tests.

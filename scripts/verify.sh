@@ -53,6 +53,8 @@ else
   ./scripts/verify-runtime-profiles.sh
   printf '[verify] hosted keyboard input routing\n'
   ./scripts/verify-squirreljme-input-routing.sh
+  printf '[verify] hosted semantic softkeys\n'
+  ./scripts/verify-squirreljme-softkeys.sh
 fi
 
 if [[ "${RUN_UI}" == '1' ]]; then

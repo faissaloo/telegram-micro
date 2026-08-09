@@ -40,6 +40,7 @@ CMAKE_TARBALL_SHA256="${TELEGRAM_MICRO_CMAKE_TARBALL_SHA256:-${DEFAULT_CMAKE_TAR
 APP_JAR="${DIST_DIR}/TelegramMicro.jar"
 APP_JAD="${DIST_DIR}/TelegramMicro.jad"
 TEST_JAR="${DIST_DIR}/TelegramMicroTests.jar"
+APP_VERSION='0.1.0'
 PATCH_FINGERPRINT_FILE="${SQUIRRELJME_DIR}/.telegrammicro-patch-fingerprint"
 PATCH_APPLIED_FINGERPRINT_FILE="${SQUIRRELJME_DIR}/.telegrammicro-applied-patch-fingerprint"
 
@@ -67,7 +68,9 @@ load_local_credentials() {
   done
 }
 
-load_local_credentials
+if [[ "${TELEGRAM_MICRO_IGNORE_LOCAL_CREDENTIALS:-0}" != '1' ]]; then
+  load_local_credentials
+fi
 
 require_command() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -254,8 +257,11 @@ verify_squirreljme_patch_sources() {
     'emulators/emulator-base/src/main/java/cc/squirreljme/emulator/scritchui/dylib/DylibMcpServer.java'
     'emulators/emulator-base/src/main/java/cc/squirreljme/emulator/vm/RuntimeProfile.java'
     'emulators/emulator-base/src/main/resources/META-INF/services/cc.squirreljme.runtime.gcf.IPConnectionFactory'
+    'modules/midp-lcdui/src/main/java/cc/squirreljme/runtime/lcdui/scritchui/MenuActionTree.java'
     'modules/midp-lcdui/src/main/java/javax/microedition/lcdui/__ExecFormInput__.java'
     'modules/midp-lcdui/src/main/java/javax/microedition/lcdui/__ExecFormPaint__.java'
+    'nanocoat/lib/scritchui/gtk2/gtk2Menu.c'
+    'nanocoat/lib/scritchui/gtk2/gtk2Window.c'
   )
 
   for required in "${required_sources[@]}"; do
@@ -486,12 +492,12 @@ compile_test_classes() {
 
 write_app_manifest() {
   local target="$1"
-  cat > "${target}" <<'EOF'
+  cat > "${target}" <<EOF
 MIDlet-1: TelegramMicro, , TelegramMicro
 MIDlet-Info-URL: https://github.com/faissaloo/telegram-micro
 MIDlet-Name: TelegramMicro
 MIDlet-Vendor: Faissaloo
-MIDlet-Version: 1.0
+MIDlet-Version: ${APP_VERSION}
 Nokia-MIDlet-Original-Display-Size: 240,320
 X-SquirrelJME-Resolution: 240x320
 MicroEdition-Configuration: CLDC-1.1
@@ -516,7 +522,7 @@ MIDlet-4: GcfSocketProbe, , runtime.GcfSocketProbeMidlet
 MIDlet-5: RuntimeProfileProbe, , runtime.RuntimeProfileProbeMidlet
 MIDlet-Name: TelegramMicroTests
 MIDlet-Vendor: Faissaloo
-MIDlet-Version: 1.0
+MIDlet-Version: ${APP_VERSION}
 TelegramMicro-Test-Mode: ${test_mode}
 Nokia-MIDlet-Original-Display-Size: 240,320
 X-SquirrelJME-Resolution: 240x320
@@ -535,7 +541,7 @@ MIDlet-Jar-Size: ${jar_size}
 MIDlet-Jar-URL: TelegramMicro.jar
 MIDlet-Name: TelegramMicro
 MIDlet-Vendor: Faissaloo
-MIDlet-Version: 1.0
+MIDlet-Version: ${APP_VERSION}
 Nokia-MIDlet-Original-Display-Size: 240,320
 X-SquirrelJME-Resolution: 240x320
 MicroEdition-Configuration: CLDC-1.1

@@ -42,6 +42,14 @@ require_source "${MENU_SOURCE}" 'gtk_button_new()' \
   'hosted commands are not exposed as clickable buttons'
 require_source "${MENU_SOURCE}" 'gtk_menu_popup(GTK_MENU(menuWidget)' \
   'overflow commands are not exposed through Options'
+require_source "${MENU_SOURCE}" 'gtk_test_widget_send_key(focus, GDK_Return, 0)' \
+  'the centre hardware control no longer emits Enter/select'
+require_source "${MENU_SOURCE}" 'gtk_widget_set_sensitive(left, FALSE)' \
+  'an unassigned left hardware control disappears'
+require_source "${MENU_SOURCE}" 'gtk_widget_set_sensitive(right, FALSE)' \
+  'an unassigned right hardware control disappears'
+require_source "${MENU_SOURCE}" 'gtk_box_pack_start(GTK_BOX(softkeyBar), center' \
+  'the centre hardware control is not in the footer'
 require_source "${WINDOW_SOURCE}" '0, 1, 1, 2,' \
   'the softkey footer is not attached below the LCD'
 require_source "${CONTAINER_SOURCE}" '0, 1, 0, 1,' \
@@ -52,4 +60,4 @@ if grep -Eq 'strcmp|strcasecmp|strstr' "${MENU_SOURCE}"; then
   exit 1
 fi
 
-printf 'Patched GTK2 commands use semantic two-softkey footer placement.\n'
+printf 'Patched GTK2 uses semantic commands with left/select/right hardware controls.\n'

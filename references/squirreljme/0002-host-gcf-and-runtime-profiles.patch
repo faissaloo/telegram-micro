@@ -447,7 +447,7 @@ new file mode 100644
 index 0000000000..229681b75a
 --- /dev/null
 +++ b/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/vm/RuntimeProfile.java
-@@ -0,0 +1,101 @@
+@@ -0,0 +1,136 @@
 +// -*- Mode: Java; indent-tabs-mode: t; tab-width: 4 -*-
 +// ---------------------------------------------------------------------------
 +// SquirrelJME
@@ -460,6 +460,7 @@ index 0000000000..229681b75a
 +package cc.squirreljme.emulator.vm;
 +
 +import java.util.Locale;
++import java.util.Map;
 +
 +/**
 + * Validated runtime identity used as the boundary for quirk emulation.
@@ -484,6 +485,10 @@ index 0000000000..229681b75a
 +
 +	/** Nokia Java Runtime used by later Series 40 devices. */
 +	public static final String NOKIA_JRT = "nokia-jrt";
++
++	/** Nokia C2-01 RM-721/RM-722 firmware 11.40 S40 PR9.1. */
++	public static final String NOKIA_S40_PR91_RM72X_V1140 =
++		"nokia-s40-pr9.1-rm72x-v11.40";
 +
 +	/** Myriad's Jbed runtime. */
 +	public static final String MYRIAD_JBED = "myriad-jbed";
@@ -523,6 +528,7 @@ index 0000000000..229681b75a
 +		if (RuntimeProfile.IDEAL.equals(profile) ||
 +			RuntimeProfile.NOKIA_KVM.equals(profile) ||
 +			RuntimeProfile.NOKIA_JRT.equals(profile) ||
++			RuntimeProfile.NOKIA_S40_PR91_RM72X_V1140.equals(profile) ||
 +			RuntimeProfile.MYRIAD_JBED.equals(profile) ||
 +			RuntimeProfile.APLIX_JBLEND.equals(profile) ||
 +			RuntimeProfile.IBM_J9.equals(profile) ||
@@ -534,6 +540,9 @@ index 0000000000..229681b75a
 +			return RuntimeProfile.NOKIA_KVM;
 +		if ("jrt".equals(profile))
 +			return RuntimeProfile.NOKIA_JRT;
++		if ("c2-01-v11.40".equals(profile) ||
++			"rm72x-v11.40".equals(profile))
++			return RuntimeProfile.NOKIA_S40_PR91_RM72X_V1140;
 +		if ("jbed".equals(profile))
 +			return RuntimeProfile.MYRIAD_JBED;
 +		if ("jblend".equals(profile))
@@ -547,6 +556,32 @@ index 0000000000..229681b75a
 +
 +		throw new IllegalArgumentException(
 +			"Unknown runtime profile: " + __profile);
++	}
++
++	/**
++	 * Applies system properties directly confirmed by the selected runtime
++	 * evidence. This must not add inferred limits or behavioral quirks.
++	 *
++	 * @param __profile Normalized runtime profile.
++	 * @param __properties Properties passed to the target VM.
++	 * @throws NullPointerException If either argument is {@code null}.
++	 * @since 2026/08/10
++	 */
++	public static void applyConfirmedProperties(String __profile,
++		Map<String, String> __properties)
++		throws NullPointerException
++	{
++		if (__profile == null || __properties == null)
++			throw new NullPointerException("NARG");
++
++		if (!RuntimeProfile.NOKIA_S40_PR91_RM72X_V1140.equals(__profile))
++			return;
++
++		__properties.put("microedition.configuration", "CLDC-1.1");
++		__properties.put("microedition.profiles", "MIDP-2.1");
++		__properties.put("microedition.encoding", "ISO-8859-1");
++		__properties.put("microedition.jtwi.version", "1.0");
++		__properties.put("microedition.msa.version", "1.0-SUBSET");
 +	}
 +}
 diff --git a/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/vm/VMFactory.java b/emulators/emulator-base/src/main/java/cc/squirreljme/emulator/vm/VMFactory.java
@@ -573,14 +608,17 @@ index ef98dda260..86181c7d7f 100644
  			// VisualVM Snapshot Dump path
  			else if (item.startsWith("-Xsnapshot:"))
  				snapshotPath = Paths.get(
-@@ -685,6 +691,11 @@ public abstract class VMFactory
+@@ -685,6 +691,14 @@ public abstract class VMFactory
  				Debugging.debugNote("Args: %s", Arrays.asList(__args));
  			}
  			
-+			// Validate the final profile after suite properties are applied.
-+			systemProperties.put(RuntimeProfile.PROPERTY,
-+				RuntimeProfile.normalize(
-+					systemProperties.get(RuntimeProfile.PROPERTY)));
++			// Validate and apply evidence-backed identity properties after
++			// suite properties have been loaded.
++			String runtimeProfile = RuntimeProfile.normalize(
++				systemProperties.get(RuntimeProfile.PROPERTY));
++			systemProperties.put(RuntimeProfile.PROPERTY, runtimeProfile);
++			RuntimeProfile.applyConfirmedProperties(runtimeProfile,
++				systemProperties);
 +
  			// Run the VM
  			VirtualMachine vm = VMFactory.mainVm(vmName,

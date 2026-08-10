@@ -18,8 +18,33 @@ public final class RuntimeProfileProbeMidlet extends MIDlet {
       System.exit(1);
     }
 
+    assertExpectedProperty("microedition.configuration");
+    assertExpectedProperty("microedition.profiles");
+    assertExpectedProperty("microedition.encoding");
+    assertExpectedProperty("microedition.jtwi.version");
+    assertExpectedProperty("microedition.msa.version");
+
     System.out.println("RUNTIME PROFILE PROBE PASSED: " + actual);
     System.exit(0);
+  }
+
+  private static void assertExpectedProperty(String property) {
+    String expected = System.getProperty(
+      "telegrammicro.expected.property." + property
+    );
+
+    if (expected == null) {
+      return;
+    }
+
+    String actual = System.getProperty(property);
+    if (!expected.equals(actual)) {
+      System.out.println(
+        "RUNTIME PROPERTY PROBE FAILED: property=" + property +
+        " expected=" + expected + " actual=" + actual
+      );
+      System.exit(1);
+    }
   }
 
   public void pauseApp() {

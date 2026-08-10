@@ -6,13 +6,14 @@ TelegramMicro targets real CLDC 1.1/MIDP phones, not one idealized desktop VM. T
 
 The pinned hosted SquirrelJME build accepts `-Xprofile:<id>`, validates aliases, and exposes the canonical value as `cc.squirreljme.runtime.profile` inside the target VM. Unknown names fail before the MIDlet starts. The default is `ideal`.
 
-At present, every vendor profile is **identity-only**: it selects a stable compatibility namespace but deliberately retains ideal behavior. The only implemented runtime correction in this patch is specification-oriented hosted GCF client TCP behavior. No Nokia, Sony Ericsson, Jbed, JBlend, J9, or Jeode behavioral divergence is claimed yet.
+At present, every vendor profile deliberately retains ideal behavior. The narrow C2-01 profile additionally supplies static firmware-confirmed system properties, which are identity data rather than behavioral quirks. The only implemented runtime correction in this patch is specification-oriented hosted GCF client TCP behavior. No Nokia, Sony Ericsson, Jbed, JBlend, J9, or Jeode behavioral divergence is claimed yet.
 
 | Canonical ID | Accepted short aliases | Current vendor-specific behavior | Evidence still required |
 | --- | --- | --- | --- |
 | `ideal` | — | Specification-oriented baseline | Continue expanding MIDP/CLDC conformance probes |
 | `nokia-kvm` | `kvm`, `nokia` | None | Exact Nokia model, firmware, runtime generation, and probe transcript |
 | `nokia-jrt` | `jrt` | None | Exact Series 40 model/JRT version and probe transcript |
+| `nokia-s40-pr9.1-rm72x-v11.40` | `c2-01-v11.40`, `rm72x-v11.40` | Confirmed identity properties only; no behavioral divergence | Physical RM-721/RM-722 11.40 probe transcript |
 | `myriad-jbed` | `jbed` | None | Exact handset/Jbed build and probe transcript |
 | `aplix-jblend` | `jblend` | None | Exact handset/JBlend build and probe transcript |
 | `ibm-j9` | `j9` | None | Exact J9 bundle/version and probe transcript |
@@ -26,6 +27,8 @@ TELEGRAM_MICRO_RUNTIME_PROFILE=nokia-jrt ./scripts/run.sh
 ```
 
 For a direct SquirrelJME launch, add `-Xprofile:nokia-jrt` to `SQUIRRELJME_VM_ARGS`. If both are present, `TELEGRAM_MICRO_RUNTIME_PROFILE` is appended last and therefore wins. This selector changes emulator behavior only; it does not rewrite TelegramMicro's production JAR.
+
+The narrow C2-01 profile is based on the static [RM-722 firmware 11.40 evidence](firmware-evidence/rm722-v11.40.md). It exposes only the confirmed CLDC, MIDP, default-encoding, JTWI, and MSA-subset properties. Static firmware strings and product configuration do not establish exception ordering, limits, or MIDP-visible command behavior, so those surfaces remain ideal pending a physical probe.
 
 ## Ideal GCF boundary
 

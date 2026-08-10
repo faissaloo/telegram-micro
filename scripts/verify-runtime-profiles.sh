@@ -21,6 +21,7 @@ run_profile() {
   local requested="$1"
   local expected="$2"
   local profile_arg="$3"
+  local property_args="${4:-}"
   local log_file="${WORK_DIR}/${requested}.log"
   local state_dir="${WORK_DIR}/${requested}-state"
   local vm_args='-Xemulator:hosted'
@@ -31,6 +32,9 @@ run_profile() {
     vm_args="${vm_args} -Xprofile:${profile_arg}"
   fi
   vm_args="${vm_args} -Dtelegrammicro.expected.runtime.profile=${expected}"
+  if [[ -n "${property_args}" ]]; then
+    vm_args="${vm_args} ${property_args}"
+  fi
 
   TELEGRAM_MICRO_EMULATOR_STATE_DIR="${state_dir}" \
   SQUIRRELJME_VM_ARGS="${vm_args}" \
@@ -50,6 +54,12 @@ run_profile default ideal ''
 run_profile ideal ideal ideal
 run_profile nokia-kvm nokia-kvm nokia-kvm
 run_profile nokia-jrt nokia-jrt nokia-jrt
+NOKIA_C2_PROPERTY_ARGS='-Dtelegrammicro.expected.property.microedition.configuration=CLDC-1.1 -Dtelegrammicro.expected.property.microedition.profiles=MIDP-2.1 -Dtelegrammicro.expected.property.microedition.encoding=ISO-8859-1 -Dtelegrammicro.expected.property.microedition.jtwi.version=1.0 -Dtelegrammicro.expected.property.microedition.msa.version=1.0-SUBSET'
+run_profile nokia-s40-pr9.1-rm72x-v11.40 \
+  nokia-s40-pr9.1-rm72x-v11.40 nokia-s40-pr9.1-rm72x-v11.40 \
+  "${NOKIA_C2_PROPERTY_ARGS}"
+run_profile c2-01-alias nokia-s40-pr9.1-rm72x-v11.40 c2-01-v11.40 \
+  "${NOKIA_C2_PROPERTY_ARGS}"
 run_profile myriad-jbed myriad-jbed myriad-jbed
 run_profile aplix-jblend aplix-jblend aplix-jblend
 run_profile ibm-j9 ibm-j9 ibm-j9

@@ -78,10 +78,11 @@ Edit the ignored local file before building. Without credentials, the login UI r
 SQUIRRELJME_MCP_PORT="$PORT" ./scripts/run.sh
 ```
 
-The emulator has a validated runtime-profile boundary. Vendor profiles are currently identity-only, not quirk-complete:
+The emulator has a validated runtime-profile boundary. Broad vendor profiles are identity-only, while the narrow C2-01 firmware profile adds confirmed system properties but no behavioral quirks:
 
 ```sh
 TELEGRAM_MICRO_RUNTIME_PROFILE=nokia-jrt ./scripts/run.sh
+TELEGRAM_MICRO_RUNTIME_PROFILE=nokia-s40-pr9.1-rm72x-v11.40 ./scripts/run.sh
 ```
 
 See [runtime-emulation.md](docs/runtime-emulation.md) for profile IDs, exact current evidence, and the device-probe requirements for adding a real runtime divergence.
@@ -118,6 +119,7 @@ Sign-in stores reusable emulator state under its ignored evidence directory and 
 - [Telegram feature matrix](docs/telegram-feature-matrix.md)
 - [Keypad-first UX guidance](docs/ux-guidelines.md)
 - [J2ME runtime emulation and quirk evidence](docs/runtime-emulation.md)
+- [Nokia C2-01 RM-722 firmware 11.40 evidence](docs/firmware-evidence/rm722-v11.40.md)
 - [Release readiness and feature-completeness assessment](docs/release-readiness.md)
 - [Agent development contract](AGENTS.md)
 

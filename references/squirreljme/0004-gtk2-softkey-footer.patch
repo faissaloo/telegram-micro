@@ -26,7 +26,7 @@ index 51b7452..4b34026 100644
  			for (int i = 0; i < n; i++)
  				leaves[i] = this.map(((MenuActionNodeOnly)__add[i])._menuNode);
 +
-+			// A two-softkey phone exposes one affirmative action on the left
++			// The hosted keypad chrome exposes one affirmative action on the left
 +			// and one negative/navigation action on the right. Mark those
 +			// semantic placements with virtual command keys so native hosted
 +			// backends can render faithful device chrome without guessing from
@@ -233,7 +233,7 @@ index adfe3c4..035b466 100644
  		return FALSE;
  	
  	/* Restore component. */
-@@ -36,6 +36,100 @@ static gboolean sjme_scritchui_gtk2_eventActivate(GtkMenuItem* gtkMenuItem,
+@@ -36,6 +36,135 @@ static gboolean sjme_scritchui_gtk2_eventActivate(GtkMenuItem* gtkMenuItem,
  	return FALSE;
  }
  
@@ -254,6 +254,24 @@ index adfe3c4..035b466 100644
 +			0, gtk_get_current_event_time());
 +}
 +
++static void sjme_scritchui_gtk2_eventSelect(GtkButton* gtkButton,
++	gpointer data)
++{
++	GtkWidget* topLevel;
++	GtkWidget* focus;
++
++	if (gtkButton == NULL)
++		return;
++
++	/* Preserve the LCD widget's focus and send its normal Enter/select key. */
++	topLevel = gtk_widget_get_toplevel(GTK_WIDGET(gtkButton));
++	if (topLevel == NULL || !GTK_IS_WINDOW(topLevel))
++		return;
++	focus = gtk_window_get_focus(GTK_WINDOW(topLevel));
++	if (focus != NULL)
++		gtk_test_widget_send_key(focus, GDK_Return, 0);
++}
++
 +static void sjme_scritchui_gtk2_removeSoftkey(GtkWidget* widget,
 +	gpointer softkeyBar)
 +{
@@ -269,8 +287,8 @@ index adfe3c4..035b466 100644
 +	sjme_scritchui_uiMenuItem menuItem;
 +	GtkWidget* softkeyBar;
 +	GtkWidget* left;
++	GtkWidget* center;
 +	GtkWidget* right;
-+	GtkWidget* options;
 +	sjme_jint overflow;
 +
 +	if (inMenu == NULL)
@@ -315,18 +333,35 @@ index adfe3c4..035b466 100644
 +			overflow++;
 +	}
 +
-+	if (left != NULL)
-+		gtk_box_pack_start(GTK_BOX(softkeyBar), left, TRUE, TRUE, 0);
++	/* The C2-01 has three physical zones even when a command is absent. */
++	if (left == NULL)
++	{
++		left = gtk_button_new();
++		gtk_widget_set_sensitive(left, FALSE);
++	}
++	gtk_box_pack_start(GTK_BOX(softkeyBar), left, TRUE, TRUE, 0);
++
++	center = NULL;
 +	if (overflow > 0)
 +	{
-+		options = inMenu->menuKind.common
++		center = inMenu->menuKind.common
 +			.handle[SJME_SUI_GTK2_H_SOFTKEY];
-+		if (options != NULL)
-+			gtk_box_pack_start(GTK_BOX(softkeyBar), options,
-+				TRUE, TRUE, 0);
 +	}
-+	if (right != NULL)
-+		gtk_box_pack_start(GTK_BOX(softkeyBar), right, TRUE, TRUE, 0);
++	if (center == NULL)
++	{
++		center = gtk_button_new_with_label("Select");
++		gtk_button_set_focus_on_click(GTK_BUTTON(center), FALSE);
++		g_signal_connect(center, "clicked",
++			G_CALLBACK(sjme_scritchui_gtk2_eventSelect), NULL);
++	}
++	gtk_box_pack_start(GTK_BOX(softkeyBar), center, TRUE, TRUE, 0);
++
++	if (right == NULL)
++	{
++		right = gtk_button_new();
++		gtk_widget_set_sensitive(right, FALSE);
++	}
++	gtk_box_pack_start(GTK_BOX(softkeyBar), right, TRUE, TRUE, 0);
 +
 +	gtk_widget_show_all(softkeyBar);
 +}
@@ -334,7 +369,7 @@ index adfe3c4..035b466 100644
  static void sjme_scritchui_gtk2_setMenuSize(
  	sjme_attrInNotNull sjme_scritchui inState,
  	sjme_attrInNotNull sjme_scritchui_uiComponent inComponent,
-@@ -73,23 +167,28 @@ sjme_errorCode sjme_scritchui_gtk2_menuBarNew(
+@@ -73,23 +202,28 @@ sjme_errorCode sjme_scritchui_gtk2_menuBarNew(
  	sjme_attrInNullable sjme_pointer ignored)
  {
  	GtkWidget* widget;
@@ -364,7 +399,7 @@ index adfe3c4..035b466 100644
  	
  	/* Success? */
  	return inState->implIntern->checkError(inState, SJME_ERROR_NONE);
-@@ -131,6 +230,15 @@ sjme_errorCode sjme_scritchui_gtk2_menuInsert(
+@@ -131,6 +265,15 @@ sjme_errorCode sjme_scritchui_gtk2_menuInsert(
  	/* Menu items need to be shown, otherwise they will be invisible. */
  	gtk_widget_show(intoWidget);
  	gtk_widget_show(childWidget);
@@ -380,7 +415,7 @@ index adfe3c4..035b466 100644
  	
  	/* Success? */
  	return inState->implIntern->checkError(inState, SJME_ERROR_NONE);
-@@ -142,6 +250,7 @@ sjme_errorCode sjme_scritchui_gtk2_menuItemNew(
+@@ -142,6 +285,7 @@ sjme_errorCode sjme_scritchui_gtk2_menuItemNew(
  	sjme_attrInNotNull const sjme_scritchui_impl_initParamMenuItem* init)
  {
  	GtkWidget* widget;
@@ -388,7 +423,7 @@ index adfe3c4..035b466 100644
  	GtkAccelGroup* gtkAccel;
  	
  	if (inState == NULL || inMenuItem == NULL)
-@@ -149,14 +258,20 @@ sjme_errorCode sjme_scritchui_gtk2_menuItemNew(
+@@ -149,14 +293,20 @@ sjme_errorCode sjme_scritchui_gtk2_menuItemNew(
  	
  	/* Create new item. */
  	widget = gtk_menu_item_new();
@@ -409,7 +444,7 @@ index adfe3c4..035b466 100644
  	
  	/* Set a reasonable size. */
  	sjme_scritchui_gtk2_setMenuSize(inState,
-@@ -173,6 +288,7 @@ sjme_errorCode sjme_scritchui_gtk2_menuNew(
+@@ -173,6 +323,7 @@ sjme_errorCode sjme_scritchui_gtk2_menuNew(
  {
  	GtkWidget* menuWidget;
  	GtkWidget* itemLike;
@@ -417,7 +452,7 @@ index adfe3c4..035b466 100644
  	
  	if (inState == NULL || inMenu == NULL)
  		return SJME_ERROR_NULL_ARGUMENTS;
-@@ -182,6 +298,7 @@ sjme_errorCode sjme_scritchui_gtk2_menuNew(
+@@ -182,6 +333,7 @@ sjme_errorCode sjme_scritchui_gtk2_menuNew(
  	
  	/* All menu pieces are essentially items that get added into. */
  	itemLike = gtk_menu_item_new();
@@ -425,7 +460,7 @@ index adfe3c4..035b466 100644
  	gtk_menu_item_set_submenu(GTK_MENU_ITEM(itemLike),
  		menuWidget);
  
-@@ -192,10 +309,14 @@ sjme_errorCode sjme_scritchui_gtk2_menuNew(
+@@ -192,10 +344,14 @@ sjme_errorCode sjme_scritchui_gtk2_menuNew(
  	inMenu->menuKind.common
  		.handle[SJME_SUI_GTK2_H_WIDGET] = menuWidget;
  	inMenu->menuKind.common.handle[SJME_SUI_GTK2_H_TOP_WIDGET] = itemLike;
@@ -440,7 +475,7 @@ index adfe3c4..035b466 100644
  	
  	/* Success? */
  	return inState->implIntern->checkError(inState, SJME_ERROR_NONE);
-@@ -211,6 +332,7 @@ sjme_errorCode sjme_scritchui_gtk2_menuRemove(
+@@ -211,6 +367,7 @@ sjme_errorCode sjme_scritchui_gtk2_menuRemove(
  	sjme_scritchui_uiMenuKind childItem;
  	GtkWidget* menuWidget;
  	GtkWidget* removeWidget;
@@ -448,7 +483,7 @@ index adfe3c4..035b466 100644
  	
  	if (inState == NULL || fromMenu == NULL)
  		return SJME_ERROR_NULL_ARGUMENTS;
-@@ -244,6 +366,19 @@ sjme_errorCode sjme_scritchui_gtk2_menuRemove(
+@@ -244,6 +401,19 @@ sjme_errorCode sjme_scritchui_gtk2_menuRemove(
  	/* but instead container based removal, so we just remove the handle. */
  	gtk_container_remove(GTK_CONTAINER(menuWidget),
  		removeWidget);

@@ -8,6 +8,7 @@ Emulator tests protect correctness and regressions; they do not establish real h
 - SHA-256 of `bin/TelegramMicro.jar` and `bin/TelegramMicro.jad`.
 - JAR byte size and class count reported by `check-device-budget.sh`.
 - Phone model, firmware, reported Java runtime/platform properties, free storage, network type, and Java security prompts.
+- For RM-721/RM-722 firmware 11.40, compare the property and control transcript with the confirmed static [firmware evidence](firmware-evidence/rm722-v11.40.md).
 - Whether the account/state is fresh or restored.
 
 Keep this record outside Git if it contains account/device identifiers.
@@ -26,6 +27,7 @@ Keep this record outside Git if it contains account/device identifiers.
 - Request and enter a login code; test 2FA if the test account enables it.
 - Load dialogs and open recent history for private chat, basic group, and channel where available.
 - Scroll long labels/messages and verify command access at 240x320.
+- Record the MIDP-visible key code, key name, and game action for left softkey, centre select, right softkey, D-pad directions, Send, End, `*`, `#`, and digits without including typed account data.
 - Send a short text, observe pending/success reconciliation, then relaunch and confirm consistent state.
 - Trigger a network loss during a safe operation, restore connectivity, and verify bounded recovery.
 

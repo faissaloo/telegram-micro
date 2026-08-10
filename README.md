@@ -120,6 +120,7 @@ Sign-in stores reusable emulator state under its ignored evidence directory and 
 - [Keypad-first UX guidance](docs/ux-guidelines.md)
 - [J2ME runtime emulation and quirk evidence](docs/runtime-emulation.md)
 - [Nokia C2-01 RM-722 firmware 11.40 evidence](docs/firmware-evidence/rm722-v11.40.md)
+- [RAP3Gv4 QEMU deep-emulation research plan](docs/rap3gv4-qemu-plan.md)
 - [Release readiness and feature-completeness assessment](docs/release-readiness.md)
 - [Agent development contract](AGENTS.md)
 
